@@ -43,7 +43,10 @@ WCH 的 GCC 工具链修改未按要求开源。本项目从上游 GCC/binutils 
     - `setup-literal-paths.sh <版本> [源码树]` — 在容器/runner 内建 WCH 字面构建路径符号链接。**守卫**：仅当存在容器标记，或 `GITHUB_ACTIONS=true` 且 `ACT` 未设时才执行，否则非零退出。
     - `act-verify.sh <job-id>` — 本地 act 验证入口，只允许 linux job，禁用 `--bind` 与任何 `-self-hosted` 映射，在专用工作副本上跑，产出 `timing.tsv`/`disk.tsv`/`deliverable-binding.txt`。
 - `.github/workflows/` — `toolchain-ci.yml`（四条腿的字节 gate）、`release.yml`（tag 触发的工具链 tarball 发布）、`wvproj.yml`（EVT 工程构建自检）。
-- `tmp/` — 上游源码 clone 与构建树（gitignored），按 `tmp/toolchain_<版本>/` 组织；自包含阶段 prompt 在 `tmp/prompts/phase-N{.md,.checklist.md}`，执行 agent 逐项打勾并附证据指针。CI 另用 `tmp/ci-src/`（上游源码）与 `tmp/ci-cache/`（官方包与前置件归档缓存）。
+- `tmp/` — **本地使用，不入 git**（gitignored，不随任何发布面分发）。布局：
+  - `tmp/prompts/` — agent 级提示词（阶段任务书 `phase-N{.md,.checklist.md}`，执行 agent 逐项打勾并附证据指针）。
+  - `tmp/<task>/` — 各任务的状态、提示词/交接文档与 evidence（如 `tmp/phase8-evidence/`、`tmp/publish/`）。上游源码 clone 与构建树按 `tmp/toolchain_<版本>/` 组织；CI 另用 `tmp/ci-src/`（上游源码）与 `tmp/ci-cache/`（官方包与前置件归档缓存）。
+  - **tmp 外的文档/文件不得指向 tmp/**：进入版本库的交付物必须自含——证据要么摘要转写、要么复制入库（先例：`analysis/toolchain/phase9-rv64-spec-*.md`）。存量豁免：既有补丁 message 与历史 analysis/DECISIONS 条目中的 tmp/ 证据坐标按 2026-08-18 裁定⑤保留、由根 README「证据指针约定」解释；新增或修订内容一律不得新增 tmp/ 指向。
 
 ## 差异测试方法
 
