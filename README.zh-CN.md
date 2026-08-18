@@ -138,7 +138,7 @@ scripts/evt-compare.sh 15.2.0 <我方 gcc 或工具链路径>   # 我方构建 -
 
 [`.github/workflows/toolchain-ci.yml`](.github/workflows/toolchain-ci.yml) 在 push 与 pull
 request 上跑 quick 字节 gate，共四条腿——`linux-15-2-0`、`darwin-15-2-0`、`darwin-12-2-0`、
-`darwin-8-2-0`——每条腿都在同一次运行内完成取官方包、备源、构建、现生成 manifest、对拍。由于对拍
+`darwin-8-2-0`——每条腿都在同一次运行内完成取官方包、备源、构建、现生成 manifest、对拍。不携带 EVT 语料的 checkout 会经 `scripts/fetch-evt.sh` 取语料包——需把仓库变量 `EVT_PACK_URL`（Settings → Secrets and variables → Actions → Variables）设为已发布的包 URL。由于对拍
 器的期望总数是从它即将校验的那份 manifest 自己数出来的，每条腿还会在对拍**之前**断言与该 manifest
 无关的绝对常数（274/274/274/242 条 gate 行、9/9/9/8 个工程）——正是这一步让静默缩水的语料判红而
 不是判绿。全量 EVT 树刻意不进托管 CI（候选 runner 一律 14 GB 整盘磁盘，单 job 6 小时被杀），仍留

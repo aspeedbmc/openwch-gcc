@@ -158,7 +158,7 @@ generating golden and comparing in one run and one directory removes the variabl
 [`.github/workflows/toolchain-ci.yml`](.github/workflows/toolchain-ci.yml) runs the quick
 byte gate on push and pull request in four legs — `linux-15-2-0`, `darwin-15-2-0`,
 `darwin-12-2-0`, `darwin-8-2-0` — each provisioning the official package, preparing sources,
-building, generating the manifest and comparing, all in one run. Because the verifier
+building, generating the manifest and comparing, all in one run. A checkout that does not carry the EVT corpus fetches the pack through `scripts/fetch-evt.sh`; set the `EVT_PACK_URL` repository variable (Settings → Secrets and variables → Actions → Variables) to the published pack URL. Because the verifier
 derives its expected total from the manifest it is about to check, each leg also asserts the
 absolute constants (274/274/274/242 gate rows, 9/9/9/8 projects) *before* comparing, which
 is what makes a silently shrunken corpus fail instead of pass. The full EVT tree
