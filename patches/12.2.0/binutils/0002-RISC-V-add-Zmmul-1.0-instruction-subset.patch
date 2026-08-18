@@ -1,0 +1,246 @@
+From 30e5ed13cb51eade879b553919b6270df0d60370 Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 4 <phase4@openwch.local>
+Date: Thu, 13 Aug 2026 06:40:17 +0900
+Subject: [PATCH 2/7] RISC-V: add Zmmul 1.0 instruction subset
+
+The official WCH 12.2 assembler records zmmul1p0 as an implicit subset of M, accepts the standalone Zmmul subset used by WCH multilibs, and keeps division instructions unavailable without M. Add the standard subset relation, classify multiply instructions under Zmmul, retain division under M, and update inherited attribute expectations for the new implied subset.
+
+WCH 12.2 behavior evidence: tmp/phase4-evidence/s3-zmmul-official/ and tmp/phase4-evidence/s3-zmmul-ours/. Full RISC-V GAS regression evidence: tmp/phase4-evidence/s3-vendor-x-final/.
+---
+ bfd/elfxx-riscv.c                                 |  4 ++++
+ gas/testsuite/gas/riscv/attribute-01.d            |  2 +-
+ gas/testsuite/gas/riscv/attribute-04.d            |  2 +-
+ gas/testsuite/gas/riscv/attribute-05.d            |  2 +-
+ gas/testsuite/gas/riscv/attribute-09.d            |  2 +-
+ gas/testsuite/gas/riscv/attribute-10.d            |  2 +-
+ gas/testsuite/gas/riscv/attribute-zmmul-implied.d |  5 +++++
+ gas/testsuite/gas/riscv/attribute-zmmul-implied.s |  1 +
+ gas/testsuite/gas/riscv/march-imply-g.d           |  2 +-
+ gas/testsuite/gas/riscv/march-imply-unsupported.d |  2 +-
+ gas/testsuite/gas/riscv/zmmul-div.d               |  2 ++
+ gas/testsuite/gas/riscv/zmmul-div.l               |  2 ++
+ gas/testsuite/gas/riscv/zmmul-div.s               |  2 ++
+ gas/testsuite/gas/riscv/zmmul.d                   | 13 +++++++++++++
+ gas/testsuite/gas/riscv/zmmul.s                   |  5 +++++
+ include/opcode/riscv.h                            |  1 +
+ opcodes/riscv-opc.c                               | 10 +++++-----
+ 17 files changed, 47 insertions(+), 12 deletions(-)
+ create mode 100644 gas/testsuite/gas/riscv/attribute-zmmul-implied.d
+ create mode 100644 gas/testsuite/gas/riscv/attribute-zmmul-implied.s
+ create mode 100644 gas/testsuite/gas/riscv/zmmul-div.d
+ create mode 100644 gas/testsuite/gas/riscv/zmmul-div.l
+ create mode 100644 gas/testsuite/gas/riscv/zmmul-div.s
+ create mode 100644 gas/testsuite/gas/riscv/zmmul.d
+ create mode 100644 gas/testsuite/gas/riscv/zmmul.s
+
+diff --git a/bfd/elfxx-riscv.c b/bfd/elfxx-riscv.c
+index ba470cdf..8308939f 100644
+--- a/bfd/elfxx-riscv.c
++++ b/bfd/elfxx-riscv.c
+@@ -1072,6 +1072,7 @@ static struct riscv_implicit_subset riscv_implicit_subsets[] =
+   {"g", "d",		check_implicit_always},
+   {"g", "zicsr",	check_implicit_always},
+   {"g", "zifencei",	check_implicit_always},
++  {"m", "zmmul",	check_implicit_always},
+   {"q", "d",		check_implicit_always},
+   {"v", "d",		check_implicit_always},
+   {"v", "zve64d",	check_implicit_always},
+@@ -1184,6 +1185,7 @@ static struct riscv_supported_ext riscv_supported_std_z_ext[] =
+   {"zifencei",		ISA_SPEC_CLASS_20191213,	2, 0,  0 },
+   {"zifencei",		ISA_SPEC_CLASS_20190608,	2, 0,  0 },
+   {"zihintpause",	ISA_SPEC_CLASS_DRAFT,		1, 0,  0 },
++  {"zmmul",		ISA_SPEC_CLASS_DRAFT,		1, 0,  0 },
+   {"zfinx",		ISA_SPEC_CLASS_DRAFT,		1, 0,  0 },
+   {"zdinx",		ISA_SPEC_CLASS_DRAFT,		1, 0,  0 },
+   {"zqinx",		ISA_SPEC_CLASS_DRAFT,		1, 0,  0 },
+@@ -2346,6 +2348,8 @@ riscv_multi_subset_supports (riscv_parse_subset_t *rps,
+       return riscv_subset_supports (rps, "zihintpause");
+     case INSN_CLASS_M:
+       return riscv_subset_supports (rps, "m");
++    case INSN_CLASS_ZMMUL:
++      return riscv_subset_supports (rps, "zmmul");
+     case INSN_CLASS_A:
+       return riscv_subset_supports (rps, "a");
+     case INSN_CLASS_F:
+diff --git a/gas/testsuite/gas/riscv/attribute-01.d b/gas/testsuite/gas/riscv/attribute-01.d
+index 2e19e09a..61230576 100644
+--- a/gas/testsuite/gas/riscv/attribute-01.d
++++ b/gas/testsuite/gas/riscv/attribute-01.d
+@@ -3,4 +3,4 @@
+ #source: empty.s
+ Attribute Section: riscv
+ File Attributes
+-  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_f2p0_d2p0"
++  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_f2p0_d2p0_zmmul1p0"
+diff --git a/gas/testsuite/gas/riscv/attribute-04.d b/gas/testsuite/gas/riscv/attribute-04.d
+index 408464d0..f64494a7 100644
+--- a/gas/testsuite/gas/riscv/attribute-04.d
++++ b/gas/testsuite/gas/riscv/attribute-04.d
+@@ -3,4 +3,4 @@
+ #source: attribute-04.s
+ Attribute Section: riscv
+ File Attributes
+-  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_f2p0_d2p0"
++  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_f2p0_d2p0_zmmul1p0"
+diff --git a/gas/testsuite/gas/riscv/attribute-05.d b/gas/testsuite/gas/riscv/attribute-05.d
+index 247f52e0..9507b439 100644
+--- a/gas/testsuite/gas/riscv/attribute-05.d
++++ b/gas/testsuite/gas/riscv/attribute-05.d
+@@ -4,7 +4,7 @@
+ Attribute Section: riscv
+ File Attributes
+   Tag_RISCV_stack_align: 16-bytes
+-  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_f2p0_d2p0"
++  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_f2p0_d2p0_zmmul1p0"
+   Tag_RISCV_unaligned_access: Unaligned access
+   Tag_RISCV_priv_spec: 1
+   Tag_RISCV_priv_spec_minor: 9
+diff --git a/gas/testsuite/gas/riscv/attribute-09.d b/gas/testsuite/gas/riscv/attribute-09.d
+index fc87f82c..c92dc970 100644
+--- a/gas/testsuite/gas/riscv/attribute-09.d
++++ b/gas/testsuite/gas/riscv/attribute-09.d
+@@ -3,4 +3,4 @@
+ #source: empty.s
+ Attribute Section: riscv
+ File Attributes
+-  Tag_RISCV_arch: "rv32i2p2_m2p0_zicsr2p0"
++  Tag_RISCV_arch: "rv32i2p2_m2p0_zicsr2p0_zmmul1p0"
+diff --git a/gas/testsuite/gas/riscv/attribute-10.d b/gas/testsuite/gas/riscv/attribute-10.d
+index 30b82d72..f4669227 100644
+--- a/gas/testsuite/gas/riscv/attribute-10.d
++++ b/gas/testsuite/gas/riscv/attribute-10.d
+@@ -3,4 +3,4 @@
+ #source: empty.s
+ Attribute Section: riscv
+ File Attributes
+-  Tag_RISCV_arch: "rv32i2p1_m2p0_a2p1_f2p2_d2p2_c2p0_zicsr2p0_zifencei2p0"
++  Tag_RISCV_arch: "rv32i2p1_m2p0_a2p1_f2p2_d2p2_c2p0_zicsr2p0_zifencei2p0_zmmul1p0"
+diff --git a/gas/testsuite/gas/riscv/attribute-zmmul-implied.d b/gas/testsuite/gas/riscv/attribute-zmmul-implied.d
+new file mode 100644
+index 00000000..0cb44032
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/attribute-zmmul-implied.d
+@@ -0,0 +1,5 @@
++#as: -misa-spec=2.2
++#readelf: -A
++Attribute Section: riscv
++File Attributes
++  Tag_RISCV_arch: "rv32i2p0_m2p0_zmmul1p0"
+diff --git a/gas/testsuite/gas/riscv/attribute-zmmul-implied.s b/gas/testsuite/gas/riscv/attribute-zmmul-implied.s
+new file mode 100644
+index 00000000..fdd3bcdb
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/attribute-zmmul-implied.s
+@@ -0,0 +1 @@
++	.attribute arch,"rv32im"
+diff --git a/gas/testsuite/gas/riscv/march-imply-g.d b/gas/testsuite/gas/riscv/march-imply-g.d
+index 33a243d7..239b717f 100644
+--- a/gas/testsuite/gas/riscv/march-imply-g.d
++++ b/gas/testsuite/gas/riscv/march-imply-g.d
+@@ -3,4 +3,4 @@
+ #source: empty.s
+ Attribute Section: riscv
+ File Attributes
+-  Tag_RISCV_arch: "rv32i2p1_m2p0_a2p1_f2p2_d2p2_zicsr2p0_zifencei2p0"
++  Tag_RISCV_arch: "rv32i2p1_m2p0_a2p1_f2p2_d2p2_zicsr2p0_zifencei2p0_zmmul1p0"
+diff --git a/gas/testsuite/gas/riscv/march-imply-unsupported.d b/gas/testsuite/gas/riscv/march-imply-unsupported.d
+index 2e19e09a..61230576 100644
+--- a/gas/testsuite/gas/riscv/march-imply-unsupported.d
++++ b/gas/testsuite/gas/riscv/march-imply-unsupported.d
+@@ -3,4 +3,4 @@
+ #source: empty.s
+ Attribute Section: riscv
+ File Attributes
+-  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_f2p0_d2p0"
++  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_f2p0_d2p0_zmmul1p0"
+diff --git a/gas/testsuite/gas/riscv/zmmul-div.d b/gas/testsuite/gas/riscv/zmmul-div.d
+new file mode 100644
+index 00000000..1d2744ea
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/zmmul-div.d
+@@ -0,0 +1,2 @@
++#as: -march=rv32i_zmmul
++#error_output: zmmul-div.l
+diff --git a/gas/testsuite/gas/riscv/zmmul-div.l b/gas/testsuite/gas/riscv/zmmul-div.l
+new file mode 100644
+index 00000000..ceeea0bc
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/zmmul-div.l
+@@ -0,0 +1,2 @@
++.*Assembler messages:
++.*: Error: unrecognized opcode `div a0,a1,a2'
+diff --git a/gas/testsuite/gas/riscv/zmmul-div.s b/gas/testsuite/gas/riscv/zmmul-div.s
+new file mode 100644
+index 00000000..5ebf8fbd
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/zmmul-div.s
+@@ -0,0 +1,2 @@
++	.text
++	div a0,a1,a2
+diff --git a/gas/testsuite/gas/riscv/zmmul.d b/gas/testsuite/gas/riscv/zmmul.d
+new file mode 100644
+index 00000000..f79c7237
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/zmmul.d
+@@ -0,0 +1,13 @@
++#as: -march=rv32i_zmmul
++#objdump: -d
++
++.*:[ 	]+file format .*
++
++
++Disassembly of section .text:
++
++0+000 <.text>:
++[ 	]+[0-9a-f]+:[ 	]+02c58533[ 	]+mul[ 	]+a0,a1,a2
++[ 	]+[0-9a-f]+:[ 	]+02c59533[ 	]+mulh[ 	]+a0,a1,a2
++[ 	]+[0-9a-f]+:[ 	]+02c5a533[ 	]+mulhsu[ 	]+a0,a1,a2
++[ 	]+[0-9a-f]+:[ 	]+02c5b533[ 	]+mulhu[ 	]+a0,a1,a2
+diff --git a/gas/testsuite/gas/riscv/zmmul.s b/gas/testsuite/gas/riscv/zmmul.s
+new file mode 100644
+index 00000000..1ecdcb5e
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/zmmul.s
+@@ -0,0 +1,5 @@
++	.text
++	mul a0,a1,a2
++	mulh a0,a1,a2
++	mulhsu a0,a1,a2
++	mulhu a0,a1,a2
+diff --git a/include/opcode/riscv.h b/include/opcode/riscv.h
+index 048ab0a5..afea78d5 100644
+--- a/include/opcode/riscv.h
++++ b/include/opcode/riscv.h
+@@ -359,6 +359,7 @@ enum riscv_insn_class
+   INSN_CLASS_C,
+   INSN_CLASS_A,
+   INSN_CLASS_M,
++  INSN_CLASS_ZMMUL,
+   INSN_CLASS_F,
+   INSN_CLASS_D,
+   INSN_CLASS_Q,
+diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
+index 2da0f7cf..a46b97d0 100644
+--- a/opcodes/riscv-opc.c
++++ b/opcodes/riscv-opc.c
+@@ -555,15 +555,15 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"amominu.d.aqrl", 64, INSN_CLASS_A, "d,t,0(s)", MATCH_AMOMINU_D|MASK_AQRL, MASK_AMOMINU_D|MASK_AQRL, match_opcode, INSN_DREF|INSN_8_BYTE },
+ 
+ /* Multiply/Divide instruction subset.  */
+-{"mul",        0, INSN_CLASS_M,   "d,s,t",     MATCH_MUL, MASK_MUL, match_opcode, 0 },
+-{"mulh",       0, INSN_CLASS_M,   "d,s,t",     MATCH_MULH, MASK_MULH, match_opcode, 0 },
+-{"mulhu",      0, INSN_CLASS_M,   "d,s,t",     MATCH_MULHU, MASK_MULHU, match_opcode, 0 },
+-{"mulhsu",     0, INSN_CLASS_M,   "d,s,t",     MATCH_MULHSU, MASK_MULHSU, match_opcode, 0 },
++{"mul",        0, INSN_CLASS_ZMMUL, "d,s,t",   MATCH_MUL, MASK_MUL, match_opcode, 0 },
++{"mulh",       0, INSN_CLASS_ZMMUL, "d,s,t",   MATCH_MULH, MASK_MULH, match_opcode, 0 },
++{"mulhu",      0, INSN_CLASS_ZMMUL, "d,s,t",   MATCH_MULHU, MASK_MULHU, match_opcode, 0 },
++{"mulhsu",     0, INSN_CLASS_ZMMUL, "d,s,t",   MATCH_MULHSU, MASK_MULHSU, match_opcode, 0 },
+ {"div",        0, INSN_CLASS_M,   "d,s,t",     MATCH_DIV, MASK_DIV, match_opcode, 0 },
+ {"divu",       0, INSN_CLASS_M,   "d,s,t",     MATCH_DIVU, MASK_DIVU, match_opcode, 0 },
+ {"rem",        0, INSN_CLASS_M,   "d,s,t",     MATCH_REM, MASK_REM, match_opcode, 0 },
+ {"remu",       0, INSN_CLASS_M,   "d,s,t",     MATCH_REMU, MASK_REMU, match_opcode, 0 },
+-{"mulw",      64, INSN_CLASS_M,   "d,s,t",     MATCH_MULW, MASK_MULW, match_opcode, 0 },
++{"mulw",      64, INSN_CLASS_ZMMUL, "d,s,t",   MATCH_MULW, MASK_MULW, match_opcode, 0 },
+ {"divw",      64, INSN_CLASS_M,   "d,s,t",     MATCH_DIVW, MASK_DIVW, match_opcode, 0 },
+ {"divuw",     64, INSN_CLASS_M,   "d,s,t",     MATCH_DIVUW, MASK_DIVUW, match_opcode, 0 },
+ {"remw",      64, INSN_CLASS_M,   "d,s,t",     MATCH_REMW, MASK_REMW, match_opcode, 0 },

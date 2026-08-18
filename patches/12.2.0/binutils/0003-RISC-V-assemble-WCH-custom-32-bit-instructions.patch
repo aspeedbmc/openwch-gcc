@@ -1,0 +1,215 @@
+From 391d633da717e6781c9c7839d31d285c7a2f9ea4 Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 4 <phase4@openwch.local>
+Date: Thu, 13 Aug 2026 06:53:30 +0900
+Subject: [PATCH 3/7] RISC-V: assemble WCH custom 32-bit instructions
+
+The official WCH 12.2 assembler accepts the four observed custom forms from rv32i and enforces the observed funct5 operand range and constant-only constraint. Add ordinary opcode-table entries plus the funct5 operand class in the validator, the parser and the printer. The third GPR operand these forms take already exists upstream in the validator and the parser; only the disassembler was missing its printing case.
+
+WCH 12.2 behavior evidence: tmp/phase4-evidence/s3-custom32-official/ and tmp/phase4-evidence/s3-custom32-final/. Encoding reference: ref/wch-isa-research/isa/custom/wch-custom-isa-reference.md section 5, whose mcpy field table is quoted from CH32V407RM V1.1 section 9.2.1.4.
+---
+ gas/config/tc-riscv.c                       | 16 ++++++++++++++++
+ gas/testsuite/gas/riscv/wch-custom32-fail.d |  2 ++
+ gas/testsuite/gas/riscv/wch-custom32-fail.l |  7 +++++++
+ gas/testsuite/gas/riscv/wch-custom32-fail.s |  3 +++
+ gas/testsuite/gas/riscv/wch-custom32.d      | 13 +++++++++++++
+ gas/testsuite/gas/riscv/wch-custom32.s      |  5 +++++
+ include/opcode/riscv-opc.h                  | 12 ++++++++++++
+ include/opcode/riscv.h                      |  2 ++
+ opcodes/riscv-dis.c                         | 19 +++++++++++++++++++
+ opcodes/riscv-opc.c                         |  4 ++++
+ 10 files changed, 83 insertions(+)
+ create mode 100644 gas/testsuite/gas/riscv/wch-custom32-fail.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-custom32-fail.l
+ create mode 100644 gas/testsuite/gas/riscv/wch-custom32-fail.s
+ create mode 100644 gas/testsuite/gas/riscv/wch-custom32.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-custom32.s
+
+diff --git a/gas/config/tc-riscv.c b/gas/config/tc-riscv.c
+index 25908597..df7902f2 100644
+--- a/gas/config/tc-riscv.c
++++ b/gas/config/tc-riscv.c
+@@ -1170,6 +1170,7 @@ validate_riscv_insn (const struct riscv_opcode *opc, int length)
+ 	  switch (*++oparg)
+ 	    {
+ 	      case '7': USE_BITS (OP_MASK_FUNCT7, OP_SH_FUNCT7); break;
++	      case '5': USE_BITS (OP_MASK_FUNCT5, OP_SH_FUNCT5); break;
+ 	      case '3': USE_BITS (OP_MASK_FUNCT3, OP_SH_FUNCT3); break;
+ 	      case '2': USE_BITS (OP_MASK_FUNCT2, OP_SH_FUNCT2); break;
+ 	      default:
+@@ -3082,6 +3083,21 @@ riscv_ip (char *str, struct riscv_cl_insn *ip, expressionS *imm_expr,
+ 	    case 'F':
+ 	      switch (*++oparg)
+ 		{
++		case '5':
++		  if (my_getSmallExpression (imm_expr, imm_reloc, asarg, p)
++		      || imm_expr->X_op != O_constant
++		      || imm_expr->X_add_number < 0
++		      || imm_expr->X_add_number >= 32)
++		    {
++		      as_bad (_("bad value for funct5 field, "
++				"value must be 0...31"));
++		      break;
++		    }
++		  INSERT_OPERAND (FUNCT5, *ip, imm_expr->X_add_number);
++		  imm_expr->X_op = O_absent;
++		  asarg = expr_end;
++		  continue;
++
+ 		case '7':
+ 		  if (my_getSmallExpression (imm_expr, imm_reloc, asarg, p)
+ 		      || imm_expr->X_op != O_constant
+diff --git a/gas/testsuite/gas/riscv/wch-custom32-fail.d b/gas/testsuite/gas/riscv/wch-custom32-fail.d
+new file mode 100644
+index 00000000..28054887
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-custom32-fail.d
+@@ -0,0 +1,2 @@
++#as: -march=rv32i
++#error_output: wch-custom32-fail.l
+diff --git a/gas/testsuite/gas/riscv/wch-custom32-fail.l b/gas/testsuite/gas/riscv/wch-custom32-fail.l
+new file mode 100644
+index 00000000..3f985b73
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-custom32-fail.l
+@@ -0,0 +1,7 @@
++.*Assembler messages:
++.*: Error: bad value for funct5 field, value must be 0...31
++.*: Error: illegal operands `wexti a0,a1,a2,-1'
++.*: Error: bad value for funct5 field, value must be 0...31
++.*: Error: illegal operands `wexti a0,a1,a2,32'
++.*: Error: bad value for funct5 field, value must be 0...31
++.*: Error: illegal operands `wexti a0,a1,a2,value'
+diff --git a/gas/testsuite/gas/riscv/wch-custom32-fail.s b/gas/testsuite/gas/riscv/wch-custom32-fail.s
+new file mode 100644
+index 00000000..dc687462
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-custom32-fail.s
+@@ -0,0 +1,3 @@
++	wexti a0,a1,a2,-1
++	wexti a0,a1,a2,32
++	wexti a0,a1,a2,value
+diff --git a/gas/testsuite/gas/riscv/wch-custom32.d b/gas/testsuite/gas/riscv/wch-custom32.d
+new file mode 100644
+index 00000000..d1020c1b
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-custom32.d
+@@ -0,0 +1,13 @@
++#as: -march=rv32i
++#objdump: -d
++
++.*:[ 	]+file format .*
++
++
++Disassembly of section .text:
++
++0+000 <.text>:
++[ 	]+[0-9a-f]+:[ 	]+60b5700f[ 	]+mcpy[ 	]+a0,a1,a2
++[ 	]+[0-9a-f]+:[ 	]+1ec5850b[ 	]+mrsl[ 	]+a0,a1,a2,3
++[ 	]+[0-9a-f]+:[ 	]+1cc5850b[ 	]+mrslu[ 	]+a0,a1,a2,3
++[ 	]+[0-9a-f]+:[ 	]+18c5850b[ 	]+wexti[ 	]+a0,a1,a2,3
+diff --git a/gas/testsuite/gas/riscv/wch-custom32.s b/gas/testsuite/gas/riscv/wch-custom32.s
+new file mode 100644
+index 00000000..c3094396
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-custom32.s
+@@ -0,0 +1,5 @@
++	.text
++	mcpy a0,a1,a2
++	mrsl a0,a1,a2,3
++	mrslu a0,a1,a2,3
++	wexti a0,a1,a2,3
+diff --git a/include/opcode/riscv-opc.h b/include/opcode/riscv-opc.h
+index 0b8cc6c7..e267f9fd 100644
+--- a/include/opcode/riscv-opc.h
++++ b/include/opcode/riscv-opc.h
+@@ -23,6 +23,14 @@
+ /* Instruction opcode macros.  */
+ #define MATCH_SLLI_RV32 0x1013
+ #define MASK_SLLI_RV32  0xfe00707f
++#define MATCH_MCPY 0x0000700f
++#define MASK_MCPY 0x06007fff
++#define MATCH_WEXTI 0x0000000b
++#define MASK_WEXTI 0x0600707f
++#define MATCH_MRSLU 0x0400000b
++#define MASK_MRSLU 0x0600707f
++#define MATCH_MRSL 0x0600000b
++#define MASK_MRSL 0x0600707f
+ #define MATCH_SRLI_RV32 0x5013
+ #define MASK_SRLI_RV32  0xfe00707f
+ #define MATCH_SRAI_RV32 0x40005013
+@@ -2303,6 +2311,10 @@
+ #define CSR_VLENB 0xc22
+ #endif /* RISCV_ENCODING_H */
+ #ifdef DECLARE_INSN
++DECLARE_INSN(mcpy, MATCH_MCPY, MASK_MCPY)
++DECLARE_INSN(wexti, MATCH_WEXTI, MASK_WEXTI)
++DECLARE_INSN(mrslu, MATCH_MRSLU, MASK_MRSLU)
++DECLARE_INSN(mrsl, MATCH_MRSL, MASK_MRSL)
+ DECLARE_INSN(slli_rv32, MATCH_SLLI_RV32, MASK_SLLI_RV32)
+ DECLARE_INSN(srli_rv32, MATCH_SRLI_RV32, MASK_SRLI_RV32)
+ DECLARE_INSN(srai_rv32, MATCH_SRAI_RV32, MASK_SRAI_RV32)
+diff --git a/include/opcode/riscv.h b/include/opcode/riscv.h
+index afea78d5..d33f6d37 100644
+--- a/include/opcode/riscv.h
++++ b/include/opcode/riscv.h
+@@ -253,6 +253,8 @@ static const char * const riscv_pred_succ[16] =
+ #define OP_SH_FUNCT3		12
+ #define OP_MASK_FUNCT7		0x7fU
+ #define OP_SH_FUNCT7		25
++#define OP_MASK_FUNCT5		0x1fU
++#define OP_SH_FUNCT5		27
+ #define OP_MASK_FUNCT2		0x3
+ #define OP_SH_FUNCT2		25
+ 
+diff --git a/opcodes/riscv-dis.c b/opcodes/riscv-dis.c
+index 34724d4a..5f988123 100644
+--- a/opcodes/riscv-dis.c
++++ b/opcodes/riscv-dis.c
+@@ -386,6 +386,11 @@ print_insn_args (const char *oparg, insn_t l, bfd_vma pc, disassemble_info *info
+ 		 riscv_gpr_names[EXTRACT_OPERAND (RS2, l)]);
+ 	  break;
+ 
++	case 'r':
++	  print (info->stream, "%s",
++		 riscv_gpr_names[EXTRACT_OPERAND (RS3, l)]);
++	  break;
++
+ 	case 'u':
+ 	  print (info->stream, "0x%x",
+ 		 (unsigned)EXTRACT_UTYPE_IMM (l) >> RISCV_IMM_BITS);
+@@ -460,6 +465,20 @@ print_insn_args (const char *oparg, insn_t l, bfd_vma pc, disassemble_info *info
+ 	  print (info->stream, "0x%x", (int)EXTRACT_OPERAND (SHAMTW, l));
+ 	  break;
+ 
++	case 'F':
++	  switch (*++oparg)
++	    {
++	    case '5':
++	      print (info->stream, "%u",
++		     (unsigned) EXTRACT_OPERAND (FUNCT5, l));
++	      break;
++	    default:
++	      print (info->stream, _("# internal error, undefined modifier (%c)"),
++		     *oparg);
++	      return;
++	    }
++	  break;
++
+ 	case 'S':
+ 	case 'U':
+ 	  print (info->stream, "%s", riscv_fpr_names[rs1]);
+diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
+index a46b97d0..b1ea95f9 100644
+--- a/opcodes/riscv-opc.c
++++ b/opcodes/riscv-opc.c
+@@ -269,6 +269,10 @@ match_vd_eq_vs1_eq_vs2 (const struct riscv_opcode *op,
+ const struct riscv_opcode riscv_opcodes[] =
+ {
+ /* name, xlen, isa, operands, match, mask, match_func, pinfo.  */
++{"mcpy",        0, INSN_CLASS_I, "s,t,r",    MATCH_MCPY, MASK_MCPY, match_opcode, 0 },
++{"mrsl",        0, INSN_CLASS_I, "d,s,t,F5", MATCH_MRSL, MASK_MRSL, match_opcode, 0 },
++{"mrslu",       0, INSN_CLASS_I, "d,s,t,F5", MATCH_MRSLU, MASK_MRSLU, match_opcode, 0 },
++{"wexti",       0, INSN_CLASS_I, "d,s,t,F5", MATCH_WEXTI, MASK_WEXTI, match_opcode, 0 },
+ {"unimp",       0, INSN_CLASS_C, "",          0, 0xffffU, match_opcode, INSN_ALIAS },
+ {"unimp",       0, INSN_CLASS_I, "",          MATCH_CSRRW|(CSR_CYCLE << OP_SH_CSR), 0xffffffffU,  match_opcode, 0 }, /* csrw cycle, x0  */
+ {"ebreak",      0, INSN_CLASS_C, "",          MATCH_C_EBREAK, MASK_C_EBREAK, match_opcode, INSN_ALIAS },

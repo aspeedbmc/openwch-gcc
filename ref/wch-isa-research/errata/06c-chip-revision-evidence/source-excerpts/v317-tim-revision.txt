@@ -1,0 +1,25 @@
+source	tmp/wch-evt/evt/QingkeV4F_CH32V317_EVT/EXAM/SRC/Peripheral/src/ch32v30x_tim.c
+sha256	82b4702c71b9430dd818abdc32f8e4b79b0cee6f63cb35fd7bf60de766052661
+range	106-127
+000106	void TIM_TimeBaseInit(TIM_TypeDef *TIMx, TIM_TimeBaseInitTypeDef *TIM_TimeBaseInitStruct)
+000107	{
+000108	    uint16_t tmpcr1 = 0;
+000109	    uint32_t temper1 = 0;
+000110	    temper1 = ((*( uint32_t * )0x1FFFF704) & 0x000000F0) >> 4;
+000111	    tmpcr1 = TIMx->CTLR1;
+000112
+000113	    if(((temper1>=4)&&(temper1<=8))&&((TIMx == TIM1) || (TIMx == TIM8) || (TIMx == TIM9) || (TIMx == TIM10)))
+000114	    {
+000115	        tmpcr1 |= 1<<13;
+000116	    }
+000117
+000118	    if((TIMx == TIM1) || (TIMx == TIM2) || (TIMx == TIM3) || (TIMx == TIM4) ||
+000119	       (TIMx == TIM5) || (TIMx == TIM8) || (TIMx == TIM9) || (TIMx == TIM10))
+000120	    {
+000121	        tmpcr1 &= (uint16_t)(~((uint16_t)(TIM_DIR | TIM_CMS)));
+000122	        tmpcr1 |= (uint32_t)TIM_TimeBaseInitStruct->TIM_CounterMode;
+000123	    }
+000124
+000125	    if((TIMx != TIM6) && (TIMx != TIM7))
+000126	    {
+000127	        tmpcr1 &= (uint16_t)(~((uint16_t)TIM_CTLR1_CKD));

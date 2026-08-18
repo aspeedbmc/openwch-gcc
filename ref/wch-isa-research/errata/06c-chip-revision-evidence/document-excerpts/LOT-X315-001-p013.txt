@@ -1,0 +1,100 @@
+CH32X315、X305 应用手册                                                                                                                          https://wch.cn
+
+
+
+3.3 时钟
+3.3.1 系统时钟结构
+                                                            图 3-2 时钟树框图
+
+         40kHz                          to RTC/IWDG
+         LSI RC
+                                                                                            PLLHS_SRC
+                                        USBPLLSRCCFG
+                                                              USBHS_PLL           480M
+                        USBHS_PLL     /24                                         625M                       PLLSRC
+                                                               USBSS              357M
+                                                                PLL               125M
+                                                                625M                                 to USBSS
+                                                                             PIPEON
+                               USBSSPLLSRC
+                                                                                  PLLSRC
+                                                                                               PLLDIV
+                                                   USBPLLSRCCFG
+                                                                                             /2,…/16
+                                                /25                                                                                 SW
+                                                                          480M
+
+  XI    5～32MHz                                                   USBHS                                               PLLCLK
+        HSE OSC                                                    PLL                                  to USBHS
+  XO                                                                             UTMION
+
+                          20MHz
+                         HSI RC                                                                                         HSI              SYSCLK
+                                             USBHSPLLSRC
+                                                                                          UTMI_CLK
+                                                                                                     to USBSS
+                                                                   LPMON
+                                                                                                                        HSE
+                               /512               to RTC
+                                                                                                                           CSS
+
+
+
+       MCO[2:0]                                                                             to Flash prog IF
+
+                  HSE                                                                       to HB bus/memory/DMA
+                           HB prescaler
+                  HSI
+ MCO                       /1,/2,/4,/8,
+                                                                                            FCLK Core free running clock
+                           /16,/64,/128,
+                  PLLCLK/8   /256,/512                                                      to Core System timer
+                                                                        /8
+                                                                                            to EXTI/RTC/IWDG/PWR
+                                            to Core/memory
+                                                                                                                      to I2C1/I2C2
+                                             （625MHz max）              peripheral clock enable
+
+
+                                                                                                                      to TIM1/TIM2/TIM3/TIM4
+                                                                       peripheral clock enable
+
+                                        FPRE
+                                                                       peripheral clock enable                        to SPI1/SPI2/SPI3
+                                       /1,/2        HCLK
+                                                （480MHz max）
+                                                                                                                      to USBHS/USBSS/USBPD
+                                                                       peripheral clock enable
+
+
+                                                                                                                      to CRC/ARGB/DMA
+                                                                       peripheral clock enable
+
+
+                                                                                                                      to USART1/USART2/USART3/USART4
+                                                                       peripheral clock enable
+
+                                                                                                                      to AFIO/GPIOA/GPIOB/GPIOC/GPIOD
+                                                                       peripheral clock enable
+
+                                                                                                                      to WWDG/ADC1/ADC2/ADC3/ADC4
+                                                                       peripheral clock enable
+                                                                                            PPRE2         ADCPRE
+
+                                                           ADCCLKDIV                      /1,/2,/4        /2,/4,
+                                                                                           /8,/16         /6,/8                     to ADC1/ADC2/ADC3/ADC4
+                          USBSS_PLL   625M
+                                                       /1,/2,…,/16
+                          USBHS_PLL   480M                                                                peripheral clock enable
+                                                                          ADC_CLK_SRC
+                                        ADC_PLL_SRC
+
+
+注：上图中标蓝的部分仅适用于批号第五位大于 0 的芯片。
+
+3.3.2 高速时钟（HSI/HSE）
+  HSI 是系统内部 20MHz 的 RC 振荡器产生的高速时钟信号。HSI RC 振荡器能够在不需要任何外部
+器件的条件下提供系统时钟。它的启动时间很短但时钟频率精度较差。HSI 通过设置 RCC_CTLR 寄存
+器中的 HSION 位被启动和关闭，HSIRDY 位指示 HSI RC 振荡器是否稳定。系统默认 HSION 和 HSIRDY
+V1.1                                                                         11
+

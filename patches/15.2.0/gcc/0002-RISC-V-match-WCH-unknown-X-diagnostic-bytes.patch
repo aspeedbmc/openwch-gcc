@@ -1,0 +1,66 @@
+From ea847158b492806c92b404a5ecfe80f922da15d0 Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 3 <phase3@openwch.local>
+Date: Thu, 13 Aug 2026 01:25:40 +0900
+Subject: [PATCH 2/9] RISC-V: match WCH unknown-X diagnostic bytes
+
+Preserve the observed WCH diagnostic spelling for an unsupported
+non-standard extension.  This is intentionally not corrected because the
+compiler binary and negative behavior probes expose the literal
+non-standard111 string.
+
+Behavior specification:
+  analysis/toolchain/wch-gcc-toolchain-survey.md sections 5.1 and 6.2
+  DECISIONS.md, entry of 2026-08-13 that puts diagnostic text inside the
+  fidelity surface and holds it to the same standard as the gate artifacts
+
+gcc/ChangeLog:
+
+	* common/config/riscv/riscv-common.cc (riscv_subset_list::add): Use
+	the WCH spelling of the unsupported non-standard extension error.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/riscv/arch-22.cc: Update the expected diagnostic.
+	* gcc.target/riscv/arch-23.c: Likewise.
+---
+ gcc/common/config/riscv/riscv-common.cc   | 2 +-
+ gcc/testsuite/gcc.target/riscv/arch-22.cc | 2 +-
+ gcc/testsuite/gcc.target/riscv/arch-23.c  | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/gcc/common/config/riscv/riscv-common.cc b/gcc/common/config/riscv/riscv-common.cc
+index f6bbac0da..46c5d85b4 100644
+--- a/gcc/common/config/riscv/riscv-common.cc
++++ b/gcc/common/config/riscv/riscv-common.cc
+@@ -767,7 +767,7 @@ riscv_subset_list::add (const char *subset, int major_version,
+     {
+       error_at (m_loc,
+ 		"%<-march=%s%>: extension %qs starts with 'x' but is "
+-		"unsupported non-standard extension",
++		"unsupported non-standard111 extension",
+ 		m_arch, subset);
+       return;
+     }
+diff --git a/gcc/testsuite/gcc.target/riscv/arch-22.cc b/gcc/testsuite/gcc.target/riscv/arch-22.cc
+index 1cb55889c..06c4e986e 100644
+--- a/gcc/testsuite/gcc.target/riscv/arch-22.cc
++++ b/gcc/testsuite/gcc.target/riscv/arch-22.cc
+@@ -8,4 +8,4 @@ int foo()
+ /* { dg-error "extension 'w' is unsupported standard single letter extension" "" { target *-*-* } 0 } */
+ /* { dg-error "extension 'zvl' starts with `z` but is unsupported standard extension" "" { target *-*-* } 0 } */
+ /* { dg-error "extension 's123' starts with `s` but is unsupported standard supervisor extension" "" { target *-*-* } 0 } */
+-/* { dg-error "extension 'x123' starts with `x` but is unsupported non-standard extension" "" { target *-*-* } 0 } */
++/* { dg-error "extension 'x123' starts with `x` but is unsupported non-standard111 extension" "" { target *-*-* } 0 } */
+diff --git a/gcc/testsuite/gcc.target/riscv/arch-23.c b/gcc/testsuite/gcc.target/riscv/arch-23.c
+index aacfc4510..37a1eeb02 100644
+--- a/gcc/testsuite/gcc.target/riscv/arch-23.c
++++ b/gcc/testsuite/gcc.target/riscv/arch-23.c
+@@ -7,4 +7,4 @@ int foo()
+ /* { dg-error "extension 'w' is unsupported standard single letter extension" "" { target *-*-* } 0 } */
+ /* { dg-error "extension 'zvl' starts with 'z' but is unsupported standard extension" "" { target *-*-* } 0 } */
+ /* { dg-error "extension 's123' starts with 's' but is unsupported standard supervisor extension" "" { target *-*-* } 0 } */
+-/* { dg-error "extension 'x123' starts with 'x' but is unsupported non-standard extension" "" { target *-*-* } 0 } */
++/* { dg-error "extension 'x123' starts with 'x' but is unsupported non-standard111 extension" "" { target *-*-* } 0 } */
+-- 
+2.55.0
+

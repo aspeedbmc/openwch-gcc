@@ -1,0 +1,13 @@
+schema_version	path	sha256	version	identity_expected	identity_seen	identity_term_count	csr804_expected	csr804_seen	csr804_literal_count	csrbc0_expected	csrbc0_seen	csrbc0_literal_count	status
+2	tmp/wch-evt/application_notes/CH32V003RM.PDF	7a6bf439ecd68e0b87ffdd6765da2ef9b1796ce16084b7d1f25a658380c3bcfe	V1.9	False	False	0	INTSYSCR	INTSYSCR	1	not-controlled	none	0	pass
+2	tmp/wch-evt/application_notes/CH32V00XRM.PDF	7d216d69fd04d990c4d1c1bf276f741c66023fd6747b6d0a2bba50a03b30c3df	V1.5	False	False	0	INTSYSCR	INTSYSCR	1	not-controlled	none	0	pass
+2	tmp/wch-evt/application_notes/CH641RM.PDF	af83c6fca780cfed771de673a94dbdd2d36076af39f3722f2872d6202f58665c	V1.4	False	False	0	INTSYSCR	INTSYSCR	1	not-controlled	none	0	pass
+2	tmp/wch-evt/application_notes/CH32X035RM.PDF	c7e301eac4790ca1ba112f946bf057139ec7f36be28e142cafc1c286bcc9daa4	V1.9	False	False	0	INTSYSCR	INTSYSCR	1	not-controlled	none	0	pass
+2	tmp/wch-evt/application_notes/CH32L103RM.PDF	27a1b969cb2cb99d296ac562cac134ec63d52e4f0c75cf9d6bad7c696bc66fe3	V2.2	False	False	0	INTSYSCR	INTSYSCR	1	not-controlled	none	0	pass
+2	tmp/wch-evt/application_notes/CH32FV2x_V3xRM.PDF	6bdc58b159a95c40e815eb9973df1f7e7309b08e8018bad1991a71c792cefb95	V2.5	False	False	0	INTSYSCR	INTSYSCR	1	not-controlled	none	0	pass
+2	tmp/wch-evt/application_notes/CH32M030RM.PDF	109a7bb0ab9a0b7029f82f05bbf8ba212f879b32a20b00a0c3e1a8f5948629ae	V1.2	False	False	0	INTSYSCR	INTSYSCR	2	CORECFGR	CORECFGR	4	pass
+2	tmp/wch-evt/application_notes/CH32V205RM.PDF	b1ed9ef040455a1f9a32f1ab9f9be0e9d3391709bc0b6fa141b2f581593b6c59	V1.2	False	False	0	INTSYSCR	INTSYSCR	2	CORECFGR	CORECFGR	4	pass
+2	tmp/wch-evt/application_notes/CH32X315RM.PDF	b6a752f9e9bdbb1d1fd9c8ba62f6e52633620c06c0d21fbc450925541a0c2785	V1.1	True	True	20	HW_POPDM_CTLR	HW_POPDM_CTLR	2	CPU_RUN_CTLR	CPU_RUN_CTLR	2	pass
+2	tmp/wch-evt/application_notes/CH32V407RM.PDF	63625af9027af6abfff57a58f8d2afdb2b68ee7d31c323e407da6ea786573c56	V1.1	True	True	15	HW_POPDM_CTLR	HW_POPDM_CTLR	2	CPU_RUN_CTLR	CPU_RUN_CTLR	2	pass
+2	tmp/wch-evt/application_notes/CH32H417RM.PDF	b57ebb0c0ae2cd772d32cb9ddeb6a6315fcc3916bcd3576e5a83eaeb7dfa6967	V1.7	True	True	20	HW_POPDM_CTLR	HW_POPDM_CTLR	2	CPU_RUN_CTLR	CPU_RUN_CTLR	4	pass
+2	tmp/wch-evt/application_notes/CH32xRM.PDF	b4ade26ba00e0f03ea8c13d89badf5491bcdebbfa10957c4839ecc60f34b3cad	V2.0	False	False	0	no-literal-entry	none	0	not-controlled	none	0	pass

@@ -1,0 +1,46 @@
+source	tmp/wch-evt/evt/QingkeV3B_CH32V205_EVT/EXAM/SRC/Peripheral/src/ch32v205_dbgmcu.c
+sha256	e69cef70e8fd6e916f81233a01bdf9bbab44dac66eea358c27a065f4bb72a479
+range	14-38
+000014	#define IDCODE_DEVID_MASK    ((uint32_t)0x0000FFFF)
+000015
+000016
+000017	/*********************************************************************
+000018	 * @fn      DBGMCU_GetREVID
+000019	 *
+000020	 * @brief   Returns the device revision identifier.
+000021	 *
+000022	 * @return  Revision identifier.
+000023	 */
+000024	uint32_t DBGMCU_GetREVID(void)
+000025	{
+000026		return (CHIPID & IDCODE_DEVID_MASK);
+000027	}
+000028
+000029	/*********************************************************************
+000030	 * @fn      DBGMCU_GetDEVID
+000031	 *
+000032	 * @brief   Returns the device identifier.
+000033	 *
+000034	 * @return  Device identifier.
+000035	 */
+000036	uint32_t DBGMCU_GetDEVID(void)
+000037	{
+000038		return (CHIPID >> 16);
+range	108-124
+000108	/*********************************************************************
+000109	 * @fn      DBGMCU_GetCHIPID
+000110	 *
+000111	 * @brief   Returns the CHIP identifier.
+000112	 *
+000113	 * @return Device identifier.
+000114	 *          ChipID List-
+000115	 *	          CH32V205CCT-0x205205x0
+000116	 * 	          CH32V205RCT-0x205105x0
+000117	 *            CH32V205VCT-0x205005x0
+000118	 *            CH32V203CCT-0x205405x0
+000119	 *
+000120	 */
+000121	uint32_t DBGMCU_GetCHIPID( void )
+000122	{
+000123		return( CHIPID );
+000124	}

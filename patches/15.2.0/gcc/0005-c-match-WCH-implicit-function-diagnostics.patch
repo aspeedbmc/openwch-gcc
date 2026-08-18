@@ -1,0 +1,789 @@
+From cd02977688369e2549813cf8bd6cecd1bcd40988 Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 3 <phase3@openwch.local>
+Date: Thu, 13 Aug 2026 21:31:24 +0900
+Subject: [PATCH 5/9] c: match WCH implicit-function diagnostics
+
+WCH 15.2.0 keeps implicit function declarations as warnings by default in
+C99 and later modes.  Use pedwarn for those modes so explicit -Werror and
+-pedantic-errors still promote the diagnostic, while preserving
+system-header suppression and the pre-C99 warning path.
+
+Match the four observed WCH diagnostic literals exactly: function0 and
+function1 in C99-and-later modes, and function2 and function3 before C99.
+Update affected upstream expectations and add focused coverage for
+severity, spelling suggestions, -fno-permissive, and system headers.
+
+The 33-case official matrix matches return code, stdout, stderr, and
+assembly byte-for-byte.  Directed tests pass; the static gcc.dg run has
+37082 PASS with all 37070 baseline PASS entries retained, and the RISC-V
+run retains all 30242 PASS entries of the RC01 (.highcode repair round)
+baseline.  The selected EVT gate remains 274/274.
+
+Behavior evidence:
+  tmp/phase3d-t2-research/rc02/results-post-rc02
+  tmp/phase3d-evidence/t2-rc02/directed-final-v6
+  tmp/phase3d-evidence/t2-rc02/suite-diff-dg-final-v5
+  tmp/phase3d-evidence/t2-rc02/suite-diff-riscv-final-v2
+
+gcc/c/ChangeLog:
+
+	* c-decl.cc (implicit_decl_permerror): Rename to ...
+	(implicit_decl_warning): ... this.  Use pedwarn instead of
+	permerror_opt in C99 and later modes and match the WCH diagnostic
+	literals.
+	(implicitly_declare): Update both callers.
+
+gcc/testsuite/ChangeLog:
+
+	* c-c++-common/spellcheck-reserved.c: Update the expected
+	diagnostic.
+	* gcc.dg/Wimplicit-function-declaration-c99-2.c: Likewise.
+	* gcc.dg/analyzer/fd-bind-pr107783.c: Likewise.
+	* gcc.dg/attr-access-read-only.c: Likewise.
+	* gcc.dg/attr-access-read-write.c: Likewise.
+	* gcc.dg/attr-access-write-only.c: Likewise.
+	* gcc.dg/gnu23-builtins-no-dfp-1.c: Likewise.
+	* gcc.dg/missing-header-fixit-1a.c: Likewise.
+	* gcc.dg/missing-header-fixit-2.c: Likewise.
+	* gcc.dg/missing-header-fixit-2a.c: Likewise.
+	* gcc.dg/missing-header-fixit-4a.c: Likewise.
+	* gcc.dg/missing-header-fixit-5a.c: Likewise.
+	* gcc.dg/permerror-default.c: Likewise.
+	* gcc.dg/permerror-pedantic.c: Likewise.
+	* gcc.dg/permerror-system.c: Likewise.
+	* gcc.dg/pr61852.c: Likewise.
+	* gcc.dg/spellcheck-identifiers-1a.c: Likewise.
+	* gcc.dg/spellcheck-identifiers-2.c: Likewise.
+	* gcc.dg/spellcheck-identifiers-2a.c: Likewise.
+	* gcc.dg/spellcheck-identifiers-3.c: Likewise.
+	* gcc.dg/spellcheck-identifiers-3a.c: Likewise.
+	* gcc.dg/spellcheck-identifiers-4.c: Likewise.
+	* gcc.dg/spellcheck-identifiers-4a.c: Likewise.
+	* gcc.dg/spellcheck-identifiers.c: Likewise.
+	* gcc.dg/spellcheck-stdlib-2.c: Likewise.
+	* gcc.target/riscv/cv-alu-fail-compile.c: Likewise.
+	* gcc.dg/wch-implicit-function-declaration-c89.c: New test.
+	* gcc.dg/wch-implicit-function-declaration-c99.c: New test.
+	* gcc.dg/wch-implicit-function-declaration-fno-permissive.c: New
+	test.
+	* gcc.dg/wch-implicit-function-declaration-system-warning.c: New
+	test.
+	* gcc.dg/wch-implicit-function-declaration-system.c: New test.
+	* gcc.dg/wch-implicit-function-declaration-system.h: New test.
+---
+ gcc/c/c-decl.cc                               | 24 +++++++++----------
+ .../c-c++-common/spellcheck-reserved.c        |  4 ++--
+ .../Wimplicit-function-declaration-c99-2.c    |  2 +-
+ .../gcc.dg/analyzer/fd-bind-pr107783.c        |  2 +-
+ gcc/testsuite/gcc.dg/attr-access-read-only.c  |  2 +-
+ gcc/testsuite/gcc.dg/attr-access-read-write.c |  2 +-
+ gcc/testsuite/gcc.dg/attr-access-write-only.c |  2 +-
+ .../gcc.dg/gnu23-builtins-no-dfp-1.c          |  3 ++-
+ .../gcc.dg/missing-header-fixit-1a.c          |  2 +-
+ gcc/testsuite/gcc.dg/missing-header-fixit-2.c |  2 +-
+ .../gcc.dg/missing-header-fixit-2a.c          |  2 +-
+ .../gcc.dg/missing-header-fixit-4a.c          |  2 +-
+ .../gcc.dg/missing-header-fixit-5a.c          |  6 ++---
+ gcc/testsuite/gcc.dg/permerror-default.c      |  2 +-
+ gcc/testsuite/gcc.dg/permerror-pedantic.c     |  2 +-
+ gcc/testsuite/gcc.dg/permerror-system.c       |  2 +-
+ gcc/testsuite/gcc.dg/pr61852.c                |  2 +-
+ .../gcc.dg/spellcheck-identifiers-1a.c        | 12 +++++-----
+ .../gcc.dg/spellcheck-identifiers-2.c         |  4 ++--
+ .../gcc.dg/spellcheck-identifiers-2a.c        |  4 ++--
+ .../gcc.dg/spellcheck-identifiers-3.c         |  6 ++---
+ .../gcc.dg/spellcheck-identifiers-3a.c        |  6 ++---
+ .../gcc.dg/spellcheck-identifiers-4.c         |  2 +-
+ .../gcc.dg/spellcheck-identifiers-4a.c        |  2 +-
+ gcc/testsuite/gcc.dg/spellcheck-identifiers.c | 12 +++++-----
+ gcc/testsuite/gcc.dg/spellcheck-stdlib-2.c    |  2 +-
+ .../wch-implicit-function-declaration-c89.c   | 16 +++++++++++++
+ .../wch-implicit-function-declaration-c99.c   | 16 +++++++++++++
+ ...icit-function-declaration-fno-permissive.c |  8 +++++++
+ ...icit-function-declaration-system-warning.c |  6 +++++
+ ...wch-implicit-function-declaration-system.c | 12 ++++++++++
+ ...wch-implicit-function-declaration-system.h |  5 ++++
+ .../gcc.target/riscv/cv-alu-fail-compile.c    |  3 ++-
+ 33 files changed, 122 insertions(+), 57 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/wch-implicit-function-declaration-c89.c
+ create mode 100644 gcc/testsuite/gcc.dg/wch-implicit-function-declaration-c99.c
+ create mode 100644 gcc/testsuite/gcc.dg/wch-implicit-function-declaration-fno-permissive.c
+ create mode 100644 gcc/testsuite/gcc.dg/wch-implicit-function-declaration-system-warning.c
+ create mode 100644 gcc/testsuite/gcc.dg/wch-implicit-function-declaration-system.c
+ create mode 100644 gcc/testsuite/gcc.dg/wch-implicit-function-declaration-system.h
+
+diff --git a/gcc/c/c-decl.cc b/gcc/c/c-decl.cc
+index 5032ba137..588627afc 100644
+--- a/gcc/c/c-decl.cc
++++ b/gcc/c/c-decl.cc
+@@ -3563,12 +3563,12 @@ pushdecl (tree x)
+ }
+ 
+ 
+-/* Issue a permerror about implicit function declaration.  ID is the function
++/* Issue a warning about implicit function declaration.  ID is the function
+    identifier, OLDDECL is a declaration of the function in a different scope,
+    or NULL_TREE.  */
+ 
+ static void
+-implicit_decl_permerror (location_t loc, tree id, tree olddecl)
++implicit_decl_warning (location_t loc, tree id, tree olddecl)
+ {
+   if (!warn_implicit_function_declaration)
+     return;
+@@ -3585,14 +3585,14 @@ implicit_decl_permerror (location_t loc, tree id, tree olddecl)
+ 	{
+ 	  gcc_rich_location richloc (loc);
+ 	  richloc.add_fixit_replace (suggestion);
+-	  warned = permerror_opt (&richloc, OPT_Wimplicit_function_declaration,
+-				  "implicit declaration of function %qE;"
+-				  " did you mean %qs?",
+-				  id, suggestion);
++	  warned = pedwarn (&richloc, OPT_Wimplicit_function_declaration,
++			    "implicit declaration of function0 %qE;"
++			    " did you mean %qs?",
++			    id, suggestion);
+ 	}
+       else
+-	warned = permerror_opt (loc, OPT_Wimplicit_function_declaration,
+-				"implicit declaration of function %qE", id);
++	warned = pedwarn (loc, OPT_Wimplicit_function_declaration,
++			  "implicit declaration of function1 %qE", id);
+     }
+   else if (const char *suggestion = hint.suggestion ())
+     {
+@@ -3600,12 +3600,12 @@ implicit_decl_permerror (location_t loc, tree id, tree olddecl)
+       richloc.add_fixit_replace (suggestion);
+       warned = warning_at
+ 	(&richloc, OPT_Wimplicit_function_declaration,
+-	 G_("implicit declaration of function %qE; did you mean %qs?"),
++	 G_("implicit declaration of function2 %qE; did you mean %qs?"),
+ 	 id, suggestion);
+     }
+   else
+     warned = warning_at (loc, OPT_Wimplicit_function_declaration,
+-			 G_("implicit declaration of function %qE"), id);
++			 G_("implicit declaration of function3 %qE"), id);
+ 
+   if (warned)
+     {
+@@ -3882,7 +3882,7 @@ implicitly_declare (location_t loc, tree functionid)
+ 	     then recycle the old declaration but with the new type.  */
+ 	  if (!C_DECL_IMPLICIT (decl))
+ 	    {
+-	      implicit_decl_permerror (loc, functionid, decl);
++	      implicit_decl_warning (loc, functionid, decl);
+ 	      C_DECL_IMPLICIT (decl) = 1;
+ 	    }
+ 	  if (fndecl_built_in_p (decl))
+@@ -3935,7 +3935,7 @@ implicitly_declare (location_t loc, tree functionid)
+   DECL_EXTERNAL (decl) = 1;
+   TREE_PUBLIC (decl) = 1;
+   C_DECL_IMPLICIT (decl) = 1;
+-  implicit_decl_permerror (loc, functionid, 0);
++  implicit_decl_warning (loc, functionid, 0);
+   asmspec_tree = maybe_apply_renaming_pragma (decl, /*asmname=*/NULL);
+   if (asmspec_tree)
+     set_user_assembler_name (decl, TREE_STRING_POINTER (asmspec_tree));
+diff --git a/gcc/testsuite/c-c++-common/spellcheck-reserved.c b/gcc/testsuite/c-c++-common/spellcheck-reserved.c
+index 0be35c56f..f99338645 100644
+--- a/gcc/testsuite/c-c++-common/spellcheck-reserved.c
++++ b/gcc/testsuite/c-c++-common/spellcheck-reserved.c
+@@ -29,7 +29,7 @@ SOME_MACRO foo; /* { dg-bogus "__SOME_MACRO" } */
+ void test (const char *buf, char ch)
+ {
+   __builtin_strtchr (buf, ch); /* { dg-line misspelled_reserved } */
+-  /* { dg-error "did you mean '__builtin_strchr'" "" { target c } misspelled_reserved } */
++  /* { dg-warning "implicit declaration of function0 '__builtin_strtchr'; did you mean '__builtin_strchr'\\?" "" { target c } misspelled_reserved } */
+   /* { dg-error "'__builtin_strtchr' was not declared in this scope; did you mean '__builtin_strrchr'\\?" "" { target c++ } misspelled_reserved } */
+ }
+ 
+@@ -38,7 +38,7 @@ void test (const char *buf, char ch)
+ void test_2 (const char *buf, char ch)
+ {
+   _builtin_strchr (buf, ch); /* { dg-line misspelled_one_underscore } */
+-  /* { dg-error "did you mean '__builtin_strchr'" "" { target c } misspelled_one_underscore } */
++  /* { dg-warning "implicit declaration of function0 '_builtin_strchr'; did you mean '__builtin_strchr'\\?" "" { target c } misspelled_one_underscore } */
+   /* { dg-error "'_builtin_strchr' was not declared in this scope; did you mean '__builtin_strchr'\\?" "" { target c++ } misspelled_one_underscore } */
+ }
+ 
+diff --git a/gcc/testsuite/gcc.dg/Wimplicit-function-declaration-c99-2.c b/gcc/testsuite/gcc.dg/Wimplicit-function-declaration-c99-2.c
+index d65abc967..8572f78f0 100644
+--- a/gcc/testsuite/gcc.dg/Wimplicit-function-declaration-c99-2.c
++++ b/gcc/testsuite/gcc.dg/Wimplicit-function-declaration-c99-2.c
+@@ -3,5 +3,5 @@
+ 
+ void f(void) 
+ { 
+-  puts("Hello"); /* { dg-error "implicit declaration of function" } */
++  puts("Hello"); /* { dg-warning "implicit declaration of function1" } */
+ }
+diff --git a/gcc/testsuite/gcc.dg/analyzer/fd-bind-pr107783.c b/gcc/testsuite/gcc.dg/analyzer/fd-bind-pr107783.c
+index 8055e55f5..4576632b6 100644
+--- a/gcc/testsuite/gcc.dg/analyzer/fd-bind-pr107783.c
++++ b/gcc/testsuite/gcc.dg/analyzer/fd-bind-pr107783.c
+@@ -3,5 +3,5 @@
+ int
+ foo (void)
+ {
+-  return bind (0, 0, 0); /* { dg-warning "implicit declaration of function 'bind'" } */
++  return bind (0, 0, 0); /* { dg-warning "implicit declaration of function1 'bind'" } */
+ }
+diff --git a/gcc/testsuite/gcc.dg/attr-access-read-only.c b/gcc/testsuite/gcc.dg/attr-access-read-only.c
+index 0763bf643..01b0fe1a5 100644
+--- a/gcc/testsuite/gcc.dg/attr-access-read-only.c
++++ b/gcc/testsuite/gcc.dg/attr-access-read-only.c
+@@ -18,7 +18,7 @@ rdonly_v_all (void);   // { dg-error "attribute .access\\(read_only\\). missing
+ 
+ int  __attribute__ ((access (read_only ())))
+ rdonly___v_all (void);   // { dg-error "attribute 'access' unexpected '\\(' after mode 'read_only'; expected a positional argument or '\\)'" }
+-// { dg-warning "implicit declaration of function 'read_only'" "" { target *-*-* } .-2 }
++// { dg-warning "implicit declaration of function1 'read_only'" "" { target *-*-* } .-2 }
+ 
+ 
+ int rdonly (void);
+diff --git a/gcc/testsuite/gcc.dg/attr-access-read-write.c b/gcc/testsuite/gcc.dg/attr-access-read-write.c
+index c0d78b5e6..b9ec45324 100644
+--- a/gcc/testsuite/gcc.dg/attr-access-read-write.c
++++ b/gcc/testsuite/gcc.dg/attr-access-read-write.c
+@@ -17,7 +17,7 @@ rdwr_v_all (void);   /* { dg-error "attribute .access\\(read_write\\). missing a
+ 
+ int  __attribute__ ((access (read_write ())))
+ rdwr___v_all (void);   /* { dg-error "attribute 'access' unexpected '\\(' after mode 'read_write'; expected a positional argument or '\\)'" } */
+-/* { dg-warning "implicit declaration of function 'read_write'" "" { target *-*-* } .-2 } */
++/* { dg-warning "implicit declaration of function1 'read_write'" "" { target *-*-* } .-2 } */
+ 
+ 
+ int rdwr (void);
+diff --git a/gcc/testsuite/gcc.dg/attr-access-write-only.c b/gcc/testsuite/gcc.dg/attr-access-write-only.c
+index 7bf30cc8b..64362cc89 100644
+--- a/gcc/testsuite/gcc.dg/attr-access-write-only.c
++++ b/gcc/testsuite/gcc.dg/attr-access-write-only.c
+@@ -18,7 +18,7 @@ wronly_v_all (void);   // { dg-error "attribute .access\\(read_only\\). missing
+ 
+ int  __attribute__ ((access (read_only ())))
+ wronly___v_all (void);   // { dg-error "attribute 'access' unexpected '\\(' after mode 'read_only'; expected a positional argument or '\\)'" }
+-// { dg-warning "implicit declaration of function 'read_only'" "" { target *-*-* } .-2 }
++// { dg-warning "implicit declaration of function1 'read_only'" "" { target *-*-* } .-2 }
+ 
+ 
+ int wronly (void);
+diff --git a/gcc/testsuite/gcc.dg/gnu23-builtins-no-dfp-1.c b/gcc/testsuite/gcc.dg/gnu23-builtins-no-dfp-1.c
+index 7cb200fce..51ba4c89b 100644
+--- a/gcc/testsuite/gcc.dg/gnu23-builtins-no-dfp-1.c
++++ b/gcc/testsuite/gcc.dg/gnu23-builtins-no-dfp-1.c
+@@ -1,7 +1,8 @@
+ /* Test C23 built-in functions: test DFP built-in functions are not
+    available when no DFP support.  Bug 91985.  */
+ /* { dg-do compile { target { ! dfp } } } */
+-/* { dg-options "-std=gnu23" } */
++/* { dg-options "-std=gnu23 -Werror=implicit-function-declaration" } */
++/* { dg-message "some warnings being treated as errors" "" { target *-*-* } 0 } */
+ 
+ int fabsd32 (void);
+ int fabsd64 (void);
+diff --git a/gcc/testsuite/gcc.dg/missing-header-fixit-1a.c b/gcc/testsuite/gcc.dg/missing-header-fixit-1a.c
+index e47236b95..903fc1af5 100644
+--- a/gcc/testsuite/gcc.dg/missing-header-fixit-1a.c
++++ b/gcc/testsuite/gcc.dg/missing-header-fixit-1a.c
+@@ -9,7 +9,7 @@
+ 
+ void test (int i, int j)
+ {
+-  printf ("%i of %i\n", i, j); /* { dg-error "implicit declaration" } */
++  printf ("%i of %i\n", i, j); /* { dg-warning "implicit declaration of function1" } */
+   /* { dg-message "include '<stdio.h>' or provide a declaration of 'printf'" "" { target *-*-* } .-1 } */
+   /* { dg-warning "incompatible implicit declaration of built-in function 'printf'" "" { target *-*-* } .-2 } */
+ }
+diff --git a/gcc/testsuite/gcc.dg/missing-header-fixit-2.c b/gcc/testsuite/gcc.dg/missing-header-fixit-2.c
+index 38d36a66c..0c75f3787 100644
+--- a/gcc/testsuite/gcc.dg/missing-header-fixit-2.c
++++ b/gcc/testsuite/gcc.dg/missing-header-fixit-2.c
+@@ -6,7 +6,7 @@
+ #include "missing-header-fixit-2.h"
+ 
+ /* These directives actually apply to the header.  */
+-/* { dg-warning "implicit declaration of function 'printf'" "" { target *-*-* } 6 } */
++/* { dg-warning "implicit declaration of function1 'printf'" "" { target *-*-* } 6 } */
+ /* { dg-warning "incompatible implicit declaration of built-in function 'printf'" "" { target *-*-* } 6 } */
+ 
+ /* { dg-options "-fpermissive -fdiagnostics-generate-patch" } */
+diff --git a/gcc/testsuite/gcc.dg/missing-header-fixit-2a.c b/gcc/testsuite/gcc.dg/missing-header-fixit-2a.c
+index 4ae617bdd..6c91337f3 100644
+--- a/gcc/testsuite/gcc.dg/missing-header-fixit-2a.c
++++ b/gcc/testsuite/gcc.dg/missing-header-fixit-2a.c
+@@ -6,7 +6,7 @@
+ #include "missing-header-fixit-2.h"
+ 
+ /* These directives actually apply to the header.  */
+-/* { dg-error "implicit declaration of function 'printf'" "" { target *-*-* } 6 } */
++/* { dg-warning "implicit declaration of function1 'printf'" "" { target *-*-* } 6 } */
+ /* { dg-warning "incompatible implicit declaration of built-in function 'printf'" "" { target *-*-* } 6 } */
+ 
+ /* { dg-options "-fdiagnostics-generate-patch" } */
+diff --git a/gcc/testsuite/gcc.dg/missing-header-fixit-4a.c b/gcc/testsuite/gcc.dg/missing-header-fixit-4a.c
+index b93061f28..7e06f8ef2 100644
+--- a/gcc/testsuite/gcc.dg/missing-header-fixit-4a.c
++++ b/gcc/testsuite/gcc.dg/missing-header-fixit-4a.c
+@@ -8,7 +8,7 @@ int the_next_line;
+ void test (int i, int j)
+ {
+   printf ("%i of %i\n", i, j); /* { dg-line printf } */
+-  /* { dg-error "implicit declaration of function" "" { target *-*-* } printf } */
++  /* { dg-warning "implicit declaration of function1" "" { target *-*-* } printf } */
+   /* { dg-begin-multiline-output "" }
+    10 |   printf ("%i of %i\n", i, j);
+       |   ^~~~~~
+diff --git a/gcc/testsuite/gcc.dg/missing-header-fixit-5a.c b/gcc/testsuite/gcc.dg/missing-header-fixit-5a.c
+index 420cbf7be..c95d2680e 100644
+--- a/gcc/testsuite/gcc.dg/missing-header-fixit-5a.c
++++ b/gcc/testsuite/gcc.dg/missing-header-fixit-5a.c
+@@ -8,7 +8,7 @@
+ int
+ foo (char *m, int i)
+ {
+-  if (isdigit (m[0])) /* { dg-error "implicit declaration of function" } */
++  if (isdigit (m[0])) /* { dg-warning "implicit declaration of function1" } */
+   /* { dg-begin-multiline-output "" }
+    11 |   if (isdigit (m[0]))
+       |       ^~~~~~~
+@@ -18,7 +18,7 @@ foo (char *m, int i)
+     1 | 
+      { dg-end-multiline-output "" } */
+     {
+-      return abs (i); /* { dg-error "implicit declaration of function" } */
++      return abs (i); /* { dg-warning "implicit declaration of function1" } */
+   /* { dg-begin-multiline-output "" }
+    21 |       return abs (i);
+       |              ^~~
+@@ -29,7 +29,7 @@ foo (char *m, int i)
+      { dg-end-multiline-output "" } */
+     }
+   else
+-    putchar (m[0]); /* { dg-error "implicit declaration of function" } */
++    putchar (m[0]); /* { dg-warning "implicit declaration of function1" } */
+   /* { dg-begin-multiline-output "" }
+    32 |     putchar (m[0]);
+       |     ^~~~~~~
+diff --git a/gcc/testsuite/gcc.dg/permerror-default.c b/gcc/testsuite/gcc.dg/permerror-default.c
+index b321a7d6a..4140c6017 100644
+--- a/gcc/testsuite/gcc.dg/permerror-default.c
++++ b/gcc/testsuite/gcc.dg/permerror-default.c
+@@ -7,7 +7,7 @@
+ void
+ implicit_function_declaration (void)
+ {
+-  f1 (); /* { dg-error "'f1' \\\[-Wimplicit-function-declaration\\\]" } */
++  f1 (); /* { dg-warning "function1 'f1' \\\[-Wimplicit-function-declaration\\\]" } */
+ }
+ 
+ extern implicit_int_1; /* { dg-error "'implicit_int_1' \\\[-Wimplicit-int\\\]" } */
+diff --git a/gcc/testsuite/gcc.dg/permerror-pedantic.c b/gcc/testsuite/gcc.dg/permerror-pedantic.c
+index 11fa83a8f..49eff1632 100644
+--- a/gcc/testsuite/gcc.dg/permerror-pedantic.c
++++ b/gcc/testsuite/gcc.dg/permerror-pedantic.c
+@@ -7,7 +7,7 @@
+ void
+ implicit_function_declaration (void)
+ {
+-  f1 (); /* { dg-error "'f1' \\\[-Wimplicit-function-declaration\\\]" } */
++  f1 (); /* { dg-error "function1 'f1' \\\[-Wimplicit-function-declaration\\\]" } */
+ }
+ 
+ extern implicit_int_1; /* { dg-error "'implicit_int_1' \\\[-Wimplicit-int\\\]" } */
+diff --git a/gcc/testsuite/gcc.dg/permerror-system.c b/gcc/testsuite/gcc.dg/permerror-system.c
+index 790e4f03d..7975ccc03 100644
+--- a/gcc/testsuite/gcc.dg/permerror-system.c
++++ b/gcc/testsuite/gcc.dg/permerror-system.c
+@@ -8,7 +8,7 @@
+ 
+ /* These errors come from permerror-default.c.  */
+ 
+-/* { dg-error "'f1' \\\[-Wimplicit-function-declaration\\\]" "" { target *-*-* } 10 } */
++/* WCH's implicit-declaration pedwarn is suppressed in system headers.  */
+ 
+ /* { dg-error "'implicit_int_1' \\\[-Wimplicit-int\\\]" "" { target *-*-* } 13 } */
+ /* { dg-error "'implicit_int_2' \\\[-Wimplicit-int\\\]" "" { target *-*-* } 14 } */
+diff --git a/gcc/testsuite/gcc.dg/pr61852.c b/gcc/testsuite/gcc.dg/pr61852.c
+index e669d3c4d..39d34299f 100644
+--- a/gcc/testsuite/gcc.dg/pr61852.c
++++ b/gcc/testsuite/gcc.dg/pr61852.c
+@@ -5,6 +5,6 @@
+ int
+ f (int a)
+ {
+-  int b = a + a + a + ff (a); /* { dg-error "23:implicit declaration of function" } */
++  int b = a + a + a + ff (a); /* { dg-warning "23:implicit declaration of function0" } */
+   return b;
+ }
+diff --git a/gcc/testsuite/gcc.dg/spellcheck-identifiers-1a.c b/gcc/testsuite/gcc.dg/spellcheck-identifiers-1a.c
+index f50c52b65..b2f55bdad 100644
+--- a/gcc/testsuite/gcc.dg/spellcheck-identifiers-1a.c
++++ b/gcc/testsuite/gcc.dg/spellcheck-identifiers-1a.c
+@@ -8,7 +8,7 @@ extern void gtk_widget_show_all (GtkWidget *w);
+ void
+ test_1 (GtkWidget *w)
+ {
+-  gtk_widget_showall (w); /* { dg-error "3: implicit declaration of function .gtk_widget_showall.; did you mean .gtk_widget_show_all.?" } */
++  gtk_widget_showall (w); /* { dg-warning "3: implicit declaration of function0 .gtk_widget_showall.; did you mean .gtk_widget_show_all.?" } */
+   /* { dg-begin-multiline-output "" }
+    gtk_widget_showall (w);
+    ^~~~~~~~~~~~~~~~~~
+@@ -17,14 +17,14 @@ test_1 (GtkWidget *w)
+ 
+   /* Ensure we don't try to suggest "gtk_widget_showall" for subsequent
+      corrections.  */
+-  gtk_widget_showall_ (w); /* { dg-error "3: implicit declaration of function .gtk_widget_showall_.; did you mean .gtk_widget_show_all.?" } */
++  gtk_widget_showall_ (w); /* { dg-warning "3: implicit declaration of function0 .gtk_widget_showall_.; did you mean .gtk_widget_show_all.?" } */
+   /* { dg-begin-multiline-output "" }
+    gtk_widget_showall_ (w);
+    ^~~~~~~~~~~~~~~~~~~
+    gtk_widget_show_all
+    { dg-end-multiline-output "" } */
+ 
+-  GtkWidgetShowAll (w); /* { dg-error "3: implicit declaration of function .GtkWidgetShowAll.; did you mean .gtk_widget_show_all.?" } */
++  GtkWidgetShowAll (w); /* { dg-warning "3: implicit declaration of function0 .GtkWidgetShowAll.; did you mean .gtk_widget_show_all.?" } */
+   /* { dg-begin-multiline-output "" }
+    GtkWidgetShowAll (w);
+    ^~~~~~~~~~~~~~~~
+@@ -48,7 +48,7 @@ test_2 (int param)
+ int
+ test_3 (int i)
+ {
+-  return MACRAME (i); /* { dg-error "10: implicit declaration of function .MACRAME.; did you mean .MACRO.?" } */
++  return MACRAME (i); /* { dg-warning "10: implicit declaration of function0 .MACRAME.; did you mean .MACRO.?" } */
+   /* { dg-begin-multiline-output "" }
+    return MACRAME (i);
+           ^~~~~~~
+@@ -61,7 +61,7 @@ test_3 (int i)
+ int
+ test_4 (int node)
+ {
+-  return IDENTIFIER_PTR (node); /* { dg-error "10: implicit declaration of function .IDENTIFIER_PTR.; did you mean .IDENTIFIER_POINTER.?" } */
++  return IDENTIFIER_PTR (node); /* { dg-warning "10: implicit declaration of function0 .IDENTIFIER_PTR.; did you mean .IDENTIFIER_POINTER.?" } */
+   /* { dg-begin-multiline-output "" }
+    return IDENTIFIER_PTR (node);
+           ^~~~~~~~~~~~~~
+@@ -127,7 +127,7 @@ void
+ test_7 (int i, int j)
+ {
+   int buffer[100];
+-  snprint (buffer, 100, "%i of %i", i, j); /* { dg-error "3: implicit declaration of function .snprint.; did you mean .snprintf.." } */
++  snprint (buffer, 100, "%i of %i", i, j); /* { dg-warning "3: implicit declaration of function0 .snprint.; did you mean .snprintf.." } */
+   /* { dg-begin-multiline-output "" }
+    snprint (buffer, 100, "%i of %i", i, j);
+    ^~~~~~~
+diff --git a/gcc/testsuite/gcc.dg/spellcheck-identifiers-2.c b/gcc/testsuite/gcc.dg/spellcheck-identifiers-2.c
+index b49709dc5..26a6ce79c 100644
+--- a/gcc/testsuite/gcc.dg/spellcheck-identifiers-2.c
++++ b/gcc/testsuite/gcc.dg/spellcheck-identifiers-2.c
+@@ -9,7 +9,7 @@ int
+ test_1 (const char *p)
+ {
+   int i;
+-  return ssacnf (p, "%d", &i); /* { dg-warning "10: implicit declaration of function .ssacnf.; did you mean .sscafn.?" } */
++  return ssacnf (p, "%d", &i); /* { dg-warning "10: implicit declaration of function0 .ssacnf.; did you mean .sscafn.?" } */
+   /* { dg-begin-multiline-output "" }
+    return ssacnf (p, "%d", &i);
+           ^~~~~~
+@@ -24,7 +24,7 @@ int
+ test_2 (void)
+ {
+   int i;
+-  return sacnf ("%d", &i); /* { dg-warning "10: implicit declaration of function .sacnf.; did you mean .scanf.?" } */
++  return sacnf ("%d", &i); /* { dg-warning "10: implicit declaration of function0 .sacnf.; did you mean .scanf.?" } */
+   /* { dg-begin-multiline-output "" }
+    return sacnf ("%d", &i);
+           ^~~~~
+diff --git a/gcc/testsuite/gcc.dg/spellcheck-identifiers-2a.c b/gcc/testsuite/gcc.dg/spellcheck-identifiers-2a.c
+index 1a3e68c70..fcd971494 100644
+--- a/gcc/testsuite/gcc.dg/spellcheck-identifiers-2a.c
++++ b/gcc/testsuite/gcc.dg/spellcheck-identifiers-2a.c
+@@ -9,7 +9,7 @@ int
+ test_1 (const char *p)
+ {
+   int i;
+-  return ssacnf (p, "%d", &i); /* { dg-error "10: implicit declaration of function .ssacnf.; did you mean .sscafn.?" } */
++  return ssacnf (p, "%d", &i); /* { dg-warning "10: implicit declaration of function0 .ssacnf.; did you mean .sscafn.?" } */
+   /* { dg-begin-multiline-output "" }
+    return ssacnf (p, "%d", &i);
+           ^~~~~~
+@@ -24,7 +24,7 @@ int
+ test_2 (void)
+ {
+   int i;
+-  return sacnf ("%d", &i); /* { dg-error "10: implicit declaration of function .sacnf.; did you mean .scanf.?" } */
++  return sacnf ("%d", &i); /* { dg-warning "10: implicit declaration of function0 .sacnf.; did you mean .scanf.?" } */
+   /* { dg-begin-multiline-output "" }
+    return sacnf ("%d", &i);
+           ^~~~~
+diff --git a/gcc/testsuite/gcc.dg/spellcheck-identifiers-3.c b/gcc/testsuite/gcc.dg/spellcheck-identifiers-3.c
+index 0b5982fa7..05445f345 100644
+--- a/gcc/testsuite/gcc.dg/spellcheck-identifiers-3.c
++++ b/gcc/testsuite/gcc.dg/spellcheck-identifiers-3.c
+@@ -8,7 +8,7 @@ void fn1abcd (void);
+ void
+ test_1 (int fn1bacd)
+ {
+-  fn1badc (); /* { dg-warning "3: implicit declaration of function .fn1badc.; did you mean .fn1abcd.?" } */
++  fn1badc (); /* { dg-warning "3: implicit declaration of function0 .fn1badc.; did you mean .fn1abcd.?" } */
+   /* { dg-begin-multiline-output "" }
+    fn1badc ();
+    ^~~~~~~
+@@ -22,7 +22,7 @@ void (*fn2efhg) (void);
+ void
+ test_2 (void)
+ {
+-  fn2fehg (); /* { dg-warning "3: implicit declaration of function .fn2fehg.; did you mean .fn2efhg.?" } */
++  fn2fehg (); /* { dg-warning "3: implicit declaration of function0 .fn2fehg.; did you mean .fn2efhg.?" } */
+   /* { dg-begin-multiline-output "" }
+    fn2fehg ();
+    ^~~~~~~
+@@ -36,7 +36,7 @@ typedef int fn3ijlk;
+ void
+ test_3 (void)
+ {
+-  fn3jilk (); /* { dg-warning "3: implicit declaration of function .fn3jilk.; did you mean .fn3ijkl.?" } */
++  fn3jilk (); /* { dg-warning "3: implicit declaration of function0 .fn3jilk.; did you mean .fn3ijkl.?" } */
+   /* { dg-begin-multiline-output "" }
+    fn3jilk ();
+    ^~~~~~~
+diff --git a/gcc/testsuite/gcc.dg/spellcheck-identifiers-3a.c b/gcc/testsuite/gcc.dg/spellcheck-identifiers-3a.c
+index 0c0a19e54..84c253b8c 100644
+--- a/gcc/testsuite/gcc.dg/spellcheck-identifiers-3a.c
++++ b/gcc/testsuite/gcc.dg/spellcheck-identifiers-3a.c
+@@ -8,7 +8,7 @@ void fn1abcd (void);
+ void
+ test_1 (int fn1bacd)
+ {
+-  fn1badc (); /* { dg-error "3: implicit declaration of function .fn1badc.; did you mean .fn1abcd.?" } */
++  fn1badc (); /* { dg-warning "3: implicit declaration of function0 .fn1badc.; did you mean .fn1abcd.?" } */
+   /* { dg-begin-multiline-output "" }
+    fn1badc ();
+    ^~~~~~~
+@@ -22,7 +22,7 @@ void (*fn2efhg) (void);
+ void
+ test_2 (void)
+ {
+-  fn2fehg (); /* { dg-error "3: implicit declaration of function .fn2fehg.; did you mean .fn2efhg.?" } */
++  fn2fehg (); /* { dg-warning "3: implicit declaration of function0 .fn2fehg.; did you mean .fn2efhg.?" } */
+   /* { dg-begin-multiline-output "" }
+    fn2fehg ();
+    ^~~~~~~
+@@ -36,7 +36,7 @@ typedef int fn3ijlk;
+ void
+ test_3 (void)
+ {
+-  fn3jilk (); /* { dg-error "3: implicit declaration of function .fn3jilk.; did you mean .fn3ijkl.?" } */
++  fn3jilk (); /* { dg-warning "3: implicit declaration of function0 .fn3jilk.; did you mean .fn3ijkl.?" } */
+   /* { dg-begin-multiline-output "" }
+    fn3jilk ();
+    ^~~~~~~
+diff --git a/gcc/testsuite/gcc.dg/spellcheck-identifiers-4.c b/gcc/testsuite/gcc.dg/spellcheck-identifiers-4.c
+index f24d863a1..ba5480e6b 100644
+--- a/gcc/testsuite/gcc.dg/spellcheck-identifiers-4.c
++++ b/gcc/testsuite/gcc.dg/spellcheck-identifiers-4.c
+@@ -5,6 +5,6 @@ extern double sqrt (double);
+ void test (float pf, float inff)
+ {
+   assert (pf == inff); /* { dg-bogus "sqrt" } */
+-  /* { dg-warning "implicit declaration of function 'assert'" "" { target *-*-* } .-1 } */
++  /* { dg-warning "implicit declaration of function1 'assert'" "" { target *-*-* } .-1 } */
+   /* { dg-message "header '<assert.h>'" "" { target *-*-* } .-2 } */
+ }
+diff --git a/gcc/testsuite/gcc.dg/spellcheck-identifiers-4a.c b/gcc/testsuite/gcc.dg/spellcheck-identifiers-4a.c
+index 33a6b4220..53a7190b9 100644
+--- a/gcc/testsuite/gcc.dg/spellcheck-identifiers-4a.c
++++ b/gcc/testsuite/gcc.dg/spellcheck-identifiers-4a.c
+@@ -5,6 +5,6 @@ extern double sqrt (double);
+ void test (float pf, float inff)
+ {
+   assert (pf == inff); /* { dg-bogus "sqrt" } */
+-  /* { dg-error "implicit declaration of function 'assert'" "" { target *-*-* } .-1 } */
++  /* { dg-warning "implicit declaration of function1 'assert'" "" { target *-*-* } .-1 } */
+   /* { dg-message "header '<assert.h>'" "" { target *-*-* } .-2 } */
+ }
+diff --git a/gcc/testsuite/gcc.dg/spellcheck-identifiers.c b/gcc/testsuite/gcc.dg/spellcheck-identifiers.c
+index cd632c6a0..1433ba0e6 100644
+--- a/gcc/testsuite/gcc.dg/spellcheck-identifiers.c
++++ b/gcc/testsuite/gcc.dg/spellcheck-identifiers.c
+@@ -8,7 +8,7 @@ extern void gtk_widget_show_all (GtkWidget *w);
+ void
+ test_1 (GtkWidget *w)
+ {
+-  gtk_widget_showall (w); /* { dg-warning "3: implicit declaration of function .gtk_widget_showall.; did you mean .gtk_widget_show_all.?" } */
++  gtk_widget_showall (w); /* { dg-warning "3: implicit declaration of function0 .gtk_widget_showall.; did you mean .gtk_widget_show_all.?" } */
+   /* { dg-begin-multiline-output "" }
+    gtk_widget_showall (w);
+    ^~~~~~~~~~~~~~~~~~
+@@ -17,14 +17,14 @@ test_1 (GtkWidget *w)
+ 
+   /* Ensure we don't try to suggest "gtk_widget_showall" for subsequent
+      corrections.  */
+-  gtk_widget_showall_ (w); /* { dg-warning "3: implicit declaration of function .gtk_widget_showall_.; did you mean .gtk_widget_show_all.?" } */
++  gtk_widget_showall_ (w); /* { dg-warning "3: implicit declaration of function0 .gtk_widget_showall_.; did you mean .gtk_widget_show_all.?" } */
+   /* { dg-begin-multiline-output "" }
+    gtk_widget_showall_ (w);
+    ^~~~~~~~~~~~~~~~~~~
+    gtk_widget_show_all
+    { dg-end-multiline-output "" } */
+ 
+-  GtkWidgetShowAll (w); /* { dg-warning "3: implicit declaration of function .GtkWidgetShowAll.; did you mean .gtk_widget_show_all.?" } */
++  GtkWidgetShowAll (w); /* { dg-warning "3: implicit declaration of function0 .GtkWidgetShowAll.; did you mean .gtk_widget_show_all.?" } */
+   /* { dg-begin-multiline-output "" }
+    GtkWidgetShowAll (w);
+    ^~~~~~~~~~~~~~~~
+@@ -48,7 +48,7 @@ test_2 (int param)
+ int
+ test_3 (int i)
+ {
+-  return MACRAME (i); /* { dg-warning "10: implicit declaration of function .MACRAME.; did you mean .MACRO.?" } */
++  return MACRAME (i); /* { dg-warning "10: implicit declaration of function0 .MACRAME.; did you mean .MACRO.?" } */
+   /* { dg-begin-multiline-output "" }
+    return MACRAME (i);
+           ^~~~~~~
+@@ -61,7 +61,7 @@ test_3 (int i)
+ int
+ test_4 (int node)
+ {
+-  return IDENTIFIER_PTR (node); /* { dg-warning "10: implicit declaration of function .IDENTIFIER_PTR.; did you mean .IDENTIFIER_POINTER.?" } */
++  return IDENTIFIER_PTR (node); /* { dg-warning "10: implicit declaration of function0 .IDENTIFIER_PTR.; did you mean .IDENTIFIER_POINTER.?" } */
+   /* { dg-begin-multiline-output "" }
+    return IDENTIFIER_PTR (node);
+           ^~~~~~~~~~~~~~
+@@ -127,7 +127,7 @@ void
+ test_7 (int i, int j)
+ {
+   int buffer[100];
+-  snprint (buffer, 100, "%i of %i", i, j); /* { dg-warning "3: implicit declaration of function .snprint.; did you mean .snprintf.." } */
++  snprint (buffer, 100, "%i of %i", i, j); /* { dg-warning "3: implicit declaration of function0 .snprint.; did you mean .snprintf.." } */
+   /* { dg-begin-multiline-output "" }
+    snprint (buffer, 100, "%i of %i", i, j);
+    ^~~~~~~
+diff --git a/gcc/testsuite/gcc.dg/spellcheck-stdlib-2.c b/gcc/testsuite/gcc.dg/spellcheck-stdlib-2.c
+index 4762e2ddb..5f22fc0af 100644
+--- a/gcc/testsuite/gcc.dg/spellcheck-stdlib-2.c
++++ b/gcc/testsuite/gcc.dg/spellcheck-stdlib-2.c
+@@ -3,6 +3,6 @@
+ /* Missing <string.h>.  */
+ void test_string_h (void)
+ {
+-  strerror (0); /* { dg-error "implicit declaration of function 'strerror'" } */
++  strerror (0); /* { dg-warning "implicit declaration of function1 'strerror'" } */
+   /* { dg-message "'strerror' is defined in header '<string.h>'" "" { target *-*-* } .-1 } */
+ }
+diff --git a/gcc/testsuite/gcc.dg/wch-implicit-function-declaration-c89.c b/gcc/testsuite/gcc.dg/wch-implicit-function-declaration-c89.c
+new file mode 100644
+index 000000000..6167a932b
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/wch-implicit-function-declaration-c89.c
+@@ -0,0 +1,16 @@
++/* { dg-do compile } */
++/* { dg-options "-std=gnu89 -Wimplicit-function-declaration" } */
++
++int declared_target ();
++
++int
++with_suggestion ()
++{
++  return declard_target (); /* { dg-warning "implicit declaration of function2 'declard_target'; did you mean 'declared_target'\\?" } */
++}
++
++int
++without_suggestion ()
++{
++  return absent_target (); /* { dg-warning "implicit declaration of function3 'absent_target'" } */
++}
+diff --git a/gcc/testsuite/gcc.dg/wch-implicit-function-declaration-c99.c b/gcc/testsuite/gcc.dg/wch-implicit-function-declaration-c99.c
+new file mode 100644
+index 000000000..f91b693e8
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/wch-implicit-function-declaration-c99.c
+@@ -0,0 +1,16 @@
++/* { dg-do compile } */
++/* { dg-options "-std=gnu99" } */
++
++int declared_target (void);
++
++int
++with_suggestion (void)
++{
++  return declard_target (); /* { dg-warning "implicit declaration of function0 'declard_target'; did you mean 'declared_target'\\?" } */
++}
++
++int
++without_suggestion (void)
++{
++  return absent_target (); /* { dg-warning "implicit declaration of function1 'absent_target'" } */
++}
+diff --git a/gcc/testsuite/gcc.dg/wch-implicit-function-declaration-fno-permissive.c b/gcc/testsuite/gcc.dg/wch-implicit-function-declaration-fno-permissive.c
+new file mode 100644
+index 000000000..480a18144
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/wch-implicit-function-declaration-fno-permissive.c
+@@ -0,0 +1,8 @@
++/* { dg-do compile } */
++/* { dg-options "-std=gnu99 -fno-permissive" } */
++
++int
++caller (void)
++{
++  return absent_target (); /* { dg-warning "implicit declaration of function1 'absent_target'" } */
++}
+diff --git a/gcc/testsuite/gcc.dg/wch-implicit-function-declaration-system-warning.c b/gcc/testsuite/gcc.dg/wch-implicit-function-declaration-system-warning.c
+new file mode 100644
+index 000000000..521647dbf
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/wch-implicit-function-declaration-system-warning.c
+@@ -0,0 +1,6 @@
++/* { dg-do compile } */
++/* { dg-options "-isystem ${srcdir} -Wsystem-headers" } */
++
++#include <gcc.dg/wch-implicit-function-declaration-system.h>
++
++/* { dg-warning "implicit declaration of function1 'absent_from_system_header'" "" { target *-*-* } 4 } */
+diff --git a/gcc/testsuite/gcc.dg/wch-implicit-function-declaration-system.c b/gcc/testsuite/gcc.dg/wch-implicit-function-declaration-system.c
+new file mode 100644
+index 000000000..328777e3b
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/wch-implicit-function-declaration-system.c
+@@ -0,0 +1,12 @@
++/* { dg-do compile } */
++/* { dg-options "-isystem ${srcdir}" } */
++
++#include <gcc.dg/wch-implicit-function-declaration-system.h>
++
++int
++caller (void)
++{
++  return system_caller ();
++}
++
++/* { dg-bogus "implicit declaration" "" { target *-*-* } 4 } */
+diff --git a/gcc/testsuite/gcc.dg/wch-implicit-function-declaration-system.h b/gcc/testsuite/gcc.dg/wch-implicit-function-declaration-system.h
+new file mode 100644
+index 000000000..1953d57e1
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/wch-implicit-function-declaration-system.h
+@@ -0,0 +1,5 @@
++static int
++system_caller (void)
++{
++  return absent_from_system_header ();
++}
+diff --git a/gcc/testsuite/gcc.target/riscv/cv-alu-fail-compile.c b/gcc/testsuite/gcc.target/riscv/cv-alu-fail-compile.c
+index 89c7f6f2f..2555d17aa 100644
+--- a/gcc/testsuite/gcc.target/riscv/cv-alu-fail-compile.c
++++ b/gcc/testsuite/gcc.target/riscv/cv-alu-fail-compile.c
+@@ -1,6 +1,7 @@
+ /* { dg-do compile } */
+ /* { dg-require-effective-target cv_alu } */
+-/* { dg-options "-march=rv32i -mabi=ilp32" } */
++/* { dg-options "-march=rv32i -mabi=ilp32 -Werror=implicit-function-declaration" } */
++/* { dg-message "some warnings being treated as errors" "" { target *-*-* } 0 } */
+ 
+ extern int d;
+ 
+-- 
+2.55.0
+

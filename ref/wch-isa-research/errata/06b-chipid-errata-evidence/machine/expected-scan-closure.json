@@ -1,0 +1,47 @@
+{
+  "expected_lane_counts": {
+    "address-dataflow": 566520,
+    "address-form-opcode": 1133040,
+    "csr-opcode": 1133040,
+    "indirect-flow": 566520,
+    "literal-pointer": 1133040,
+    "raw-csr": 566520,
+    "relocation-source": 1133040,
+    "rom-address-dataflow": 5,
+    "rom-address-or-literal": 10,
+    "rom-csr-opcode": 10,
+    "rom-indirect-flow": 5,
+    "rom-raw-csr": 5,
+    "rom-symbol-metadata": 5,
+    "rom-xw-slot": 10,
+    "scope-control": 115622,
+    "symbol-string-debug": 566520,
+    "xw-slot": 1133040
+  },
+  "expected_scan_rows": 8046952,
+  "logical_object_occurrences": 682142,
+  "native_occurrences": 566520,
+  "non_native_occurrences": 115622,
+  "rom_occurrences": 5,
+  "rows_per_native_occurrence": 14,
+  "rows_per_non_native_occurrence": 1,
+  "rows_per_rom_occurrence": 10,
+  "schema_version": "2",
+  "scope_counts": {
+    "foreign-target": 115508,
+    "host": 57,
+    "rom-wrapper": 50,
+    "unknown-provenance": 564001,
+    "wch-closed": 2526
+  },
+  "source_set_counts": {
+    "evt": 848,
+    "mrs-2.4-arm": 115508,
+    "mrs-2.4-riscv-gcc12": 156339,
+    "mrs-2.4-riscv-gcc15": 88663,
+    "mrs-2.4-riscv-gcc8": 37439,
+    "mrs-2.5-linux-x64-gcc15": 89567,
+    "mrs-2.5-macos-arm64-gcc12": 156339,
+    "mrs-2.5-macos-arm64-gcc8": 37439
+  }
+}

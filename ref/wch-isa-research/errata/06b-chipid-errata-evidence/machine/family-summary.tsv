@@ -1,0 +1,23 @@
+schema_version	family	physical_artifacts
+2	BLE	10
+2	IQMath	50
+2	IoCHub	4
+2	LWNS	4
+2	Mesh	3
+2	Mesh ROM	4
+2	Motor	2
+2	MounRiver Studio package	1
+2	ROM API/JT header	3
+2	ROM candidate	1
+2	RV3UFI	16
+2	Touch	11
+2	UHSIF	1
+2	VoiceRcg	1
+2	WCHNET	6
+2	WCHUSB/other USB	3
+2	generic-runtime-candidate	506
+2	other target artifact	3652
+2	printf	72
+2	printfloat	72
+2	sh	72
+2	shfloat	72

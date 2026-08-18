@@ -1,0 +1,73 @@
+# RISC-V instruction census -- unidentified encodings
+# date               2026-08-03
+# repo               /Users/apple/Projects/gccriscv-wch
+# script             audit-report-f/followup/tools/isa_census.py
+# script_sha256      a4cd4d32c25e3ef338ee1659ddcd6fc096b2c9ce3f7b43ed8fe40f3a76828ee3
+# python             Python 3.14.6
+# python_exe         /opt/homebrew/opt/python@3.14/bin/python3.14
+# assembler          MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC12/bin/riscv-wch-elf-as
+# assembler_version  GNU assembler (xPack GNU RISC-V Embedded GCC arm64) 2.38
+# assembler_march    rv32imac_zba_zbb_zbc_zbs_xw
+# objdump_xcheck     MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC12/bin/riscv-wch-elf-objdump
+# objdump_xcheck_ver GNU objdump (xPack GNU RISC-V Embedded GCC arm64) 2.38
+# objdump_gcc15      MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC15/bin/riscv32-wch-elf-objdump
+# objdump_gcc15_ver  GNU objdump (GNU Binutils) 2.45
+# join key to isa-census.tsv: (scope, rep_archive)
+scope	rep_archive	member	section+offset(first)	len	raw_hex	features	count
+evt	tmp/wch-evt/evt/QingkeV4B_CH32V203_EVT/EXAM/BLE/LIB/libwchble.a	ble_task_process.o	.highcode.ble_controller_scheduler+0xa	2	0x0000	q=0,f3=0,b65=0	2
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC/riscv-none-embed/lib/rv32ec/ilp32e/libshflib.a	printfloat.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC/riscv-none-embed/lib/rv32ec/ilp32e/libshlib.a	wchprintf.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC/riscv-none-embed/lib/rv32ecxw/ilp32e/libshflib.a	printfloat.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC/riscv-none-embed/lib/rv32ecxw/ilp32e/libshlib.a	wchprintf.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC/riscv-none-embed/lib/rv32imac/ilp32/libshflib.a	printfloat.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC/riscv-none-embed/lib/rv32imac/ilp32/libshlib.a	wchprintf.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC/riscv-none-embed/lib/rv32imacxw/ilp32/libshflib.a	printfloat.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC/riscv-none-embed/lib/rv32imacxw/ilp32/libshlib.a	wchprintf.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC/riscv-none-embed/lib/rv32imafc/ilp32f/libshflib.a	printfloat.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC/riscv-none-embed/lib/rv32imafc/ilp32f/libshlib.a	wchprintf.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC/riscv-none-embed/lib/rv32imafcxw/ilp32f/libshflib.a	printfloat.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC/riscv-none-embed/lib/rv32imafcxw/ilp32f/libshlib.a	wchprintf.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32ec_zmmul/ilp32e/libshflib.a	printfloat.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32ec_zmmul/ilp32e/libshlib.a	wchprintf.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32ec_zmmul_xw/ilp32e/libshflib.a	printfloat.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32ec_zmmul_xw/ilp32e/libshlib.a	wchprintf.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32imac_zba_zbb_zbc_zbs/ilp32/libshflib.a	printfloat.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32imac_zba_zbb_zbc_zbs/ilp32/libshlib.a	wchprintf.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32imac_zba_zbb_zbc_zbs_xw/ilp32/libshflib.a	printfloat.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32imac_zba_zbb_zbc_zbs_xw/ilp32/libshlib.a	wchprintf.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32imafc_zba_zbb_zbc_zbs/ilp32f/libshflib.a	printfloat.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32imafc_zba_zbb_zbc_zbs/ilp32f/libshlib.a	wchprintf.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32imafc_zba_zbb_zbc_zbs_xw/ilp32f/libshflib.a	printfloat.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32imafc_zba_zbb_zbc_zbs_xw/ilp32f/libshlib.a	wchprintf.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32imc_zba_zbb_zbc_zbs/ilp32/libshflib.a	printfloat.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32imc_zba_zbb_zbc_zbs/ilp32/libshlib.a	wchprintf.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32imc_zba_zbb_zbc_zbs_xw/ilp32/libshflib.a	printfloat.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs24	MRS_Toolchain_MAC_V240/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32imc_zba_zbb_zbc_zbs_xw/ilp32/libshlib.a	wchprintf.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC/riscv-none-embed/lib/rv32ec/ilp32e/libshflib.a	printfloat.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC/riscv-none-embed/lib/rv32ec/ilp32e/libshlib.a	wchprintf.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC/riscv-none-embed/lib/rv32ecxw/ilp32e/libshflib.a	printfloat.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC/riscv-none-embed/lib/rv32ecxw/ilp32e/libshlib.a	wchprintf.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC/riscv-none-embed/lib/rv32imac/ilp32/libshflib.a	printfloat.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC/riscv-none-embed/lib/rv32imac/ilp32/libshlib.a	wchprintf.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC/riscv-none-embed/lib/rv32imacxw/ilp32/libshflib.a	printfloat.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC/riscv-none-embed/lib/rv32imacxw/ilp32/libshlib.a	wchprintf.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC/riscv-none-embed/lib/rv32imafc/ilp32f/libshflib.a	printfloat.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC/riscv-none-embed/lib/rv32imafc/ilp32f/libshlib.a	wchprintf.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC/riscv-none-embed/lib/rv32imafcxw/ilp32f/libshflib.a	printfloat.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC/riscv-none-embed/lib/rv32imafcxw/ilp32f/libshlib.a	wchprintf.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32ec_zmmul/ilp32e/libshflib.a	printfloat.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32ec_zmmul/ilp32e/libshlib.a	wchprintf.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32ec_zmmul_xw/ilp32e/libshflib.a	printfloat.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32ec_zmmul_xw/ilp32e/libshlib.a	wchprintf.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32imac_zba_zbb_zbc_zbs/ilp32/libshflib.a	printfloat.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32imac_zba_zbb_zbc_zbs/ilp32/libshlib.a	wchprintf.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32imac_zba_zbb_zbc_zbs_xw/ilp32/libshflib.a	printfloat.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32imac_zba_zbb_zbc_zbs_xw/ilp32/libshlib.a	wchprintf.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32imafc_zba_zbb_zbc_zbs/ilp32f/libshflib.a	printfloat.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32imafc_zba_zbb_zbc_zbs/ilp32f/libshlib.a	wchprintf.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32imafc_zba_zbb_zbc_zbs_xw/ilp32f/libshflib.a	printfloat.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32imafc_zba_zbb_zbc_zbs_xw/ilp32f/libshlib.a	wchprintf.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32imc_zba_zbb_zbc_zbs/ilp32/libshflib.a	printfloat.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32imc_zba_zbb_zbc_zbs/ilp32/libshlib.a	wchprintf.o	.text.wshc+0x2a	2	0x0000	q=0,f3=0,b65=0	3
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32imc_zba_zbb_zbc_zbs_xw/ilp32/libshflib.a	printfloat.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4
+mrs25	tmp/mrs-2.5/WCH/Toolchain/RISC-V Embedded GCC12/riscv-wch-elf/lib/rv32imc_zba_zbb_zbc_zbs_xw/ilp32/libshlib.a	wchprintf.o	.text.wshc+0x28	2	0x0000	q=0,f3=0,b65=0	4

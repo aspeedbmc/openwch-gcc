@@ -1,0 +1,812 @@
+From 669cab9c81a38b6b8e5055c252264cec4a41e232 Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 6 <phase6@openwch.local>
+Date: Sun, 16 Aug 2026 16:33:35 +0900
+Subject: [PATCH 1/2] RISC-V: add the WCH XW compressed byte and halfword
+ accesses
+
+WCH's QingKe cores add eight 16-bit compressed byte/halfword load and
+store forms.  gas accepts them as explicit mnemonics and also selects
+them for ordinary lbu/lhu/sb/sh whose operands fit, which is where the
+code-size difference against the vendor assembler comes from: the
+compiler emits no XW instruction of its own, the assembler picks the
+short encoding exactly as it does for RVC.
+
+Observed behaviour (vendor 8.2.0 as,
+tmp/toolchain_8.2.0/evidence/s1/probes/raw/05-xw-encodings):
+
+  c.lbu   a0,0(a1)  8821    c.lbusp a0,0(sp)  0880
+  c.lhu   a0,0(a1)  8a21    c.lhusp a0,0(sp)  2880
+  c.sb    a0,0(a1)  88a1    c.sbsp  a0,0(sp)  4880
+  c.sh    a0,0(a1)  8aa1    c.shsp  a0,0(sp)  6880
+
+The four register forms take over the Q0 and Q2 double-precision slots
+(c.fld/c.fldsp/c.fsd/c.fsdsp) and the sp forms use the reserved Q0
+funct3=100 slot, selecting the operation with bits 6-5.  The immediate
+field widths are pinned by the vendor assembler's accept/reject
+boundaries in the same probe set: c.lbu takes 31 and rejects 32, c.lhu
+takes 62 and rejects 64 and 1, c.lbusp takes 15 and rejects 16.  Field
+placement follows ref/wch-isa-research/isa/custom/wch-custom-isa-reference.md
+section 3.1, which also records that the sp halfword offset is not a
+linear low-bit mapping: uimm[1..3] goes to bits 8-10 and uimm[4] to bit 7.
+
+Because the encodings overlap the D slots, the two sets cannot be live
+at once.  The vendor assembler resolves this with a pair of complementary
+match functions over one global flag rather than a new instruction class
+-- its as and objdump export exactly match_with_wch_rvc_extension,
+match_without_wch_rvc_extension and wch_rvc_extension and nothing else
+(tmp/toolchain_8.2.0/evidence/s1/optsweep/optsweep.md sections 3.2 and
+3.3).  This reproduces that shape: the XW entries carry the C subset and
+the with-flag matcher, the four c.f{ld,sd}{,sp} entries and their fld/fsd
+aliases carry the without-flag matcher, and riscv_set_arch raises the flag
+when the parsed architecture names both xw and c.  The flag stays clear in
+the disassembler, so default objdump output is unchanged and still decodes
+these words through the D entries.
+
+Inside gas riscv_set_arch is the only writer of that flag, and it only ever
+raises it: nothing lowers it, so a later .attribute arch naming an
+architecture without xw does not hand the D slots back.  That is the vendor
+behaviour as well, not an omission here.  With .attribute arch,"rv32imac_xw"
+followed by .attribute arch,"rv32imafdc", a following c.fld is rejected by
+the vendor assembler and by this one alike, under every -march tried
+(tmp/toolchain_8.2.0/evidence/s4/defect-fidelity/out/*/raw/
+19-attr-arch-monotonic: four sources -- no directive, xw only, imafdc only,
+xw then imafdc -- each assembled under -march=rv32imafdc, rv32imac and
+rv32imafdc_xw, 12 invocations, derived table monotonic.tsv; the two sides
+agree case by case).  A reset path would therefore be a behaviour change,
+not a cleanup.
+
+Reading the parsed subset list rather than riscv_subset_supports is what
+splits the two diagnostics the vendor assembler produces, and both were
+measured: without c in -march the mnemonic is skipped for want of the
+compressed class and gas reports "unrecognized opcode"
+(tmp/toolchain_8.2.0/evidence/s1/probes/raw/05-xw-encodings/
+gating-correction), while ".option rvc" makes the class available so the
+entry is considered and the failing matcher downgrades it to "illegal
+operands" (tmp/toolchain_8.2.0/evidence/s1/probes/raw/05-xw-encodings/
+gating.tsv, 27 cases).  .option rvc must not by itself select XW.
+
+Operand characters: the vendor as carries four argument strings that
+stock 2.32 does not -- "Ct,Cb(Cs)", "Ct,CB(Cs)", "Ct,Ch(Cc)" and
+"Ct,CH(Cc)", extracted from its __TEXT,__cstring.  The (Cs)/(Cc) split
+fixes b/B as the register forms and h/H as the sp forms; lower and upper
+case then separate byte from halfword within each pair, which is not
+separately observable.  All four sub-characters are free in 2.32's C
+namespace.  xlen_requirement is 0 rather than 32 because the vendor
+assembler also accepts these under -march=rv64imacxw -mabi=lp64,
+emitting the same 8821 (measured).
+
+gas/testsuite: 13 new tests, every expected byte and diagnostic taken
+from a vendor-assembler run of the same source
+(tmp/toolchain_8.2.0/evidence/s3/d2/spec-probe): xw-compressed, xw-imm,
+xw-imm-fail, xw-gate-no-c, xw-gate-no-xw, xw-gate-option-rvc, xw-dslot,
+xw-dslot-fail, xw-dslot-nozw, xw-norvc, xw-attribute, xw-no-compress,
+xw-gate-attr-only.
+---
+ gas/config/tc-riscv.c                        | 53 ++++++++++++++++++
+ gas/testsuite/gas/riscv/xw-attribute.d       |  7 +++
+ gas/testsuite/gas/riscv/xw-attribute.s       |  3 ++
+ gas/testsuite/gas/riscv/xw-compressed.d      |  8 +++
+ gas/testsuite/gas/riscv/xw-compressed.s      | 16 ++++++
+ gas/testsuite/gas/riscv/xw-dslot-fail.d      |  3 ++
+ gas/testsuite/gas/riscv/xw-dslot-fail.l      |  5 ++
+ gas/testsuite/gas/riscv/xw-dslot-fail.s      |  4 ++
+ gas/testsuite/gas/riscv/xw-dslot-nozw.d      |  7 +++
+ gas/testsuite/gas/riscv/xw-dslot-nozw.s      |  4 ++
+ gas/testsuite/gas/riscv/xw-dslot.d           |  7 +++
+ gas/testsuite/gas/riscv/xw-dslot.s           |  5 ++
+ gas/testsuite/gas/riscv/xw-gate-attr-only.d  |  3 ++
+ gas/testsuite/gas/riscv/xw-gate-attr-only.l  |  2 +
+ gas/testsuite/gas/riscv/xw-gate-attr-only.s  |  2 +
+ gas/testsuite/gas/riscv/xw-gate-no-c.d       |  3 ++
+ gas/testsuite/gas/riscv/xw-gate-no-c.l       |  3 ++
+ gas/testsuite/gas/riscv/xw-gate-no-c.s       |  2 +
+ gas/testsuite/gas/riscv/xw-gate-no-xw.d      |  3 ++
+ gas/testsuite/gas/riscv/xw-gate-no-xw.l      |  3 ++
+ gas/testsuite/gas/riscv/xw-gate-no-xw.s      |  2 +
+ gas/testsuite/gas/riscv/xw-gate-option-rvc.d |  3 ++
+ gas/testsuite/gas/riscv/xw-gate-option-rvc.l |  3 ++
+ gas/testsuite/gas/riscv/xw-gate-option-rvc.s |  3 ++
+ gas/testsuite/gas/riscv/xw-imm-fail.d        |  3 ++
+ gas/testsuite/gas/riscv/xw-imm-fail.l        |  7 +++
+ gas/testsuite/gas/riscv/xw-imm-fail.s        |  6 +++
+ gas/testsuite/gas/riscv/xw-imm.d             |  8 +++
+ gas/testsuite/gas/riscv/xw-imm.s             | 12 +++++
+ gas/testsuite/gas/riscv/xw-no-compress.d     |  8 +++
+ gas/testsuite/gas/riscv/xw-no-compress.s     |  6 +++
+ gas/testsuite/gas/riscv/xw-norvc.d           |  7 +++
+ gas/testsuite/gas/riscv/xw-norvc.s           |  6 +++
+ include/opcode/riscv-opc.h                   | 28 ++++++++++
+ include/opcode/riscv.h                       | 33 ++++++++++++
+ opcodes/riscv-opc.c                          | 57 +++++++++++++++++---
+ 36 files changed, 327 insertions(+), 8 deletions(-)
+ create mode 100644 gas/testsuite/gas/riscv/xw-attribute.d
+ create mode 100644 gas/testsuite/gas/riscv/xw-attribute.s
+ create mode 100644 gas/testsuite/gas/riscv/xw-compressed.d
+ create mode 100644 gas/testsuite/gas/riscv/xw-compressed.s
+ create mode 100644 gas/testsuite/gas/riscv/xw-dslot-fail.d
+ create mode 100644 gas/testsuite/gas/riscv/xw-dslot-fail.l
+ create mode 100644 gas/testsuite/gas/riscv/xw-dslot-fail.s
+ create mode 100644 gas/testsuite/gas/riscv/xw-dslot-nozw.d
+ create mode 100644 gas/testsuite/gas/riscv/xw-dslot-nozw.s
+ create mode 100644 gas/testsuite/gas/riscv/xw-dslot.d
+ create mode 100644 gas/testsuite/gas/riscv/xw-dslot.s
+ create mode 100644 gas/testsuite/gas/riscv/xw-gate-attr-only.d
+ create mode 100644 gas/testsuite/gas/riscv/xw-gate-attr-only.l
+ create mode 100644 gas/testsuite/gas/riscv/xw-gate-attr-only.s
+ create mode 100644 gas/testsuite/gas/riscv/xw-gate-no-c.d
+ create mode 100644 gas/testsuite/gas/riscv/xw-gate-no-c.l
+ create mode 100644 gas/testsuite/gas/riscv/xw-gate-no-c.s
+ create mode 100644 gas/testsuite/gas/riscv/xw-gate-no-xw.d
+ create mode 100644 gas/testsuite/gas/riscv/xw-gate-no-xw.l
+ create mode 100644 gas/testsuite/gas/riscv/xw-gate-no-xw.s
+ create mode 100644 gas/testsuite/gas/riscv/xw-gate-option-rvc.d
+ create mode 100644 gas/testsuite/gas/riscv/xw-gate-option-rvc.l
+ create mode 100644 gas/testsuite/gas/riscv/xw-gate-option-rvc.s
+ create mode 100644 gas/testsuite/gas/riscv/xw-imm-fail.d
+ create mode 100644 gas/testsuite/gas/riscv/xw-imm-fail.l
+ create mode 100644 gas/testsuite/gas/riscv/xw-imm-fail.s
+ create mode 100644 gas/testsuite/gas/riscv/xw-imm.d
+ create mode 100644 gas/testsuite/gas/riscv/xw-imm.s
+ create mode 100644 gas/testsuite/gas/riscv/xw-no-compress.d
+ create mode 100644 gas/testsuite/gas/riscv/xw-no-compress.s
+ create mode 100644 gas/testsuite/gas/riscv/xw-norvc.d
+ create mode 100644 gas/testsuite/gas/riscv/xw-norvc.s
+
+diff --git a/gas/config/tc-riscv.c b/gas/config/tc-riscv.c
+index 99b007f5..4490b374 100644
+--- a/gas/config/tc-riscv.c
++++ b/gas/config/tc-riscv.c
+@@ -144,6 +144,15 @@ riscv_set_arch (const char *s)
+ 
+   riscv_release_subset_list (&riscv_subsets);
+   riscv_parse_subset (&rps, s);
++
++  /* The WCH XW compressed accesses need both the vendor extension and the
++     compressed base they encode into, so they are selected only by an
++     architecture naming xw together with c.  This looks at the parsed
++     subset list rather than riscv_subset_supports, because .option rvc
++     enables the compressed instructions without selecting XW.  */
++  if (riscv_lookup_subset (&riscv_subsets, "xw")
++      && riscv_lookup_subset (&riscv_subsets, "c"))
++    wch_rvc_extension = 1;
+ }
+ 
+ /* Handle of the OPCODE hash table.  */
+@@ -571,7 +580,11 @@ validate_riscv_insn (const struct riscv_opcode *opc, int length)
+ 	switch (c = *p++)
+ 	  {
+ 	  case 'a': used_bits |= ENCODE_RVC_J_IMM (-1U); break;
++	  case 'b': used_bits |= ENCODE_RVC_XW_B_UIMM (-1U); break;
++	  case 'B': used_bits |= ENCODE_RVC_XW_H_UIMM (-1U); break;
+ 	  case 'c': break; /* RS1, constrained to equal sp */
++	  case 'h': used_bits |= ENCODE_RVC_XW_BSP_UIMM (-1U); break;
++	  case 'H': used_bits |= ENCODE_RVC_XW_HSP_UIMM (-1U); break;
+ 	  case 'i': used_bits |= ENCODE_RVC_SIMM3(-1U); break;
+ 	  case 'j': used_bits |= ENCODE_RVC_IMM (-1U); break;
+ 	  case 'o': used_bits |= ENCODE_RVC_IMM (-1U); break;
+@@ -1523,6 +1536,46 @@ rvc_imm_done:
+ 		    break;
+ 		  ip->insn_opcode |= ENCODE_RVC_IMM (imm_expr->X_add_number);
+ 		  goto rvc_imm_done;
++		case 'b':
++		  if (riscv_handle_implicit_zero_offset (imm_expr, s))
++		    continue;
++		  if (my_getSmallExpression (imm_expr, imm_reloc, s, p)
++		      || imm_expr->X_op != O_constant
++		      || !VALID_RVC_XW_B_UIMM (imm_expr->X_add_number))
++		    break;
++		  ip->insn_opcode |=
++		    ENCODE_RVC_XW_B_UIMM (imm_expr->X_add_number);
++		  goto rvc_imm_done;
++		case 'B':
++		  if (riscv_handle_implicit_zero_offset (imm_expr, s))
++		    continue;
++		  if (my_getSmallExpression (imm_expr, imm_reloc, s, p)
++		      || imm_expr->X_op != O_constant
++		      || !VALID_RVC_XW_H_UIMM (imm_expr->X_add_number))
++		    break;
++		  ip->insn_opcode |=
++		    ENCODE_RVC_XW_H_UIMM (imm_expr->X_add_number);
++		  goto rvc_imm_done;
++		case 'h':
++		  if (riscv_handle_implicit_zero_offset (imm_expr, s))
++		    continue;
++		  if (my_getSmallExpression (imm_expr, imm_reloc, s, p)
++		      || imm_expr->X_op != O_constant
++		      || !VALID_RVC_XW_BSP_UIMM (imm_expr->X_add_number))
++		    break;
++		  ip->insn_opcode |=
++		    ENCODE_RVC_XW_BSP_UIMM (imm_expr->X_add_number);
++		  goto rvc_imm_done;
++		case 'H':
++		  if (riscv_handle_implicit_zero_offset (imm_expr, s))
++		    continue;
++		  if (my_getSmallExpression (imm_expr, imm_reloc, s, p)
++		      || imm_expr->X_op != O_constant
++		      || !VALID_RVC_XW_HSP_UIMM (imm_expr->X_add_number))
++		    break;
++		  ip->insn_opcode |=
++		    ENCODE_RVC_XW_HSP_UIMM (imm_expr->X_add_number);
++		  goto rvc_imm_done;
+ 		case 'k':
+ 		  if (riscv_handle_implicit_zero_offset (imm_expr, s))
+ 		    continue;
+diff --git a/gas/testsuite/gas/riscv/xw-attribute.d b/gas/testsuite/gas/riscv/xw-attribute.d
+new file mode 100644
+index 00000000..85871548
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-attribute.d
+@@ -0,0 +1,7 @@
++#as: -march=rv32imac -mabi=ilp32
++#objdump: -s -j .text
++
++.*:[ 	]+file format .*
++
++Contents of section .text:
++ 0000 88218821 .*
+diff --git a/gas/testsuite/gas/riscv/xw-attribute.s b/gas/testsuite/gas/riscv/xw-attribute.s
+new file mode 100644
+index 00000000..bd7efd31
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-attribute.s
+@@ -0,0 +1,3 @@
++	.attribute arch, "rv32imac_xw"
++	c.lbu	a0,0(a1)
++	lbu	a0,0(a1)
+diff --git a/gas/testsuite/gas/riscv/xw-compressed.d b/gas/testsuite/gas/riscv/xw-compressed.d
+new file mode 100644
+index 00000000..f2c22d63
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-compressed.d
+@@ -0,0 +1,8 @@
++#as: -march=rv32imac_xw -mabi=ilp32
++#objdump: -s -j .text
++
++.*:[ 	]+file format .*
++
++Contents of section .text:
++ 0000 88218a21 88a18aa1 08802880 48806880 .*
++ 0010 88218a21 88a18aa1 08802880 48806880 .*
+diff --git a/gas/testsuite/gas/riscv/xw-compressed.s b/gas/testsuite/gas/riscv/xw-compressed.s
+new file mode 100644
+index 00000000..ed67bf0e
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-compressed.s
+@@ -0,0 +1,16 @@
++	c.lbu	a0,0(a1)
++	c.lhu	a0,0(a1)
++	c.sb	a0,0(a1)
++	c.sh	a0,0(a1)
++	c.lbusp	a0,0(sp)
++	c.lhusp	a0,0(sp)
++	c.sbsp	a0,0(sp)
++	c.shsp	a0,0(sp)
++	lbu	a0,0(a1)
++	lhu	a0,0(a1)
++	sb	a0,0(a1)
++	sh	a0,0(a1)
++	lbu	a0,0(sp)
++	lhu	a0,0(sp)
++	sb	a0,0(sp)
++	sh	a0,0(sp)
+diff --git a/gas/testsuite/gas/riscv/xw-dslot-fail.d b/gas/testsuite/gas/riscv/xw-dslot-fail.d
+new file mode 100644
+index 00000000..6d1c411e
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-dslot-fail.d
+@@ -0,0 +1,3 @@
++#as: -march=rv32imafdc_xw -mabi=ilp32
++#source: xw-dslot-fail.s
++#error_output: xw-dslot-fail.l
+diff --git a/gas/testsuite/gas/riscv/xw-dslot-fail.l b/gas/testsuite/gas/riscv/xw-dslot-fail.l
+new file mode 100644
+index 00000000..9fd87528
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-dslot-fail.l
+@@ -0,0 +1,5 @@
++.*: Assembler messages:
++.*: Error: illegal operands `c.fld fa0,0\(a1\)'
++.*: Error: illegal operands `c.fsd fa0,0\(a1\)'
++.*: Error: illegal operands `c.fldsp fa0,0\(sp\)'
++.*: Error: illegal operands `c.fsdsp fa0,0\(sp\)'
+diff --git a/gas/testsuite/gas/riscv/xw-dslot-fail.s b/gas/testsuite/gas/riscv/xw-dslot-fail.s
+new file mode 100644
+index 00000000..6eb14930
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-dslot-fail.s
+@@ -0,0 +1,4 @@
++	c.fld	fa0,0(a1)
++	c.fsd	fa0,0(a1)
++	c.fldsp	fa0,0(sp)
++	c.fsdsp	fa0,0(sp)
+diff --git a/gas/testsuite/gas/riscv/xw-dslot-nozw.d b/gas/testsuite/gas/riscv/xw-dslot-nozw.d
+new file mode 100644
+index 00000000..90dc0e53
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-dslot-nozw.d
+@@ -0,0 +1,7 @@
++#as: -march=rv32imafdc -mabi=ilp32
++#objdump: -s -j .text
++
++.*:[ 	]+file format .*
++
++Contents of section .text:
++ 0000 882188a1 88210225 .*
+diff --git a/gas/testsuite/gas/riscv/xw-dslot-nozw.s b/gas/testsuite/gas/riscv/xw-dslot-nozw.s
+new file mode 100644
+index 00000000..d143f1dc
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-dslot-nozw.s
+@@ -0,0 +1,4 @@
++	fld	fa0,0(a1)
++	fsd	fa0,0(a1)
++	c.fld	fa0,0(a1)
++	c.fldsp	fa0,0(sp)
+diff --git a/gas/testsuite/gas/riscv/xw-dslot.d b/gas/testsuite/gas/riscv/xw-dslot.d
+new file mode 100644
+index 00000000..c1955a4c
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-dslot.d
+@@ -0,0 +1,7 @@
++#as: -march=rv32imafdc_xw -mabi=ilp32
++#objdump: -s -j .text
++
++.*:[ 	]+file format .*
++
++Contents of section .text:
++ 0000 07b50500 27b0a500 88612ae0 8821 .*
+diff --git a/gas/testsuite/gas/riscv/xw-dslot.s b/gas/testsuite/gas/riscv/xw-dslot.s
+new file mode 100644
+index 00000000..ec46ee1e
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-dslot.s
+@@ -0,0 +1,5 @@
++	fld	fa0,0(a1)
++	fsd	fa0,0(a1)
++	c.flw	fa0,0(a1)
++	c.fswsp	fa0,0(sp)
++	c.lbu	a0,0(a1)
+diff --git a/gas/testsuite/gas/riscv/xw-gate-attr-only.d b/gas/testsuite/gas/riscv/xw-gate-attr-only.d
+new file mode 100644
+index 00000000..93febb35
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-gate-attr-only.d
+@@ -0,0 +1,3 @@
++#as: -march=rv32imac -mabi=ilp32
++#source: xw-gate-attr-only.s
++#error_output: xw-gate-attr-only.l
+diff --git a/gas/testsuite/gas/riscv/xw-gate-attr-only.l b/gas/testsuite/gas/riscv/xw-gate-attr-only.l
+new file mode 100644
+index 00000000..0bca4129
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-gate-attr-only.l
+@@ -0,0 +1,2 @@
++.*: Assembler messages:
++.*: Error: illegal operands `c.lbu a0,0\(a1\)'
+diff --git a/gas/testsuite/gas/riscv/xw-gate-attr-only.s b/gas/testsuite/gas/riscv/xw-gate-attr-only.s
+new file mode 100644
+index 00000000..d7fa3f0d
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-gate-attr-only.s
+@@ -0,0 +1,2 @@
++	.attribute arch, "rv32imac"
++	c.lbu	a0,0(a1)
+diff --git a/gas/testsuite/gas/riscv/xw-gate-no-c.d b/gas/testsuite/gas/riscv/xw-gate-no-c.d
+new file mode 100644
+index 00000000..9b021288
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-gate-no-c.d
+@@ -0,0 +1,3 @@
++#as: -march=rv32i -mabi=ilp32
++#source: xw-gate-no-c.s
++#error_output: xw-gate-no-c.l
+diff --git a/gas/testsuite/gas/riscv/xw-gate-no-c.l b/gas/testsuite/gas/riscv/xw-gate-no-c.l
+new file mode 100644
+index 00000000..9a83ea42
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-gate-no-c.l
+@@ -0,0 +1,3 @@
++.*: Assembler messages:
++.*: Error: unrecognized opcode `c.lbu a0,0\(a1\)'
++.*: Error: unrecognized opcode `c.lbusp a0,0\(sp\)'
+diff --git a/gas/testsuite/gas/riscv/xw-gate-no-c.s b/gas/testsuite/gas/riscv/xw-gate-no-c.s
+new file mode 100644
+index 00000000..3ba8c009
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-gate-no-c.s
+@@ -0,0 +1,2 @@
++	c.lbu	a0,0(a1)
++	c.lbusp	a0,0(sp)
+diff --git a/gas/testsuite/gas/riscv/xw-gate-no-xw.d b/gas/testsuite/gas/riscv/xw-gate-no-xw.d
+new file mode 100644
+index 00000000..e46e2e60
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-gate-no-xw.d
+@@ -0,0 +1,3 @@
++#as: -march=rv32imac -mabi=ilp32
++#source: xw-gate-no-xw.s
++#error_output: xw-gate-no-xw.l
+diff --git a/gas/testsuite/gas/riscv/xw-gate-no-xw.l b/gas/testsuite/gas/riscv/xw-gate-no-xw.l
+new file mode 100644
+index 00000000..89911d55
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-gate-no-xw.l
+@@ -0,0 +1,3 @@
++.*: Assembler messages:
++.*: Error: illegal operands `c.lbu a0,0\(a1\)'
++.*: Error: illegal operands `c.lbusp a0,0\(sp\)'
+diff --git a/gas/testsuite/gas/riscv/xw-gate-no-xw.s b/gas/testsuite/gas/riscv/xw-gate-no-xw.s
+new file mode 100644
+index 00000000..3ba8c009
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-gate-no-xw.s
+@@ -0,0 +1,2 @@
++	c.lbu	a0,0(a1)
++	c.lbusp	a0,0(sp)
+diff --git a/gas/testsuite/gas/riscv/xw-gate-option-rvc.d b/gas/testsuite/gas/riscv/xw-gate-option-rvc.d
+new file mode 100644
+index 00000000..9cc44101
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-gate-option-rvc.d
+@@ -0,0 +1,3 @@
++#as: -march=rv32i -mabi=ilp32
++#source: xw-gate-option-rvc.s
++#error_output: xw-gate-option-rvc.l
+diff --git a/gas/testsuite/gas/riscv/xw-gate-option-rvc.l b/gas/testsuite/gas/riscv/xw-gate-option-rvc.l
+new file mode 100644
+index 00000000..89911d55
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-gate-option-rvc.l
+@@ -0,0 +1,3 @@
++.*: Assembler messages:
++.*: Error: illegal operands `c.lbu a0,0\(a1\)'
++.*: Error: illegal operands `c.lbusp a0,0\(sp\)'
+diff --git a/gas/testsuite/gas/riscv/xw-gate-option-rvc.s b/gas/testsuite/gas/riscv/xw-gate-option-rvc.s
+new file mode 100644
+index 00000000..78954dae
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-gate-option-rvc.s
+@@ -0,0 +1,3 @@
++	.option	rvc
++	c.lbu	a0,0(a1)
++	c.lbusp	a0,0(sp)
+diff --git a/gas/testsuite/gas/riscv/xw-imm-fail.d b/gas/testsuite/gas/riscv/xw-imm-fail.d
+new file mode 100644
+index 00000000..03ef40d4
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-imm-fail.d
+@@ -0,0 +1,3 @@
++#as: -march=rv32imac_xw -mabi=ilp32
++#source: xw-imm-fail.s
++#error_output: xw-imm-fail.l
+diff --git a/gas/testsuite/gas/riscv/xw-imm-fail.l b/gas/testsuite/gas/riscv/xw-imm-fail.l
+new file mode 100644
+index 00000000..9ba587b9
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-imm-fail.l
+@@ -0,0 +1,7 @@
++.*: Assembler messages:
++.*: Error: illegal operands `c.lbu a0,32\(a1\)'
++.*: Error: illegal operands `c.lhu a0,64\(a1\)'
++.*: Error: illegal operands `c.lhu a0,1\(a1\)'
++.*: Error: illegal operands `c.lbusp a0,16\(sp\)'
++.*: Error: illegal operands `c.lhusp a0,32\(sp\)'
++.*: Error: illegal operands `c.lhusp a0,1\(sp\)'
+diff --git a/gas/testsuite/gas/riscv/xw-imm-fail.s b/gas/testsuite/gas/riscv/xw-imm-fail.s
+new file mode 100644
+index 00000000..e7237998
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-imm-fail.s
+@@ -0,0 +1,6 @@
++	c.lbu	a0,32(a1)
++	c.lhu	a0,64(a1)
++	c.lhu	a0,1(a1)
++	c.lbusp	a0,16(sp)
++	c.lhusp	a0,32(sp)
++	c.lhusp	a0,1(sp)
+diff --git a/gas/testsuite/gas/riscv/xw-imm.d b/gas/testsuite/gas/riscv/xw-imm.d
+new file mode 100644
+index 00000000..db82c91f
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-imm.d
+@@ -0,0 +1,8 @@
++#as: -march=rv32imac_xw -mabi=ilp32
++#objdump: -s -j .text
++
++.*:[ 	]+file format .*
++
++Contents of section .text:
++ 0000 e83dea3d e8bdeabd 8887a887 c887e887 .*
++ 0010 88398a35 8884a883 .*
+diff --git a/gas/testsuite/gas/riscv/xw-imm.s b/gas/testsuite/gas/riscv/xw-imm.s
+new file mode 100644
+index 00000000..16f38305
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-imm.s
+@@ -0,0 +1,12 @@
++	c.lbu	a0,31(a1)
++	c.lhu	a0,62(a1)
++	c.sb	a0,31(a1)
++	c.sh	a0,62(a1)
++	c.lbusp	a0,15(sp)
++	c.lhusp	a0,30(sp)
++	c.sbsp	a0,15(sp)
++	c.shsp	a0,30(sp)
++	lbu	a0,17(a1)
++	lhu	a0,40(a1)
++	lbu	a0,9(sp)
++	lhu	a0,22(sp)
+diff --git a/gas/testsuite/gas/riscv/xw-no-compress.d b/gas/testsuite/gas/riscv/xw-no-compress.d
+new file mode 100644
+index 00000000..48a7735d
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-no-compress.d
+@@ -0,0 +1,8 @@
++#as: -march=rv32imac_xw -mabi=ilp32
++#objdump: -s -j .text
++
++.*:[ 	]+file format .*
++
++Contents of section .text:
++ 0000 83c20500 03450300 03c50502 03d51500 .*
++ 0010 23005100 03d50504 .*
+diff --git a/gas/testsuite/gas/riscv/xw-no-compress.s b/gas/testsuite/gas/riscv/xw-no-compress.s
+new file mode 100644
+index 00000000..23394bae
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-no-compress.s
+@@ -0,0 +1,6 @@
++	lbu	t0,0(a1)
++	lbu	a0,0(t1)
++	lbu	a0,32(a1)
++	lhu	a0,1(a1)
++	sb	t0,0(sp)
++	lhu	a0,64(a1)
+diff --git a/gas/testsuite/gas/riscv/xw-norvc.d b/gas/testsuite/gas/riscv/xw-norvc.d
+new file mode 100644
+index 00000000..7f8707ec
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-norvc.d
+@@ -0,0 +1,7 @@
++#as: -march=rv32imac_xw -mabi=ilp32
++#objdump: -s -j .text
++
++.*:[ 	]+file format .*
++
++Contents of section .text:
++ 0000 03c50500 2380a500 882188a1 .*
+diff --git a/gas/testsuite/gas/riscv/xw-norvc.s b/gas/testsuite/gas/riscv/xw-norvc.s
+new file mode 100644
+index 00000000..a4fef5e7
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-norvc.s
+@@ -0,0 +1,6 @@
++	.option	norvc
++	lbu	a0,0(a1)
++	sb	a0,0(a1)
++	.option	rvc
++	lbu	a0,0(a1)
++	sb	a0,0(a1)
+diff --git a/include/opcode/riscv-opc.h b/include/opcode/riscv-opc.h
+index b5b98f8e..4ac1f768 100644
+--- a/include/opcode/riscv-opc.h
++++ b/include/opcode/riscv-opc.h
+@@ -507,6 +507,26 @@
+ #define MASK_C_SWSP  0xe003
+ #define MATCH_C_FSWSP 0xe002
+ #define MASK_C_FSWSP  0xe003
++/* WCH XW compressed byte/halfword load and store instructions.  The
++   register forms take over the Q0 (funct3 001/101) and Q2 (funct3 001/101)
++   double-precision load/store slots; the sp forms use the reserved
++   Q0 funct3 100 slot and select the operation with bits 6-5.  */
++#define MATCH_C_XW_LBU 0x2000
++#define MASK_C_XW_LBU  0xe003
++#define MATCH_C_XW_LHU 0x2002
++#define MASK_C_XW_LHU  0xe003
++#define MATCH_C_XW_SB 0xa000
++#define MASK_C_XW_SB  0xe003
++#define MATCH_C_XW_SH 0xa002
++#define MASK_C_XW_SH  0xe003
++#define MATCH_C_XW_LBUSP 0x8000
++#define MASK_C_XW_LBUSP  0xf863
++#define MATCH_C_XW_LHUSP 0x8020
++#define MASK_C_XW_LHUSP  0xf863
++#define MATCH_C_XW_SBSP 0x8040
++#define MASK_C_XW_SBSP  0xf863
++#define MATCH_C_XW_SHSP 0x8060
++#define MASK_C_XW_SHSP  0xf863
+ #define MATCH_C_NOP 0x1
+ #define MASK_C_NOP  0xffff
+ #define MATCH_C_ADDI16SP 0x6101
+@@ -1058,6 +1078,14 @@ DECLARE_INSN(fmsub_q, MATCH_FMSUB_Q, MASK_FMSUB_Q)
+ DECLARE_INSN(fnmsub_q, MATCH_FNMSUB_Q, MASK_FNMSUB_Q)
+ DECLARE_INSN(fnmadd_q, MATCH_FNMADD_Q, MASK_FNMADD_Q)
+ DECLARE_INSN(c_addi4spn, MATCH_C_ADDI4SPN, MASK_C_ADDI4SPN)
++DECLARE_INSN(c_xw_lbu, MATCH_C_XW_LBU, MASK_C_XW_LBU)
++DECLARE_INSN(c_xw_lhu, MATCH_C_XW_LHU, MASK_C_XW_LHU)
++DECLARE_INSN(c_xw_sb, MATCH_C_XW_SB, MASK_C_XW_SB)
++DECLARE_INSN(c_xw_sh, MATCH_C_XW_SH, MASK_C_XW_SH)
++DECLARE_INSN(c_xw_lbusp, MATCH_C_XW_LBUSP, MASK_C_XW_LBUSP)
++DECLARE_INSN(c_xw_lhusp, MATCH_C_XW_LHUSP, MASK_C_XW_LHUSP)
++DECLARE_INSN(c_xw_sbsp, MATCH_C_XW_SBSP, MASK_C_XW_SBSP)
++DECLARE_INSN(c_xw_shsp, MATCH_C_XW_SHSP, MASK_C_XW_SHSP)
+ DECLARE_INSN(c_fld, MATCH_C_FLD, MASK_C_FLD)
+ DECLARE_INSN(c_lw, MATCH_C_LW, MASK_C_LW)
+ DECLARE_INSN(c_flw, MATCH_C_FLW, MASK_C_FLW)
+diff --git a/include/opcode/riscv.h b/include/opcode/riscv.h
+index 4acc25ce..8c7f63bf 100644
+--- a/include/opcode/riscv.h
++++ b/include/opcode/riscv.h
+@@ -95,6 +95,17 @@ static const char * const riscv_pred_succ[16] =
+   ((RV_X(x, 9, 4) << 2) | (RV_X(x, 7, 2) << 6))
+ #define EXTRACT_RVC_SDSP_IMM(x) \
+   ((RV_X(x, 10, 3) << 3) | (RV_X(x, 7, 3) << 6))
++/* WCH XW compressed byte/halfword load and store offsets.  The register
++   forms reuse the whole Q0/Q2 immediate area (bit 12, bits 11-10, bits 6-5);
++   the sp forms only have bits 10-7 available.  */
++#define EXTRACT_RVC_XW_B_UIMM(x) \
++  (RV_X(x, 12, 1) | (RV_X(x, 5, 2) << 1) | (RV_X(x, 10, 2) << 3))
++#define EXTRACT_RVC_XW_H_UIMM(x) \
++  ((RV_X(x, 5, 2) << 1) | (RV_X(x, 10, 2) << 3) | (RV_X(x, 12, 1) << 5))
++#define EXTRACT_RVC_XW_BSP_UIMM(x) \
++  (RV_X(x, 7, 4))
++#define EXTRACT_RVC_XW_HSP_UIMM(x) \
++  ((RV_X(x, 8, 3) << 1) | (RV_X(x, 7, 1) << 4))
+ #define EXTRACT_RVC_B_IMM(x) \
+   ((RV_X(x, 3, 2) << 1) | (RV_X(x, 10, 2) << 3) | (RV_X(x, 2, 1) << 5) | (RV_X(x, 5, 2) << 6) | (-RV_X(x, 12, 1) << 8))
+ #define EXTRACT_RVC_J_IMM(x) \
+@@ -134,6 +145,14 @@ static const char * const riscv_pred_succ[16] =
+   ((RV_X(x, 2, 4) << 9) | (RV_X(x, 6, 2) << 7))
+ #define ENCODE_RVC_SDSP_IMM(x) \
+   ((RV_X(x, 3, 3) << 10) | (RV_X(x, 6, 3) << 7))
++#define ENCODE_RVC_XW_B_UIMM(x) \
++  ((RV_X(x, 0, 1) << 12) | (RV_X(x, 1, 2) << 5) | (RV_X(x, 3, 2) << 10))
++#define ENCODE_RVC_XW_H_UIMM(x) \
++  ((RV_X(x, 1, 2) << 5) | (RV_X(x, 3, 2) << 10) | (RV_X(x, 5, 1) << 12))
++#define ENCODE_RVC_XW_BSP_UIMM(x) \
++  (RV_X(x, 0, 4) << 7)
++#define ENCODE_RVC_XW_HSP_UIMM(x) \
++  ((RV_X(x, 1, 3) << 8) | (RV_X(x, 4, 1) << 7))
+ #define ENCODE_RVC_B_IMM(x) \
+   ((RV_X(x, 1, 2) << 3) | (RV_X(x, 3, 2) << 10) | (RV_X(x, 5, 1) << 2) | (RV_X(x, 6, 2) << 5) | (RV_X(x, 8, 1) << 12))
+ #define ENCODE_RVC_J_IMM(x) \
+@@ -156,6 +175,10 @@ static const char * const riscv_pred_succ[16] =
+ #define VALID_RVC_LDSP_IMM(x) (EXTRACT_RVC_LDSP_IMM(ENCODE_RVC_LDSP_IMM(x)) == (x))
+ #define VALID_RVC_SWSP_IMM(x) (EXTRACT_RVC_SWSP_IMM(ENCODE_RVC_SWSP_IMM(x)) == (x))
+ #define VALID_RVC_SDSP_IMM(x) (EXTRACT_RVC_SDSP_IMM(ENCODE_RVC_SDSP_IMM(x)) == (x))
++#define VALID_RVC_XW_B_UIMM(x) (EXTRACT_RVC_XW_B_UIMM(ENCODE_RVC_XW_B_UIMM(x)) == (x))
++#define VALID_RVC_XW_H_UIMM(x) (EXTRACT_RVC_XW_H_UIMM(ENCODE_RVC_XW_H_UIMM(x)) == (x))
++#define VALID_RVC_XW_BSP_UIMM(x) (EXTRACT_RVC_XW_BSP_UIMM(ENCODE_RVC_XW_BSP_UIMM(x)) == (x))
++#define VALID_RVC_XW_HSP_UIMM(x) (EXTRACT_RVC_XW_HSP_UIMM(ENCODE_RVC_XW_HSP_UIMM(x)) == (x))
+ #define VALID_RVC_B_IMM(x) (EXTRACT_RVC_B_IMM(ENCODE_RVC_B_IMM(x)) == (x))
+ #define VALID_RVC_J_IMM(x) (EXTRACT_RVC_J_IMM(ENCODE_RVC_J_IMM(x)) == (x))
+ 
+@@ -396,6 +419,16 @@ enum
+ };
+ 
+ 
++/* Non-zero when the WCH XW compressed byte/halfword load and store
++   encodings are selected.  They reuse the Q0/Q2 double-precision load and
++   store slots, so the two sets are mutually exclusive: the assembler sets
++   this from the -march string, and the disassembler leaves it clear unless
++   the user asks for the WCH decoding.  */
++extern int wch_rvc_extension;
++
++extern int match_with_wch_rvc_extension (const struct riscv_opcode *, insn_t);
++extern int match_without_wch_rvc_extension (const struct riscv_opcode *, insn_t);
++
+ extern const char * const riscv_gpr_names_numeric[NGPR];
+ extern const char * const riscv_gpr_names_abi[NGPR];
+ extern const char * const riscv_fpr_names_numeric[NFPR];
+diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
+index bd652590..610d41dc 100644
+--- a/opcodes/riscv-opc.c
++++ b/opcodes/riscv-opc.c
+@@ -93,6 +93,27 @@ match_never (const struct riscv_opcode *op ATTRIBUTE_UNUSED,
+   return 0;
+ }
+ 
++/* The WCH XW compressed byte and halfword accesses reuse the Q0 and Q2
++   double-precision load and store slots, so a given encoding means either
++   the XW instruction or the D instruction, never both.  wch_rvc_extension
++   selects which of the two overlapping sets is live: the assembler sets it
++   from the -march string, and it stays clear everywhere else, so the D
++   forms keep their standard behaviour by default.  */
++
++int wch_rvc_extension = 0;
++
++int
++match_with_wch_rvc_extension (const struct riscv_opcode *op, insn_t insn)
++{
++  return match_opcode (op, insn) && wch_rvc_extension;
++}
++
++int
++match_without_wch_rvc_extension (const struct riscv_opcode *op, insn_t insn)
++{
++  return match_opcode (op, insn) && !wch_rvc_extension;
++}
++
+ static int
+ match_rs1_eq_rs2 (const struct riscv_opcode *op, insn_t insn)
+ {
+@@ -304,10 +325,14 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"sub",         0, {"I", 0},   "d,s,t",  MATCH_SUB, MASK_SUB, match_opcode, 0 },
+ {"lb",          0, {"I", 0},   "d,o(s)",  MATCH_LB, MASK_LB, match_opcode, INSN_DREF|INSN_1_BYTE },
+ {"lb",          0, {"I", 0},   "d,A",  0, (int) M_LB, match_never, INSN_MACRO },
++{"lbu",         0, {"C", 0},   "Ct,Ch(Cc)",  MATCH_C_XW_LBUSP, MASK_C_XW_LBUSP, match_with_wch_rvc_extension, INSN_ALIAS|INSN_DREF|INSN_1_BYTE },
++{"lbu",         0, {"C", 0},   "Ct,Cb(Cs)",  MATCH_C_XW_LBU, MASK_C_XW_LBU, match_with_wch_rvc_extension, INSN_ALIAS|INSN_DREF|INSN_1_BYTE },
+ {"lbu",         0, {"I", 0},   "d,o(s)",  MATCH_LBU, MASK_LBU, match_opcode, INSN_DREF|INSN_1_BYTE },
+ {"lbu",         0, {"I", 0},   "d,A",  0, (int) M_LBU, match_never, INSN_MACRO },
+ {"lh",          0, {"I", 0},   "d,o(s)",  MATCH_LH, MASK_LH, match_opcode, INSN_DREF|INSN_2_BYTE },
+ {"lh",          0, {"I", 0},   "d,A",  0, (int) M_LH, match_never, INSN_MACRO },
++{"lhu",         0, {"C", 0},   "Ct,CH(Cc)",  MATCH_C_XW_LHUSP, MASK_C_XW_LHUSP, match_with_wch_rvc_extension, INSN_ALIAS|INSN_DREF|INSN_2_BYTE },
++{"lhu",         0, {"C", 0},   "Ct,CB(Cs)",  MATCH_C_XW_LHU, MASK_C_XW_LHU, match_with_wch_rvc_extension, INSN_ALIAS|INSN_DREF|INSN_2_BYTE },
+ {"lhu",         0, {"I", 0},   "d,o(s)",  MATCH_LHU, MASK_LHU, match_opcode, INSN_DREF|INSN_2_BYTE },
+ {"lhu",         0, {"I", 0},   "d,A",  0, (int) M_LHU, match_never, INSN_MACRO },
+ {"lw",          0, {"C", 0},   "d,Cm(Cc)",  MATCH_C_LWSP, MASK_C_LWSP, match_rd_nonzero, INSN_ALIAS|INSN_DREF|INSN_4_BYTE },
+@@ -333,8 +358,12 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"sltu",        0, {"I", 0},   "d,s,j",  MATCH_SLTIU, MASK_SLTIU, match_opcode, INSN_ALIAS },
+ {"sgt",         0, {"I", 0},   "d,t,s",  MATCH_SLT, MASK_SLT, match_opcode, INSN_ALIAS },
+ {"sgtu",        0, {"I", 0},   "d,t,s",  MATCH_SLTU, MASK_SLTU, match_opcode, INSN_ALIAS },
++{"sb",          0, {"C", 0},   "Ct,Ch(Cc)",  MATCH_C_XW_SBSP, MASK_C_XW_SBSP, match_with_wch_rvc_extension, INSN_ALIAS|INSN_DREF|INSN_1_BYTE },
++{"sb",          0, {"C", 0},   "Ct,Cb(Cs)",  MATCH_C_XW_SB, MASK_C_XW_SB, match_with_wch_rvc_extension, INSN_ALIAS|INSN_DREF|INSN_1_BYTE },
+ {"sb",          0, {"I", 0},   "t,q(s)",  MATCH_SB, MASK_SB, match_opcode, INSN_DREF|INSN_1_BYTE },
+ {"sb",          0, {"I", 0},   "t,A,s",  0, (int) M_SB, match_never, INSN_MACRO },
++{"sh",          0, {"C", 0},   "Ct,CH(Cc)",  MATCH_C_XW_SHSP, MASK_C_XW_SHSP, match_with_wch_rvc_extension, INSN_ALIAS|INSN_DREF|INSN_2_BYTE },
++{"sh",          0, {"C", 0},   "Ct,CB(Cs)",  MATCH_C_XW_SH, MASK_C_XW_SH, match_with_wch_rvc_extension, INSN_ALIAS|INSN_DREF|INSN_2_BYTE },
+ {"sh",          0, {"I", 0},   "t,q(s)",  MATCH_SH, MASK_SH, match_opcode, INSN_DREF|INSN_2_BYTE },
+ {"sh",          0, {"I", 0},   "t,A,s",  0, (int) M_SH, match_never, INSN_MACRO },
+ {"sw",          0, {"C", 0},   "CV,CM(Cc)",  MATCH_C_SWSP, MASK_C_SWSP, match_opcode, INSN_ALIAS|INSN_DREF|INSN_4_BYTE },
+@@ -577,12 +606,12 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"fcvt.s.lu", 64, {"F", 0}, "D,s,m",  MATCH_FCVT_S_LU, MASK_FCVT_S_LU, match_opcode, 0 },
+ 
+ /* Double-precision floating-point instruction subset */
+-{"fld",        0, {"D", "C", 0},   "D,Cn(Cc)",  MATCH_C_FLDSP, MASK_C_FLDSP, match_opcode, INSN_ALIAS|INSN_DREF|INSN_8_BYTE },
+-{"fld",        0, {"D", "C", 0},   "CD,Cl(Cs)",  MATCH_C_FLD, MASK_C_FLD, match_opcode, INSN_ALIAS|INSN_DREF|INSN_8_BYTE },
++{"fld",        0, {"D", "C", 0},   "D,Cn(Cc)",  MATCH_C_FLDSP, MASK_C_FLDSP, match_without_wch_rvc_extension, INSN_ALIAS|INSN_DREF|INSN_8_BYTE },
++{"fld",        0, {"D", "C", 0},   "CD,Cl(Cs)",  MATCH_C_FLD, MASK_C_FLD, match_without_wch_rvc_extension, INSN_ALIAS|INSN_DREF|INSN_8_BYTE },
+ {"fld",        0, {"D", 0},   "D,o(s)",  MATCH_FLD, MASK_FLD, match_opcode, INSN_DREF|INSN_8_BYTE },
+ {"fld",        0, {"D", 0},   "D,A,s",  0, (int) M_FLD, match_never, INSN_MACRO },
+-{"fsd",        0, {"D", "C", 0},   "CT,CN(Cc)",  MATCH_C_FSDSP, MASK_C_FSDSP, match_opcode, INSN_ALIAS|INSN_DREF|INSN_8_BYTE },
+-{"fsd",        0, {"D", "C", 0},   "CD,Cl(Cs)",  MATCH_C_FSD, MASK_C_FSD, match_opcode, INSN_ALIAS|INSN_DREF|INSN_8_BYTE },
++{"fsd",        0, {"D", "C", 0},   "CT,CN(Cc)",  MATCH_C_FSDSP, MASK_C_FSDSP, match_without_wch_rvc_extension, INSN_ALIAS|INSN_DREF|INSN_8_BYTE },
++{"fsd",        0, {"D", "C", 0},   "CD,Cl(Cs)",  MATCH_C_FSD, MASK_C_FSD, match_without_wch_rvc_extension, INSN_ALIAS|INSN_DREF|INSN_8_BYTE },
+ {"fsd",        0, {"D", 0},   "T,q(s)",  MATCH_FSD, MASK_FSD, match_opcode, INSN_DREF|INSN_8_BYTE },
+ {"fsd",        0, {"D", 0},   "T,A,s",  0, (int) M_FSD, match_never, INSN_MACRO },
+ {"fmv.d",      0, {"D", 0},   "D,U",  MATCH_FSGNJ_D, MASK_FSGNJ_D, match_rs1_eq_rs2, INSN_ALIAS },
+@@ -737,15 +766,27 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"c.ld",      64, {"C", 0}, "Ct,Cl(Cs)",  MATCH_C_LD, MASK_C_LD, match_opcode, INSN_DREF|INSN_8_BYTE },
+ {"c.sdsp",    64, {"C", 0}, "CV,CN(Cc)",  MATCH_C_SDSP, MASK_C_SDSP, match_opcode, INSN_DREF|INSN_8_BYTE },
+ {"c.sd",      64, {"C", 0}, "Ct,Cl(Cs)",  MATCH_C_SD, MASK_C_SD, match_opcode, INSN_DREF|INSN_8_BYTE },
+-{"c.fldsp",    0, {"D", "C", 0},   "D,Cn(Cc)",  MATCH_C_FLDSP, MASK_C_FLDSP, match_opcode, INSN_DREF|INSN_8_BYTE },
+-{"c.fld",      0, {"D", "C", 0},   "CD,Cl(Cs)",  MATCH_C_FLD, MASK_C_FLD, match_opcode, INSN_DREF|INSN_8_BYTE },
+-{"c.fsdsp",    0, {"D", "C", 0},   "CT,CN(Cc)",  MATCH_C_FSDSP, MASK_C_FSDSP, match_opcode, INSN_DREF|INSN_8_BYTE },
+-{"c.fsd",      0, {"D", "C", 0},   "CD,Cl(Cs)",  MATCH_C_FSD, MASK_C_FSD, match_opcode, INSN_DREF|INSN_8_BYTE },
++{"c.fldsp",    0, {"D", "C", 0},   "D,Cn(Cc)",  MATCH_C_FLDSP, MASK_C_FLDSP, match_without_wch_rvc_extension, INSN_DREF|INSN_8_BYTE },
++{"c.fld",      0, {"D", "C", 0},   "CD,Cl(Cs)",  MATCH_C_FLD, MASK_C_FLD, match_without_wch_rvc_extension, INSN_DREF|INSN_8_BYTE },
++{"c.fsdsp",    0, {"D", "C", 0},   "CT,CN(Cc)",  MATCH_C_FSDSP, MASK_C_FSDSP, match_without_wch_rvc_extension, INSN_DREF|INSN_8_BYTE },
++{"c.fsd",      0, {"D", "C", 0},   "CD,Cl(Cs)",  MATCH_C_FSD, MASK_C_FSD, match_without_wch_rvc_extension, INSN_DREF|INSN_8_BYTE },
+ {"c.flwsp",   32, {"F", "C", 0}, "D,Cm(Cc)",  MATCH_C_FLWSP, MASK_C_FLWSP, match_opcode, INSN_DREF|INSN_4_BYTE },
+ {"c.flw",     32, {"F", "C", 0}, "CD,Ck(Cs)",  MATCH_C_FLW, MASK_C_FLW, match_opcode, INSN_DREF|INSN_4_BYTE },
+ {"c.fswsp",   32, {"F", "C", 0}, "CT,CM(Cc)",  MATCH_C_FSWSP, MASK_C_FSWSP, match_opcode, INSN_DREF|INSN_4_BYTE },
+ {"c.fsw",     32, {"F", "C", 0}, "CD,Ck(Cs)",  MATCH_C_FSW, MASK_C_FSW, match_opcode, INSN_DREF|INSN_4_BYTE },
+ 
++/* WCH XW compressed byte and halfword accesses.  These share the Q0 and Q2
++   double-precision load and store slots above, so exactly one of the two
++   sets is live at a time (see match_with_wch_rvc_extension).  */
++{"c.lbu",      0, {"C", 0}, "Ct,Cb(Cs)",  MATCH_C_XW_LBU, MASK_C_XW_LBU, match_with_wch_rvc_extension, INSN_DREF|INSN_1_BYTE },
++{"c.lhu",      0, {"C", 0}, "Ct,CB(Cs)",  MATCH_C_XW_LHU, MASK_C_XW_LHU, match_with_wch_rvc_extension, INSN_DREF|INSN_2_BYTE },
++{"c.sb",       0, {"C", 0}, "Ct,Cb(Cs)",  MATCH_C_XW_SB, MASK_C_XW_SB, match_with_wch_rvc_extension, INSN_DREF|INSN_1_BYTE },
++{"c.sh",       0, {"C", 0}, "Ct,CB(Cs)",  MATCH_C_XW_SH, MASK_C_XW_SH, match_with_wch_rvc_extension, INSN_DREF|INSN_2_BYTE },
++{"c.lbusp",    0, {"C", 0}, "Ct,Ch(Cc)",  MATCH_C_XW_LBUSP, MASK_C_XW_LBUSP, match_with_wch_rvc_extension, INSN_DREF|INSN_1_BYTE },
++{"c.lhusp",    0, {"C", 0}, "Ct,CH(Cc)",  MATCH_C_XW_LHUSP, MASK_C_XW_LHUSP, match_with_wch_rvc_extension, INSN_DREF|INSN_2_BYTE },
++{"c.sbsp",     0, {"C", 0}, "Ct,Ch(Cc)",  MATCH_C_XW_SBSP, MASK_C_XW_SBSP, match_with_wch_rvc_extension, INSN_DREF|INSN_1_BYTE },
++{"c.shsp",     0, {"C", 0}, "Ct,CH(Cc)",  MATCH_C_XW_SHSP, MASK_C_XW_SHSP, match_with_wch_rvc_extension, INSN_DREF|INSN_2_BYTE },
++
+ /* Supervisor instructions */
+ {"csrr",       0, {"I", 0},   "d,E",  MATCH_CSRRS, MASK_CSRRS | MASK_RS1, match_opcode, INSN_ALIAS },
+ {"csrwi",      0, {"I", 0},   "E,Z",  MATCH_CSRRWI, MASK_CSRRWI | MASK_RD, match_opcode, INSN_ALIAS },
+-- 
+2.55.0
+

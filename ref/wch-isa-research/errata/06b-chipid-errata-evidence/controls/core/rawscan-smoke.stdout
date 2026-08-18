@@ -1,0 +1,58 @@
+archive                                  members     insn     XW?  CSR  addr  detail
+libIQMath_RV32EC_ZMMUL_XW.a                   30    34036      13    0   237  ADDR:0x40000000
+libM12014SV_M007_LIB_20250115.a                8     2711      98    0     0
+IQmath_RV32.a                                 28    30351       0    0   178  ADDR:0x40000000
+libvoilent_fan_SRC-Lib.a                       6      849      81    0     0
+libCH32V205_TOUCH_CS.a                         2     2079     185    0    22  ADDR:0x40011000,0x40012000,0x40021000
+libCH32V205_TOUCH_CT.a                         2     2030     166    0    17  ADDR:0x40011000,0x40012000,0x40021000
+libCH32V00X_TOUCH.a                            2     1443     130    0    20  ADDR:0x40011000,0x40012000,0x40021000
+libRV3UFI.a                                    5     4579       0    0     0
+libRV3UFI.a                                    5     4579       0    0     0
+libRV3UFI.a                                    5     4579       0    0     0
+libCH32V205_TOUCH_CS.a                         2     2079     185    0    22  ADDR:0x40011000,0x40012000,0x40021000
+libCH32V205_TOUCH_CT.a                         2     2030     166    0    17  ADDR:0x40011000,0x40012000,0x40021000
+libRV3UFI.a                                    5     4579       0    0     0
+libRV3UFI.a                                    5     4579       0    0     0
+libCH58xBLE.a                                 62    67262    5592    0    50  ADDR:0x40000000,0x4000c000,0xe000e000
+LIBWCHLWNS.a                                  20     4814       0    0     0
+libMESH.a                                     25    37244       0    0     3  ADDR:0x40000000,0xe0000000
+libCH587_TOUCH.a                               2     1692     250    0     9  ADDR:0x40000000,0x40001000
+libRV3UFI.a                                    5     4579       0    0     0
+libRV3UFI.a                                    5     4579       0    0     0
+libRV3UFI.a                                    5     4579       0    0     0
+libwchiochub.a                                 4     7979       0    0     1  ADDR:0x1ffff000
+libwchnet.a                                   56    28188    2320    0    28  ADDR:0x1ffff000,0x40000000,0xe0000000
+libRV3UFI.a                                    5     4579       0    0     0
+libwchble.a                                   69    75859       0    4   105  CSR:0x341(mepc),0x804(intsyscr) ADDR:0x40000000,0x40022000,0x40024000,0x40025000,0xe0000000,0xe000e000
+    CSR @ble_task_scheduler.o/.highcode+0x6: csr=0x804 intsyscr f3=2 rd=0 rs1=11
+    CSR @ble_task_scheduler.o/.highcode+0xc: csr=0x341 mepc f3=1 rd=0 rs1=11
+    CSR @ble_task_process.o/.highcode.LLE_IRQLibHandler+0x16: csr=0x341 mepc f3=2 rd=11 rs1=0
+    CSR @ble_task_process.o/.highcode.LLE_IRQLibHandler+0x24: csr=0x341 mepc f3=1 rd=0 rs1=11
+LIBWCHLWNS.a                                  20     4814       0    0     0
+LIBMESH.a                                     25    37244       0    0     3  ADDR:0x40000000,0xe0000000
+LIBMESHROM.a                                  25    37320    1750    0     3  ADDR:0x40000000,0xe0000000
+libwchnet.a                                   28    14210    1137    0    14  ADDR:0x1ffff000,0x40000000,0xe0000000
+libRV3UFI.a                                    5     4579       0    0     0
+libwchble.a                                   69    75859       0    4   105  CSR:0x341(mepc),0x804(intsyscr) ADDR:0x40000000,0x40022000,0x40024000,0x40025000,0xe0000000,0xe000e000
+    CSR @ble_task_scheduler.o/.highcode+0x6: csr=0x804 intsyscr f3=2 rd=0 rs1=11
+    CSR @ble_task_scheduler.o/.highcode+0xc: csr=0x341 mepc f3=1 rd=0 rs1=11
+    CSR @ble_task_process.o/.highcode.LLE_IRQLibHandler+0x16: csr=0x341 mepc f3=2 rd=11 rs1=0
+    CSR @ble_task_process.o/.highcode.LLE_IRQLibHandler+0x24: csr=0x341 mepc f3=1 rd=0 rs1=11
+LIBWCHLWNS.a                                  20     4814       0    0     0
+LIBMESH.a                                     25    37244       0    0     3  ADDR:0x40000000,0xe0000000
+LIBMESHROM.a                                  25    37320    1750    0     3  ADDR:0x40000000,0xe0000000
+libwchnet.a                                   28    14210    1137    0    14  ADDR:0x1ffff000,0x40000000,0xe0000000
+libRV3UFI.a                                    5     4579       0    0     0
+libwchiochub.a                                 4     7979       0    0     1  ADDR:0x1ffff000
+libwchnet.a                                   56    28420    2274    0    28  ADDR:0x1ffff000,0x40000000,0xe0000000
+libwchnet_float.a                             56    28360    2274    0    26  ADDR:0x40000000,0xe0000000
+libRV3UFI.a                                    5     4579       0    0     0
+libRV3UFI.a                                    5     4579       0    0     0
+libVoiceRcg.a                                  4     1111       0    0     0
+libwchiochub.a                                 4     7979       0    0     1  ADDR:0x1ffff000
+libwchnet.a                                   56    28188    2320    0    28  ADDR:0x1ffff000,0x40000000,0xe0000000
+libCH32H417_TOUCH.a                            2     1542     171    0    19  ADDR:0x40011000,0x40013000,0x40021000
+libUHSIF.a                                     1     1284      14    0    33  ADDR:0x40010000,0x40011000,0x40012000,0x40021000,0xe000e000
+libRV3UFI.a                                    5     4579       0    0     0
+libRV3UFI.a                                    5     4579       0    0     0
+libRV3UFI.a                                    5     4579       0    0     0

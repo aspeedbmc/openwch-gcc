@@ -1,0 +1,375 @@
+From 1d504099db064bd575bff8b4d5140c8c6f3d3bdb Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 6 <phase6@openwch.local>
+Date: Sun, 16 Aug 2026 18:40:22 +0900
+Subject: [PATCH 4/5] riscv: accept the WCH QingKe 'WCH-Interrupt-fast'
+ interrupt value
+
+The stock backend rejects the interrupt value every WCH EVT interrupt
+handler uses, warns "unrecognized argument", and emits an ordinary function.
+Three objects of the quick gate still differ from the WCH build for exactly
+that reason -- the official object leaves the handler through mret where
+ours leaves through ret:
+
+  tmp/golden/8.2.0/v3b-pioc/run1/obj/0000_RGB1W.c.o          (mret at 0x16)
+  tmp/golden/8.2.0/v4bc-pmp/run1/obj/0000_ch32v20x_it.c.o
+  tmp/golden/8.2.0/v4bc-pmp/run1/obj/0001_main.c.o
+
+The QingKe core pushes and pops the caller-saved GPRs and the return address
+in hardware when such a handler is entered, so the software prologue must
+leave that register set alone while keeping the ordinary interrupt treatment
+for everything else.
+
+Spec source, all first-hand measurements of the official binary
+ref/gcc/darwin-arm64/8.2.0/bin/riscv-none-embed-gcc.
+
+Archived matrix, tmp/toolchain_8.2.0/evidence/s1/probes/raw/07-c-attributes:
+i1 interrupt and i2 interrupt("machine") save the temporaries and return by
+mret; i3 interrupt("WCH-Interrupt-fast") saves nothing and still returns by
+mret; i5 uret and i6 sret are unchanged; i4 "WCH-Interrupt-Fast" and i7
+"wch-interrupt-fast" keep the upstream warning and degrade to ret, so only
+the exact spelling is accepted.  i3-noxw shows the value is not gated on the
+xw extension: the .o is byte-identical under -march=rv32imac.
+
+Directed matrix, tmp/toolchain_8.2.0/evidence/s3/d4/spec-probe/official,
+which fixes what the archived cases leave open.  p01, a non-leaf handler,
+saves neither ra nor any temporary, so the hardware-saved set has to include
+the return address even though GCC's own table calls it call-saved.  p02, a
+leaf handler using floats, still spills fa3/fa4/fa5 while saving no GPR, and
+p03 spills every call-used FPR -- the FPRs keep the ordinary interrupt rule,
+which is why this is a subtraction from riscv_save_reg_p rather than a switch
+to ordinary function frames.  p04 and p12 keep the callee-saved GPRs
+software-saved.  p05 uses t1 as the large-frame temporary without saving it,
+which is why the interrupt_save_t1 computation is skipped.  p06 shows shrink
+wrapping gives such a handler an exit that bypasses the interrupt epilogue.
+p09 and p11 keep the upstream naked and return-value errors.
+
+Second matrix, tmp/toolchain_8.2.0/evidence/s3/d4/spec-probe/extra-official,
+which fixes the model.  The value neither sets nor conflicts with a privilege
+mode: m01 interrupt("user","machine") still errors, while m02 and m03 pair it
+with user and supervisor and are accepted, keeping uret and sret in the
+epilogue; m04 tolerates it twice.  It is therefore a flag beside the two
+SiFive CLIC flags, not a fourth privilege level.  sw03 and sw04 show the
+shrink-wrapped exit stays mret even when the epilogue returns by uret or
+sret, so riscv_output_return is not mode-dispatched.  m05 combines it with
+SiFive-CLIC-preemptible and gets a bare fast frame with no CSR traffic,
+which needs no extra guard: the preemptible prologue already sits inside the
+"any register saved" branch of riscv_expand_prologue, and a fast handler
+leaves that mask empty.
+
+8 new tests in gcc.target/riscv, the one gcc face with a pristine baseline
+(tmp/toolchain_8.2.0/evidence/s3/testsuite-pristine): 30 new PASS tuples, no
+baseline tuple removed.
+---
+ gcc/config/riscv/riscv.c                      | 38 +++++++++++++++++--
+ .../riscv/wch-fast-interrupt-bigframe.c       | 16 ++++++++
+ .../riscv/wch-fast-interrupt-callee-saved.c   | 20 ++++++++++
+ .../riscv/wch-fast-interrupt-float.c          | 16 ++++++++
+ .../riscv/wch-fast-interrupt-leaf.c           | 15 ++++++++
+ .../riscv/wch-fast-interrupt-mode.c           | 15 ++++++++
+ .../riscv/wch-fast-interrupt-nonleaf.c        | 18 +++++++++
+ .../riscv/wch-fast-interrupt-shrink-wrap.c    | 26 +++++++++++++
+ .../riscv/wch-fast-interrupt-warning.c        | 21 ++++++++++
+ 9 files changed, 182 insertions(+), 3 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-bigframe.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-callee-saved.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-float.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-leaf.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-mode.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-nonleaf.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-shrink-wrap.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-warning.c
+
+diff --git a/gcc/config/riscv/riscv.c b/gcc/config/riscv/riscv.c
+index 46f904023..c4487a216 100644
+--- a/gcc/config/riscv/riscv.c
++++ b/gcc/config/riscv/riscv.c
+@@ -135,6 +135,9 @@ struct GTY(()) riscv_interrupt_flags {
+   /* True if current function is an SiFive CLIC stack swap interrupt
+      function.  */
+   bool sifive_clic_stack_swap_p : 1;
++  /* True if current function is a WCH QingKe fast interrupt function, whose
++     caller-saved GPRs are pushed and popped by the hardware.  */
++  bool wch_interrupt_fast_p : 1;
+ };
+ 
+ struct GTY(()) machine_function {
+@@ -1917,6 +1920,11 @@ riscv_output_return ()
+   if (cfun->machine->naked_p)
+     return "";
+ 
++  /* Shrink wrapping can give a WCH fast interrupt handler an exit that does
++     not run the interrupt epilogue; it still has to leave through mret.  */
++  if (cfun->machine->interrupt_flags.wch_interrupt_fast_p)
++    return "mret";
++
+   return "ret";
+ }
+ 
+@@ -2809,7 +2817,8 @@ riscv_handle_type_attribute (tree *node ATTRIBUTE_UNUSED, tree name, tree args,
+ 	  if (strcmp (string, "user") && strcmp (string, "supervisor")
+ 	      && strcmp (string, "machine")
+ 	      && strcmp (string, "SiFive-CLIC-preemptible")
+-	      && strcmp (string, "SiFive-CLIC-stack-swap"))
++	      && strcmp (string, "SiFive-CLIC-stack-swap")
++	      && strcmp (string, "WCH-Interrupt-fast"))
+ 	    {
+ 	      warning (OPT_Wattributes,
+ 		       "unrecognized argument to %qE attribute", name);
+@@ -3356,11 +3365,28 @@ riscv_frame_set (rtx mem, rtx reg)
+   return set;
+ }
+ 
++/* Return true if REGNO is pushed and popped by the WCH QingKe fast interrupt
++   hardware, which covers the caller-saved GPRs and the return address.  */
++
++static bool
++riscv_wch_hardware_saved_reg_p (unsigned int regno)
++{
++  return (GP_REG_P (regno)
++	  && (call_used_regs[regno] || regno == RETURN_ADDR_REGNUM));
++}
++
+ /* Return true if the current function must save register REGNO.  */
+ 
+ static bool
+ riscv_save_reg_p (unsigned int regno)
+ {
++  /* A WCH fast interrupt handler relies on the hardware to preserve the
++     registers above, so software must not save them again.  Everything else,
++     including the FPRs, keeps the ordinary interrupt treatment below.  */
++  if (cfun->machine->interrupt_flags.wch_interrupt_fast_p
++      && riscv_wch_hardware_saved_reg_p (regno))
++    return false;
++
+   bool call_saved = !global_regs[regno] && !call_used_regs[regno];
+   bool might_clobber = crtl->saves_all_registers
+ 		       || df_regs_ever_live_p (regno);
+@@ -3476,8 +3502,11 @@ riscv_compute_frame_info (void)
+   frame = &cfun->machine->frame;
+ 
+   /* In an interrupt function, if we have a large frame, then we need to
+-     save/restore t1.  We check for this before clearing the frame struct.  */
+-  if (cfun->machine->interrupt_handler_p)
++     save/restore t1.  We check for this before clearing the frame struct.
++     A WCH fast interrupt handler gets t1 back from the hardware, so it may
++     use it as the frame temporary without saving it.  */
++  if (cfun->machine->interrupt_handler_p
++      && !cfun->machine->interrupt_flags.wch_interrupt_fast_p)
+     {
+       HOST_WIDE_INT step1 = riscv_first_stack_step (frame);
+       if (! SMALL_OPERAND (frame->total_size - step1))
+@@ -4814,6 +4843,7 @@ riscv_get_interrupt_type (tree decl)
+   interrupt_flags.interrupt_mode = MACHINE_MODE;
+   interrupt_flags.sifive_clic_preemptible_p = FALSE;
+   interrupt_flags.sifive_clic_stack_swap_p = FALSE;
++  interrupt_flags.wch_interrupt_fast_p = FALSE;
+   interrupt_mode_set = FALSE;
+ 
+   while (attr_args)
+@@ -4824,6 +4854,8 @@ riscv_get_interrupt_type (tree decl)
+ 	interrupt_flags.sifive_clic_preemptible_p = TRUE;
+       else if (!strcmp (string, "SiFive-CLIC-stack-swap"))
+ 	interrupt_flags.sifive_clic_stack_swap_p = TRUE;
++      else if (!strcmp (string, "WCH-Interrupt-fast"))
++	interrupt_flags.wch_interrupt_fast_p = TRUE;
+       else
+ 	{
+ 	  if (interrupt_mode_set)
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-bigframe.c b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-bigframe.c
+new file mode 100644
+index 000000000..ed082be51
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-bigframe.c
+@@ -0,0 +1,16 @@
++/* Verify a WCH fast interrupt handler uses t1 as the large-frame temporary
++   without saving it.  */
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv32imac -mabi=ilp32" } */
++
++extern void ext (char *);
++
++void __attribute__ ((interrupt ("WCH-Interrupt-fast")))
++fast_big_frame (void)
++{
++  volatile char buf[3000];
++  ext ((char *) buf);
++}
++
++/* { dg-final { scan-assembler "mret" } } */
++/* { dg-final { scan-assembler-not "s\[wd\]\[ \t\]+t1,\[0-9\]+\\(sp\\)" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-callee-saved.c b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-callee-saved.c
+new file mode 100644
+index 000000000..1d9d115b4
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-callee-saved.c
+@@ -0,0 +1,20 @@
++/* Verify a WCH fast interrupt handler still saves the callee-saved GPRs it
++   uses; the hardware prologue does not cover them.  */
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv32imac -mabi=ilp32" } */
++
++extern void ext (void);
++volatile int g;
++
++void __attribute__ ((interrupt ("WCH-Interrupt-fast")))
++fast_callee_saved (void)
++{
++  register int keep asm ("s0") = g;
++  __asm__ volatile ("" : "+r" (keep));
++  ext ();
++  g = keep;
++}
++
++/* { dg-final { scan-assembler "s\[wd\]\[ \t\]+s0,\[0-9\]+\\(sp\\)" } } */
++/* { dg-final { scan-assembler-not "s\[wd\]\[ \t\]+ra,\[0-9\]+\\(sp\\)" } } */
++/* { dg-final { scan-assembler "mret" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-float.c b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-float.c
+new file mode 100644
+index 000000000..ac76f5375
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-float.c
+@@ -0,0 +1,16 @@
++/* Verify a WCH fast interrupt handler still software-saves the FPRs; the
++   hardware prologue covers the GPRs only.  */
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv32imafc -mabi=ilp32f" } */
++
++volatile float g;
++
++void __attribute__ ((interrupt ("WCH-Interrupt-fast")))
++fast_float (void)
++{
++  g = g * 3.0f + 1.0f;
++}
++
++/* { dg-final { scan-assembler "fs\[wd\]\[ \t\]+fa5,\[0-9\]+\\(sp\\)" } } */
++/* { dg-final { scan-assembler-not "s\[wd\]\[ \t\]+a\[0-9\]+,\[0-9\]+\\(sp\\)" } } */
++/* { dg-final { scan-assembler "mret" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-leaf.c b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-leaf.c
+new file mode 100644
+index 000000000..619242b4b
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-leaf.c
+@@ -0,0 +1,15 @@
++/* Verify a WCH fast interrupt leaf handler saves nothing and returns by mret.  */
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv32imac -mabi=ilp32" } */
++
++volatile int g;
++
++void __attribute__ ((interrupt ("WCH-Interrupt-fast")))
++fast_leaf (void)
++{
++  g++;
++}
++
++/* { dg-final { scan-assembler "mret" } } */
++/* { dg-final { scan-assembler-not "addi\[ \t\]+sp,sp," } } */
++/* { dg-final { scan-assembler-not "s\[wd\]\[ \t\]+\[at\]\[0-9\]+,\[0-9\]+\\(sp\\)" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-mode.c b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-mode.c
+new file mode 100644
+index 000000000..bc71e9a3d
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-mode.c
+@@ -0,0 +1,15 @@
++/* Verify WCH-Interrupt-fast is a frame flag, not a privilege mode: it may be
++   combined with a mode, which still selects the epilogue return.  */
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv32imac -mabi=ilp32" } */
++
++volatile int g;
++
++void __attribute__ ((interrupt ("WCH-Interrupt-fast", "supervisor")))
++fast_supervisor (void)
++{
++  g++;
++}
++
++/* { dg-final { scan-assembler "sret" } } */
++/* { dg-final { scan-assembler-not "addi\[ \t\]+sp,sp," } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-nonleaf.c b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-nonleaf.c
+new file mode 100644
+index 000000000..0ecf24ede
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-nonleaf.c
+@@ -0,0 +1,18 @@
++/* Verify a WCH fast interrupt handler leaves the hardware-saved GPRs, the
++   return address included, to the hardware prologue.  */
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv32imac -mabi=ilp32" } */
++
++extern void ext (void);
++volatile int g;
++
++void __attribute__ ((interrupt ("WCH-Interrupt-fast")))
++fast_nonleaf (void)
++{
++  ext ();
++  g++;
++}
++
++/* { dg-final { scan-assembler "mret" } } */
++/* { dg-final { scan-assembler-not "s\[wd\]\[ \t\]+ra,\[0-9\]+\\(sp\\)" } } */
++/* { dg-final { scan-assembler-not "s\[wd\]\[ \t\]+\[at\]\[0-9\]+,\[0-9\]+\\(sp\\)" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-shrink-wrap.c b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-shrink-wrap.c
+new file mode 100644
+index 000000000..a74f0ffe5
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-shrink-wrap.c
+@@ -0,0 +1,26 @@
++/* Verify a shrink-wrapped exit of a WCH fast interrupt handler, which skips
++   the interrupt epilogue, still leaves through mret.  */
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv32imac -mabi=ilp32" } */
++
++extern void slow (void);
++extern volatile int flag0, payload, sink;
++
++void __attribute__ ((interrupt ("WCH-Interrupt-fast")))
++fast_two_exits (void)
++{
++  if (!flag0)
++    {
++      __asm__ volatile ("# early exit");
++      return;
++    }
++  {
++    register int keep asm ("s0") = payload;
++    __asm__ volatile ("" : "+r" (keep));
++    slow ();
++    sink = keep;
++  }
++}
++
++/* { dg-final { scan-assembler-times "mret" 2 } } */
++/* { dg-final { scan-assembler-not "\tret" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-warning.c b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-warning.c
+new file mode 100644
+index 000000000..5af5339e0
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-warning.c
+@@ -0,0 +1,21 @@
++/* Verify only the exact WCH-Interrupt-fast spelling is accepted; a misspelling
++   keeps the upstream diagnostic and degrades to an ordinary function.  */
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv32imac -mabi=ilp32" } */
++
++volatile int g;
++
++void __attribute__ ((interrupt ("WCH-Interrupt-Fast")))
++wrong_case (void)
++{ /* { dg-warning "unrecognized argument to 'interrupt' attribute" } */
++  g += 1;
++}
++
++void __attribute__ ((interrupt ("wch-interrupt-fast")))
++all_lower (void)
++{ /* { dg-warning "unrecognized argument to 'interrupt' attribute" } */
++  g += 2;
++}
++
++/* { dg-final { scan-assembler-not "mret" } } */
++/* { dg-final { scan-assembler-times "\tret" 2 } } */
+-- 
+2.55.0
+

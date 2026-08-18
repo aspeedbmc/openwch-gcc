@@ -1,0 +1,137 @@
+{
+  "schema": "openwch-xw-lto-contract-v1",
+  "suite_version": 1,
+  "target": "riscv32-wch-elf",
+  "abi": "ilp32",
+  "gcc_version": "15.2.0",
+  "source_date_epoch": 1767225600,
+  "lanes": [
+    "official-1",
+    "official-2",
+    "ours-1",
+    "ours-2"
+  ],
+  "comparison_pairs": [
+    {
+      "id": "official-self",
+      "phase": "self-consistency",
+      "left": "official-1",
+      "right": "official-2"
+    },
+    {
+      "id": "ours-self",
+      "phase": "self-consistency",
+      "left": "ours-1",
+      "right": "ours-2"
+    },
+    {
+      "id": "parity-run-1",
+      "phase": "official-vs-ours",
+      "left": "official-1",
+      "right": "ours-1"
+    },
+    {
+      "id": "parity-run-2",
+      "phase": "official-vs-ours",
+      "left": "official-2",
+      "right": "ours-2"
+    }
+  ],
+  "asm_cases": [
+    {
+      "id": "xw-eight",
+      "fixture": "fixtures/xw-eight.S",
+      "march": "rv32imac_xw",
+      "entry": "xw_eight",
+      "compile_seed": "xw-eight-tu",
+      "link_seed": "xw-eight-link",
+      "expected_compile_rc": 0,
+      "expected_text_hex": "8821aa21a8b1caa188822883c88368848280"
+    },
+    {
+      "id": "zcb-only",
+      "fixture": "fixtures/same-mnemonic.S",
+      "march": "rv32imac_zcb",
+      "entry": "same_mnemonic",
+      "compile_seed": "zcb-only-tu",
+      "link_seed": "zcb-only-link",
+      "expected_compile_rc": 0,
+      "expected_text_hex": "88818280"
+    },
+    {
+      "id": "zcb-xw-priority",
+      "fixture": "fixtures/same-mnemonic.S",
+      "march": "rv32imac_zcb_xw",
+      "entry": "same_mnemonic",
+      "compile_seed": "zcb-xw-priority-tu",
+      "link_seed": "zcb-xw-priority-link",
+      "expected_compile_rc": 0,
+      "expected_text_hex": "88218280"
+    },
+    {
+      "id": "dc-xw-cfld-negative",
+      "fixture": "fixtures/dc-xw-cfld.S",
+      "march": "rv32imafdc_xw",
+      "entry": "dc_xw_cfld",
+      "compile_seed": "dc-xw-cfld-negative-tu",
+      "link_seed": null,
+      "expected_compile_rc": 1,
+      "expected_text_hex": null
+    },
+    {
+      "id": "fc-xw-coexist",
+      "fixture": "fixtures/fc-xw-coexist.S",
+      "march": "rv32imafc_xw",
+      "entry": "fc_xw_coexist",
+      "compile_seed": "fc-xw-coexist-tu",
+      "link_seed": "fc-xw-coexist-link",
+      "expected_compile_rc": 0,
+      "expected_text_hex": "886188218280"
+    }
+  ],
+  "lto_case": {
+    "id": "lto-xw-stream",
+    "compile_march": "rv32imac_xw",
+    "positive_link_march": "rv32imac_xw",
+    "negative_link_march": "rv32imac",
+    "entry": "_start",
+    "flto_jobs": 1,
+    "translation_units": [
+      {
+        "stem": "lto-attrs",
+        "fixture": "fixtures/lto-attrs.c",
+        "seed": "lto-xw-attrs-tu"
+      },
+      {
+        "stem": "lto-entry",
+        "fixture": "fixtures/lto-entry.c",
+        "seed": "lto-xw-entry-tu"
+      }
+    ],
+    "positive_link_seed": "lto-xw-positive-link",
+    "negative_link_seed": "lto-xw-base-negative-link",
+    "expected_compile_rc": 0,
+    "expected_positive_link_rc": 0,
+    "expected_negative_link_rc": 1,
+    "required_ltrans_tokens": [
+      "lto_xw_global:",
+      "lto_xw_added:",
+      "lto_xw_versioned:",
+      "xw2p0",
+      "xw9p9",
+      "c.lbu a0, 0(a1)",
+      "c.lhu a0, 2(a1)",
+      "c.sb a0, 3(a1)",
+      "c.sh a0, 4(a1)",
+      "c.lbusp a0, 5(sp)",
+      "c.lhusp a0, 6(sp)",
+      "c.sbsp a0, 7(sp)",
+      "c.shsp a0, 8(sp)"
+    ],
+    "required_function_arch_tokens": {
+      "lto_xw_global": "zca_xw",
+      "lto_xw_added": "xw2p0",
+      "lto_xw_versioned": "xw9p9"
+    }
+  }
+}

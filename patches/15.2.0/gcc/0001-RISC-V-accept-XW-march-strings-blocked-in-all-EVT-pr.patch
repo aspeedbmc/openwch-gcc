@@ -1,0 +1,72 @@
+From f893b93cbfb0a1c991a1f5774d7fb875f3fc66fe Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 3 <phase3@openwch.local>
+Date: Thu, 13 Aug 2026 01:23:44 +0900
+Subject: [PATCH 1/9] RISC-V: accept XW march strings blocked in all EVT
+ projects
+
+Register the WCH XW extension with its observed default version 2.0.  The
+existing multi-letter parser then accepts concatenated and underscore
+forms, preserves explicit versions, and emits canonical xw2p0 for the bare
+form.
+
+Behavior specification:
+  analysis/toolchain/wch-gcc-toolchain-survey.md sections 5.1 and 5.2
+  ref/wch-isa-research/isa/custom/wch-custom-isa-reference.md section 4.1
+
+gcc/ChangeLog:
+
+	* common/config/riscv/riscv-common.cc (riscv_ext_version_table):
+	Register the WCH xw extension at version 2.0.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/riscv/wch-xw-arch.c: New test.
+	* gcc.target/riscv/wch-xw-version.c: New test.
+---
+ gcc/common/config/riscv/riscv-common.cc         | 2 ++
+ gcc/testsuite/gcc.target/riscv/wch-xw-arch.c    | 6 ++++++
+ gcc/testsuite/gcc.target/riscv/wch-xw-version.c | 6 ++++++
+ 3 files changed, 14 insertions(+)
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-xw-arch.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-xw-version.c
+
+diff --git a/gcc/common/config/riscv/riscv-common.cc b/gcc/common/config/riscv/riscv-common.cc
+index b34409adf..f6bbac0da 100644
+--- a/gcc/common/config/riscv/riscv-common.cc
++++ b/gcc/common/config/riscv/riscv-common.cc
+@@ -442,6 +442,8 @@ static const struct riscv_ext_version riscv_ext_version_table[] =
+   {"xsfvqmaccdod",    ISA_SPEC_CLASS_NONE, 1, 0},
+   {"xsfvfnrclipxfqf", ISA_SPEC_CLASS_NONE, 1, 0},
+ 
++  {"xw", ISA_SPEC_CLASS_NONE, 2, 0},
++
+   /* Terminate the list.  */
+   {NULL, ISA_SPEC_CLASS_NONE, 0, 0}
+ };
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-xw-arch.c b/gcc/testsuite/gcc.target/riscv/wch-xw-arch.c
+new file mode 100644
+index 000000000..f886120fd
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-xw-arch.c
+@@ -0,0 +1,6 @@
++/* { dg-do compile } */
++/* { dg-options "-march=rv32imac_xw -mabi=ilp32 -mriscv-attribute" } */
++
++int foo;
++
++/* { dg-final { scan-assembler "xw2p0" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-xw-version.c b/gcc/testsuite/gcc.target/riscv/wch-xw-version.c
+new file mode 100644
+index 000000000..8a0bf6e0c
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-xw-version.c
+@@ -0,0 +1,6 @@
++/* { dg-do compile } */
++/* { dg-options "-march=rv32imacxw9p9 -mabi=ilp32 -mriscv-attribute" } */
++
++int foo;
++
++/* { dg-final { scan-assembler "xw9p9" } } */
+-- 
+2.55.0
+

@@ -1,0 +1,58 @@
+From c77cce413d4383df3ecc2700e731f2e0f9f22858 Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 4 <phase4@openwch.local>
+Date: Thu, 13 Aug 2026 06:49:32 +0900
+Subject: [PATCH 4/9] RISC-V: recognize RV32 Zbs single-bit constant moves
+
+With RV32 Zbs enabled, integer construction and move output both select bseti for a single-bit constant, but splittable_const_int_operand only excludes that form on RV64. This leaves an unsplit CONST_INT with no move pattern and causes extract_insn ICEs in EVT sources. Apply the Zbs exclusion to both XLENs.
+
+Observed ICE, probe lane: tmp/phase4-evidence/s3-zbs-constant/ours.stderr
+(rc=1, internal compiler error: in extract_insn, at recog.cc:2791).  Observed
+ICE, EVT lane: tmp/phase4-evidence/s3-after-xw-accept/compare.stderr (seven
+extract_insn ICEs, all on the const_int 2048 move, in QingkeV3B_CH32V205
+PIOC_1_Wire RGB1W.c, QingkeV3C_CH587_EVT CH58x_adc.c, QingkeV3F_CH32X315
+system_ch32x3x5.c and debug.c).  Behavior specification:
+tmp/phase4-evidence/s3-zbs-constant/official.s; tmp/phase4-evidence/s3-zbs-constant/ours-fixed.s; tmp/phase4-evidence/s3-zbs-constant/conclusion.txt.
+
+gcc/ChangeLog:
+
+	* config/riscv/predicates.md (splittable_const_int_operand): Apply
+	the Zbs single-bit exclusion on RV32 as well as RV64.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/riscv/zbs-load-single-bit.c: New test.
+---
+ gcc/config/riscv/predicates.md                       |  2 +-
+ gcc/testsuite/gcc.target/riscv/zbs-load-single-bit.c | 10 ++++++++++
+ 2 files changed, 11 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.target/riscv/zbs-load-single-bit.c
+
+diff --git a/gcc/config/riscv/predicates.md b/gcc/config/riscv/predicates.md
+index 97cdbdf05..7686d56e5 100644
+--- a/gcc/config/riscv/predicates.md
++++ b/gcc/config/riscv/predicates.md
+@@ -76,7 +76,7 @@
+ 
+   /* Check whether the constant can be loaded in a single
+      instruction with zbs extensions.  */
+-  if (TARGET_64BIT && TARGET_ZBS && SINGLE_BIT_MASK_OPERAND (INTVAL (op)))
++  if (TARGET_ZBS && SINGLE_BIT_MASK_OPERAND (INTVAL (op)))
+     return false;
+ 
+   /* Otherwise check whether the constant can be loaded in a single
+diff --git a/gcc/testsuite/gcc.target/riscv/zbs-load-single-bit.c b/gcc/testsuite/gcc.target/riscv/zbs-load-single-bit.c
+new file mode 100644
+index 000000000..5230c1493
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/zbs-load-single-bit.c
+@@ -0,0 +1,10 @@
++/* { dg-do compile } */
++/* { dg-options "-Os -march=rv32i_zbs -mabi=ilp32" } */
++
++unsigned int
++f (void)
++{
++  return 2048u;
++}
++
++/* { dg-final { scan-assembler "bseti\ta0,zero,11" } } */

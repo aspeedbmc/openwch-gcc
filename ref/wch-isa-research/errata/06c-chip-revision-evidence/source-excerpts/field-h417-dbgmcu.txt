@@ -1,0 +1,47 @@
+source	tmp/wch-evt/evt/QingkeV5F_CH32H417_EVT/EXAM/SRC/Peripheral/src/ch32h417_dbgmcu.c
+sha256	5959d67f48908077d722e2d997487b009e0de41ae72cbc23669ea67c5db77ffd
+range	14-39
+000014	#define IDCODE_DEVID_MASK    ((uint32_t)0x0000FFFF)
+000015
+000016	/*********************************************************************
+000017	 * @fn      DBGMCU_GetREVID
+000018	 *
+000019	 * @brief   Returns the device revision identifier.
+000020	 *
+000021	 * @return  Revision identifier.
+000022	 */
+000023	uint32_t DBGMCU_GetREVID(void)
+000024	{
+000025	    FLASH_BOOT_GetMode();
+000026	    return ((*(uint32_t *)0x1FFFF704) & IDCODE_DEVID_MASK);
+000027	}
+000028
+000029	/*********************************************************************
+000030	 * @fn      DBGMCU_GetDEVID
+000031	 *
+000032	 * @brief   Returns the device identifier.
+000033	 *
+000034	 * @return  Device identifier.
+000035	 */
+000036	uint32_t DBGMCU_GetDEVID(void)
+000037	{
+000038	    FLASH_BOOT_GetMode();
+000039	    return ((*(uint32_t *)0x1FFFF704) >> 16);
+range	122-138
+000122	 * @fn      DBGMCU_GetCHIPID
+000123	 *
+000124	 * @brief   Returns the CHIP identifier.
+000125	 *
+000126	 * @return Device identifier.
+000127	 *          ChipID List-
+000128	 *  CH32H417QEU - 0x417005xD
+000129	 *  CH32H417MEU - 0x417105xD
+000130	 *  CH32H417WEU - 0x417205xD
+000131	 *  CH32H415REU - 0x415005xD
+000132	 *  CH32H416RDU - 0x416005xD
+000133	 */
+000134	uint32_t DBGMCU_GetCHIPID( void )
+000135	{
+000136	    FLASH_BOOT_GetMode();
+000137	    return( *( uint32_t * )0x1FFFF704 );
+000138	}

@@ -1,0 +1,4 @@
+schema_version	path	chip	sha256	size	version	default_base	jt_offset	slot0_semantics	function_slot_count	maximum_function_slot
+2	tmp/wch-evt/evt/QingkeV3C_CH587_EVT/EXAM/BLE/LIB/CH58xBLE_ROM.h	CH587	d0b1ba53907fce8c2c0ac340ffbdf7fd7104a3d39bbbd8d788a6cb4fea4c442c	243996	v1.00	0x00040000	0x34	VER_LIB-data-pointer	137	149
+2	tmp/wch-evt/evt/QingkeV4B_CH32V203_EVT/EXAM/BLE/LIB/wchble_rom.h	CH32V203	83c9c4fde829bda78b6d08e7ccc753152fe8b4d42ebef9756489e1cf81f38df1	248815	V1.40	0x00040000	0x34	VER_LIB-data-pointer	145	148
+2	tmp/wch-evt/evt/QingkeV4C_CH32V20x_EVT/EXAM/BLE/LIB/wchble_rom.h	CH32V20x	83c9c4fde829bda78b6d08e7ccc753152fe8b4d42ebef9756489e1cf81f38df1	248815	V1.40	0x00040000	0x34	VER_LIB-data-pointer	145	148

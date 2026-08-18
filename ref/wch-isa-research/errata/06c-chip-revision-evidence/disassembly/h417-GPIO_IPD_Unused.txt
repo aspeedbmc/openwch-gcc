@@ -1,0 +1,653 @@
+
+/Users/apple/Projects/gccriscv-wch/tmp/wch-evt/validation/round2/byte-identical-r12b-run/wch/QingkeV5F_CH32H417_EVT_EXAM_CAN_TestMode_V3F--258624070cce/obj/0020_ch32h417_gpio.o:     file format elf32-littleriscv
+
+
+Disassembly of section .text.GPIO_DeInit:
+
+Disassembly of section .text.GPIO_AFIODeInit:
+
+Disassembly of section .text.GPIO_Init:
+
+Disassembly of section .text.GPIO_StructInit:
+
+Disassembly of section .text.GPIO_ReadInputDataBit:
+
+Disassembly of section .text.GPIO_ReadInputData:
+
+Disassembly of section .text.GPIO_ReadOutputDataBit:
+
+Disassembly of section .text.GPIO_ReadOutputData:
+
+Disassembly of section .text.GPIO_SetBits:
+
+Disassembly of section .text.GPIO_ResetBits:
+
+Disassembly of section .text.GPIO_WriteBit:
+
+Disassembly of section .text.GPIO_Write:
+
+Disassembly of section .text.GPIO_PinLockConfig:
+
+Disassembly of section .text.GPIO_PinRemapConfig:
+
+Disassembly of section .text.GPIO_PinAFConfig:
+
+Disassembly of section .text.GPIO_EXTILineConfig:
+
+Disassembly of section .text.GPIO_IPD_Unused:
+
+00000000 <GPIO_IPD_Unused>:
+   0:	00000317          	auipc	t1,0x0
+			0: R_RISCV_CALL_PLT	__riscv_save_1
+			0: R_RISCV_RELAX	*ABS*
+   4:	000302e7          	jalr	t0,t1 # 0 <GPIO_IPD_Unused>
+
+00000008 <.LM418>:
+   8:	1141                	addi	sp,sp,-16
+
+0000000a <.LM420>:
+   a:	4585                	li	a1,1
+   c:	0fc00513          	li	a0,252
+
+00000010 <.LM421>:
+  10:	c202                	sw	zero,4(sp)
+  12:	c402                	sw	zero,8(sp)
+  14:	c602                	sw	zero,12(sp)
+
+00000016 <.LM422>:
+  16:	00000097          	auipc	ra,0x0
+			16: R_RISCV_CALL_PLT	RCC_HB2PeriphClockCmd
+			16: R_RISCV_RELAX	*ABS*
+  1a:	000080e7          	jalr	ra # 16 <.LM422>
+
+0000001e <.LM424>:
+  1e:	4002a7b7          	lui	a5,0x4002a
+  22:	4b98                	lw	a4,16(a5)
+  24:	f0077713          	andi	a4,a4,-256
+
+00000028 <.LM427>:
+  28:	c03a                	sw	a4,0(sp)
+
+0000002a <.LM428>:
+  2a:	4702                	lw	a4,0(sp)
+  2c:	01b76713          	ori	a4,a4,27
+  30:	c03a                	sw	a4,0(sp)
+
+00000032 <.LM430>:
+  32:	4702                	lw	a4,0(sp)
+  34:	cb98                	sw	a4,16(a5)
+
+00000036 <.LM432>:
+  36:	4002a7b7          	lui	a5,0x4002a
+  3a:	4bd8                	lw	a4,20(a5)
+  3c:	fc077713          	andi	a4,a4,-64
+
+00000040 <.LM434>:
+  40:	c03a                	sw	a4,0(sp)
+
+00000042 <.LM435>:
+  42:	4702                	lw	a4,0(sp)
+  44:	00e76713          	ori	a4,a4,14
+  48:	c03a                	sw	a4,0(sp)
+
+0000004a <.LM437>:
+  4a:	4702                	lw	a4,0(sp)
+  4c:	cbd8                	sw	a4,20(a5)
+
+0000004e <.LM439>:
+  4e:	00000097          	auipc	ra,0x0
+			4e: R_RISCV_CALL_PLT	FLASH_BOOT_GetMode
+			4e: R_RISCV_RELAX	*ABS*
+  52:	000080e7          	jalr	ra # 4e <.LM439>
+
+00000056 <.LM440>:
+  56:	1ffff7b7          	lui	a5,0x1ffff
+
+0000005a <.LM442>:
+  5a:	7047a783          	lw	a5,1796(a5) # 1ffff704 <.LLST0+0x1ffff06e>
+  5e:	0f07f793          	andi	a5,a5,240
+
+00000062 <.LM443>:
+  62:	e79d                	bnez	a5,90 <.L78>
+			62: R_RISCV_RVC_BRANCH	.L78
+
+00000064 <.LM444>:
+  64:	4585                	li	a1,1
+  66:	80000537          	lui	a0,0x80000
+  6a:	00000097          	auipc	ra,0x0
+			6a: R_RISCV_CALL_PLT	RCC_HB1PeriphClockCmd
+			6a: R_RISCV_RELAX	*ABS*
+  6e:	000080e7          	jalr	ra # 6a <.LM444+0x6>
+
+00000072 <.LM445>:
+  72:	400087b7          	lui	a5,0x40008
+  76:	40078793          	addi	a5,a5,1024 # 40008400 <.LLST0+0x40007d6a>
+  7a:	53d8                	lw	a4,36(a5)
+
+0000007c <.LM447>:
+  7c:	4581                	li	a1,0
+  7e:	80000537          	lui	a0,0x80000
+
+00000082 <.LM448>:
+  82:	00176713          	ori	a4,a4,1
+  86:	d3d8                	sw	a4,36(a5)
+
+00000088 <.LM449>:
+  88:	00000097          	auipc	ra,0x0
+			88: R_RISCV_CALL_PLT	RCC_HB1PeriphClockCmd
+			88: R_RISCV_RELAX	*ABS*
+  8c:	000080e7          	jalr	ra # 88 <.LM449>
+
+00000090 <.L78>:
+  90:	1ffff7b7          	lui	a5,0x1ffff
+
+00000094 <.LM452>:
+  94:	7047a783          	lw	a5,1796(a5) # 1ffff704 <.LLST0+0x1ffff06e>
+
+00000098 <.LM453>:
+  98:	41710737          	lui	a4,0x41710
+  9c:	50d70713          	addi	a4,a4,1293 # 4171050d <.LLST0+0x4170fe77>
+
+000000a0 <.LM454>:
+  a0:	f0f7f793          	andi	a5,a5,-241
+
+000000a4 <.LM455>:
+  a4:	0ae78563          	beq	a5,a4,14e <.L79>
+			a4: R_RISCV_BRANCH	.L79
+  a8:	02f76363          	bltu	a4,a5,ce <.L80>
+			a8: R_RISCV_BRANCH	.L80
+  ac:	41500737          	lui	a4,0x41500
+  b0:	50d70713          	addi	a4,a4,1293 # 4150050d <.LLST0+0x414ffe77>
+  b4:	12e78f63          	beq	a5,a4,1f2 <.L81>
+			b4: R_RISCV_BRANCH	.L81
+  b8:	41600737          	lui	a4,0x41600
+  bc:	50d70713          	addi	a4,a4,1293 # 4160050d <.LLST0+0x415ffe77>
+  c0:	1ae78e63          	beq	a5,a4,27c <.L82>
+			c0: R_RISCV_BRANCH	.L82
+
+000000c4 <.L77>:
+  c4:	0141                	addi	sp,sp,16
+  c6:	00000317          	auipc	t1,0x0
+			c6: R_RISCV_CALL_PLT	__riscv_restore_1
+			c6: R_RISCV_RELAX	*ABS*
+  ca:	00030067          	jr	t1 # c6 <.L77+0x2>
+
+000000ce <.L80>:
+  ce:	41720737          	lui	a4,0x41720
+  d2:	50d70713          	addi	a4,a4,1293 # 4172050d <.LLST0+0x4171fe77>
+  d6:	fee797e3          	bne	a5,a4,c4 <.L77>
+			d6: R_RISCV_BRANCH	.L77
+
+000000da <.LM458>:
+  da:	6789                	lui	a5,0x2
+
+000000dc <.LM460>:
+  dc:	40011537          	lui	a0,0x40011
+
+000000e0 <.LM461>:
+  e0:	02800413          	li	s0,40
+
+000000e4 <.LM462>:
+  e4:	fdf78793          	addi	a5,a5,-33 # 1fdf <.LLST0+0x1949>
+
+000000e8 <.LM463>:
+  e8:	004c                	addi	a1,sp,4
+  ea:	80050513          	addi	a0,a0,-2048 # 40010800 <.LLST0+0x4001016a>
+
+000000ee <.LM464>:
+  ee:	827c                	.insn	2, 0x827c
+
+000000f0 <.LM465>:
+  f0:	c622                	sw	s0,12(sp)
+
+000000f2 <.LM467>:
+  f2:	00000097          	auipc	ra,0x0
+			f2: R_RISCV_CALL_PLT	GPIO_Init
+			f2: R_RISCV_RELAX	*ABS*
+  f6:	000080e7          	jalr	ra # f2 <.LM467>
+
+000000fa <.LM468>:
+  fa:	77e1                	lui	a5,0xffff8
+
+000000fc <.LM470>:
+  fc:	40011537          	lui	a0,0x40011
+
+00000100 <.LM471>:
+ 100:	0fc78793          	addi	a5,a5,252 # ffff80fc <.LLST0+0xffff7a66>
+
+00000104 <.LM472>:
+ 104:	004c                	addi	a1,sp,4
+ 106:	c0050513          	addi	a0,a0,-1024 # 40010c00 <.LLST0+0x4001056a>
+
+0000010a <.LM473>:
+ 10a:	827c                	.insn	2, 0x827c
+
+0000010c <.LM474>:
+ 10c:	c622                	sw	s0,12(sp)
+
+0000010e <.LM476>:
+ 10e:	00000097          	auipc	ra,0x0
+			10e: R_RISCV_CALL_PLT	GPIO_Init
+			10e: R_RISCV_RELAX	*ABS*
+ 112:	000080e7          	jalr	ra # 10e <.LM476>
+
+00000116 <.LM477>:
+ 116:	77f9                	lui	a5,0xffffe
+ 118:	03078793          	addi	a5,a5,48 # ffffe030 <.LLST0+0xffffd99a>
+
+0000011c <.LM479>:
+ 11c:	004c                	addi	a1,sp,4
+ 11e:	40011537          	lui	a0,0x40011
+
+00000122 <.LM480>:
+ 122:	827c                	.insn	2, 0x827c
+
+00000124 <.LM481>:
+ 124:	c622                	sw	s0,12(sp)
+
+00000126 <.LM483>:
+ 126:	00000097          	auipc	ra,0x0
+			126: R_RISCV_CALL_PLT	GPIO_Init
+			126: R_RISCV_RELAX	*ABS*
+ 12a:	000080e7          	jalr	ra # 126 <.LM483>
+
+0000012e <.LM484>:
+ 12e:	40011537          	lui	a0,0x40011
+
+00000132 <.LM486>:
+ 132:	30000793          	li	a5,768
+
+00000136 <.LM487>:
+ 136:	004c                	addi	a1,sp,4
+ 138:	40050513          	addi	a0,a0,1024 # 40011400 <.LLST0+0x40010d6a>
+
+0000013c <.LM488>:
+ 13c:	827c                	.insn	2, 0x827c
+
+0000013e <.LM489>:
+ 13e:	c622                	sw	s0,12(sp)
+
+00000140 <.LM491>:
+ 140:	00000097          	auipc	ra,0x0
+			140: R_RISCV_CALL_PLT	GPIO_Init
+			140: R_RISCV_RELAX	*ABS*
+ 144:	000080e7          	jalr	ra # 140 <.LM491>
+
+00000148 <.LM492>:
+ 148:	6789                	lui	a5,0x2
+ 14a:	17f1                	addi	a5,a5,-4 # 1ffc <.LLST0+0x1966>
+ 14c:	a88d                	j	1be <.L87>
+			14c: R_RISCV_RVC_JUMP	.L87
+
+0000014e <.L79>:
+ 14e:	40011537          	lui	a0,0x40011
+
+00000152 <.LM496>:
+ 152:	02800413          	li	s0,40
+
+00000156 <.LM497>:
+ 156:	1ce00793          	li	a5,462
+
+0000015a <.LM498>:
+ 15a:	004c                	addi	a1,sp,4
+ 15c:	80050513          	addi	a0,a0,-2048 # 40010800 <.LLST0+0x4001016a>
+
+00000160 <.LM499>:
+ 160:	827c                	.insn	2, 0x827c
+
+00000162 <.LM500>:
+ 162:	c622                	sw	s0,12(sp)
+
+00000164 <.LM502>:
+ 164:	00000097          	auipc	ra,0x0
+			164: R_RISCV_CALL_PLT	GPIO_Init
+			164: R_RISCV_RELAX	*ABS*
+ 168:	000080e7          	jalr	ra # 164 <.LM502>
+
+0000016c <.LM503>:
+ 16c:	77e1                	lui	a5,0xffff8
+
+0000016e <.LM505>:
+ 16e:	40011537          	lui	a0,0x40011
+
+00000172 <.LM506>:
+ 172:	0e478793          	addi	a5,a5,228 # ffff80e4 <.LLST0+0xffff7a4e>
+
+00000176 <.LM507>:
+ 176:	004c                	addi	a1,sp,4
+ 178:	c0050513          	addi	a0,a0,-1024 # 40010c00 <.LLST0+0x4001056a>
+
+0000017c <.LM508>:
+ 17c:	827c                	.insn	2, 0x827c
+
+0000017e <.LM509>:
+ 17e:	c622                	sw	s0,12(sp)
+
+00000180 <.LM511>:
+ 180:	00000097          	auipc	ra,0x0
+			180: R_RISCV_CALL_PLT	GPIO_Init
+			180: R_RISCV_RELAX	*ABS*
+ 184:	000080e7          	jalr	ra # 180 <.LM511>
+
+00000188 <.LM512>:
+ 188:	77f9                	lui	a5,0xffffe
+ 18a:	03078793          	addi	a5,a5,48 # ffffe030 <.LLST0+0xffffd99a>
+
+0000018e <.LM514>:
+ 18e:	004c                	addi	a1,sp,4
+ 190:	40011537          	lui	a0,0x40011
+
+00000194 <.LM515>:
+ 194:	827c                	.insn	2, 0x827c
+
+00000196 <.LM516>:
+ 196:	c622                	sw	s0,12(sp)
+
+00000198 <.LM518>:
+ 198:	00000097          	auipc	ra,0x0
+			198: R_RISCV_CALL_PLT	GPIO_Init
+			198: R_RISCV_RELAX	*ABS*
+ 19c:	000080e7          	jalr	ra # 198 <.LM518>
+
+000001a0 <.LM519>:
+ 1a0:	40011537          	lui	a0,0x40011
+
+000001a4 <.LM521>:
+ 1a4:	30000793          	li	a5,768
+
+000001a8 <.LM522>:
+ 1a8:	004c                	addi	a1,sp,4
+ 1aa:	40050513          	addi	a0,a0,1024 # 40011400 <.LLST0+0x40010d6a>
+
+000001ae <.LM523>:
+ 1ae:	827c                	.insn	2, 0x827c
+
+000001b0 <.LM524>:
+ 1b0:	c622                	sw	s0,12(sp)
+
+000001b2 <.LM526>:
+ 1b2:	00000097          	auipc	ra,0x0
+			1b2: R_RISCV_CALL_PLT	GPIO_Init
+			1b2: R_RISCV_RELAX	*ABS*
+ 1b6:	000080e7          	jalr	ra # 1b2 <.LM526>
+
+000001ba <.LM527>:
+ 1ba:	38400793          	li	a5,900
+
+000001be <.L87>:
+ 1be:	40012537          	lui	a0,0x40012
+ 1c2:	004c                	addi	a1,sp,4
+ 1c4:	80050513          	addi	a0,a0,-2048 # 40011800 <.LLST0+0x4001116a>
+
+000001c8 <.LM530>:
+ 1c8:	827c                	.insn	2, 0x827c
+
+000001ca <.LM531>:
+ 1ca:	c622                	sw	s0,12(sp)
+
+000001cc <.LM533>:
+ 1cc:	00000097          	auipc	ra,0x0
+			1cc: R_RISCV_CALL_PLT	GPIO_Init
+			1cc: R_RISCV_RELAX	*ABS*
+ 1d0:	000080e7          	jalr	ra # 1cc <.LM533>
+
+000001d4 <.LM534>:
+ 1d4:	6791                	lui	a5,0x4
+ 1d6:	fc078793          	addi	a5,a5,-64 # 3fc0 <.LLST0+0x392a>
+
+000001da <.L86>:
+ 1da:	40012537          	lui	a0,0x40012
+ 1de:	004c                	addi	a1,sp,4
+ 1e0:	c0050513          	addi	a0,a0,-1024 # 40011c00 <.LLST0+0x4001156a>
+
+000001e4 <.LM537>:
+ 1e4:	827c                	.insn	2, 0x827c
+
+000001e6 <.LM538>:
+ 1e6:	c622                	sw	s0,12(sp)
+
+000001e8 <.LM540>:
+ 1e8:	00000097          	auipc	ra,0x0
+			1e8: R_RISCV_CALL_PLT	GPIO_Init
+			1e8: R_RISCV_RELAX	*ABS*
+ 1ec:	000080e7          	jalr	ra # 1e8 <.LM540>
+
+000001f0 <.LM541>:
+ 1f0:	bdd1                	j	c4 <.L77>
+			1f0: R_RISCV_RVC_JUMP	.L77
+
+000001f2 <.L81>:
+ 1f2:	40011537          	lui	a0,0x40011
+
+000001f6 <.LM545>:
+ 1f6:	02800413          	li	s0,40
+
+000001fa <.LM546>:
+ 1fa:	10000793          	li	a5,256
+
+000001fe <.LM547>:
+ 1fe:	004c                	addi	a1,sp,4
+ 200:	80050513          	addi	a0,a0,-2048 # 40010800 <.LLST0+0x4001016a>
+
+00000204 <.LM548>:
+ 204:	827c                	.insn	2, 0x827c
+
+00000206 <.LM549>:
+ 206:	c622                	sw	s0,12(sp)
+
+00000208 <.LM551>:
+ 208:	00000097          	auipc	ra,0x0
+			208: R_RISCV_CALL_PLT	GPIO_Init
+			208: R_RISCV_RELAX	*ABS*
+ 20c:	000080e7          	jalr	ra # 208 <.LM551>
+
+00000210 <.LM552>:
+ 210:	40011537          	lui	a0,0x40011
+
+00000214 <.LM554>:
+ 214:	02400793          	li	a5,36
+
+00000218 <.LM555>:
+ 218:	004c                	addi	a1,sp,4
+ 21a:	c0050513          	addi	a0,a0,-1024 # 40010c00 <.LLST0+0x4001056a>
+
+0000021e <.LM556>:
+ 21e:	827c                	.insn	2, 0x827c
+
+00000220 <.LM557>:
+ 220:	c622                	sw	s0,12(sp)
+
+00000222 <.LM559>:
+ 222:	00000097          	auipc	ra,0x0
+			222: R_RISCV_CALL_PLT	GPIO_Init
+			222: R_RISCV_RELAX	*ABS*
+ 226:	000080e7          	jalr	ra # 222 <.LM559>
+
+0000022a <.LM560>:
+ 22a:	77f9                	lui	a5,0xffffe
+ 22c:	02078793          	addi	a5,a5,32 # ffffe020 <.LLST0+0xffffd98a>
+
+00000230 <.LM562>:
+ 230:	004c                	addi	a1,sp,4
+ 232:	40011537          	lui	a0,0x40011
+
+00000236 <.LM563>:
+ 236:	827c                	.insn	2, 0x827c
+
+00000238 <.LM564>:
+ 238:	c622                	sw	s0,12(sp)
+
+0000023a <.LM566>:
+ 23a:	00000097          	auipc	ra,0x0
+			23a: R_RISCV_CALL_PLT	GPIO_Init
+			23a: R_RISCV_RELAX	*ABS*
+ 23e:	000080e7          	jalr	ra # 23a <.LM566>
+
+00000242 <.LM567>:
+ 242:	40011537          	lui	a0,0x40011
+
+00000246 <.LM569>:
+ 246:	57dd                	li	a5,-9
+
+00000248 <.LM570>:
+ 248:	004c                	addi	a1,sp,4
+ 24a:	40050513          	addi	a0,a0,1024 # 40011400 <.LLST0+0x40010d6a>
+
+0000024e <.LM571>:
+ 24e:	827c                	.insn	2, 0x827c
+
+00000250 <.LM572>:
+ 250:	c622                	sw	s0,12(sp)
+
+00000252 <.LM574>:
+ 252:	00000097          	auipc	ra,0x0
+			252: R_RISCV_CALL_PLT	GPIO_Init
+			252: R_RISCV_RELAX	*ABS*
+ 256:	000080e7          	jalr	ra # 252 <.LM574>
+
+0000025a <.LM575>:
+ 25a:	40012537          	lui	a0,0x40012
+
+0000025e <.LM577>:
+ 25e:	78700793          	li	a5,1927
+
+00000262 <.LM578>:
+ 262:	004c                	addi	a1,sp,4
+ 264:	80050513          	addi	a0,a0,-2048 # 40011800 <.LLST0+0x4001116a>
+
+00000268 <.LM579>:
+ 268:	827c                	.insn	2, 0x827c
+
+0000026a <.LM580>:
+ 26a:	c622                	sw	s0,12(sp)
+
+0000026c <.LM582>:
+ 26c:	00000097          	auipc	ra,0x0
+			26c: R_RISCV_CALL_PLT	GPIO_Init
+			26c: R_RISCV_RELAX	*ABS*
+ 270:	000080e7          	jalr	ra # 26c <.LM582>
+
+00000274 <.LM583>:
+ 274:	67a1                	lui	a5,0x8
+ 276:	fc778793          	addi	a5,a5,-57 # 7fc7 <.LLST0+0x7931>
+ 27a:	b785                	j	1da <.L86>
+			27a: R_RISCV_RVC_JUMP	.L86
+
+0000027c <.L82>:
+ 27c:	40011537          	lui	a0,0x40011
+
+00000280 <.LM587>:
+ 280:	02800413          	li	s0,40
+
+00000284 <.LM588>:
+ 284:	70000793          	li	a5,1792
+
+00000288 <.LM589>:
+ 288:	004c                	addi	a1,sp,4
+ 28a:	80050513          	addi	a0,a0,-2048 # 40010800 <.LLST0+0x4001016a>
+
+0000028e <.LM590>:
+ 28e:	827c                	.insn	2, 0x827c
+
+00000290 <.LM591>:
+ 290:	c622                	sw	s0,12(sp)
+
+00000292 <.LM593>:
+ 292:	00000097          	auipc	ra,0x0
+			292: R_RISCV_CALL_PLT	GPIO_Init
+			292: R_RISCV_RELAX	*ABS*
+ 296:	000080e7          	jalr	ra # 292 <.LM593>
+
+0000029a <.LM594>:
+ 29a:	40011537          	lui	a0,0x40011
+
+0000029e <.LM596>:
+ 29e:	c0400793          	li	a5,-1020
+
+000002a2 <.LM597>:
+ 2a2:	004c                	addi	a1,sp,4
+ 2a4:	c0050513          	addi	a0,a0,-1024 # 40010c00 <.LLST0+0x4001056a>
+
+000002a8 <.LM598>:
+ 2a8:	827c                	.insn	2, 0x827c
+
+000002aa <.LM599>:
+ 2aa:	c622                	sw	s0,12(sp)
+
+000002ac <.LM601>:
+ 2ac:	00000097          	auipc	ra,0x0
+			2ac: R_RISCV_CALL_PLT	GPIO_Init
+			2ac: R_RISCV_RELAX	*ABS*
+ 2b0:	000080e7          	jalr	ra # 2ac <.LM601>
+
+000002b4 <.LM602>:
+ 2b4:	77f9                	lui	a5,0xffffe
+
+000002b6 <.LM604>:
+ 2b6:	004c                	addi	a1,sp,4
+ 2b8:	40011537          	lui	a0,0x40011
+
+000002bc <.LM605>:
+ 2bc:	827c                	.insn	2, 0x827c
+
+000002be <.LM606>:
+ 2be:	c622                	sw	s0,12(sp)
+
+000002c0 <.LM608>:
+ 2c0:	00000097          	auipc	ra,0x0
+			2c0: R_RISCV_CALL_PLT	GPIO_Init
+			2c0: R_RISCV_RELAX	*ABS*
+ 2c4:	000080e7          	jalr	ra # 2c0 <.LM608>
+
+000002c8 <.LM609>:
+ 2c8:	40011537          	lui	a0,0x40011
+
+000002cc <.LM611>:
+ 2cc:	9f300793          	li	a5,-1549
+
+000002d0 <.LM612>:
+ 2d0:	004c                	addi	a1,sp,4
+ 2d2:	40050513          	addi	a0,a0,1024 # 40011400 <.LLST0+0x40010d6a>
+
+000002d6 <.LM613>:
+ 2d6:	827c                	.insn	2, 0x827c
+
+000002d8 <.LM614>:
+ 2d8:	c622                	sw	s0,12(sp)
+
+000002da <.LM616>:
+ 2da:	00000097          	auipc	ra,0x0
+			2da: R_RISCV_CALL_PLT	GPIO_Init
+			2da: R_RISCV_RELAX	*ABS*
+ 2de:	000080e7          	jalr	ra # 2da <.LM616>
+
+000002e2 <.LM617>:
+ 2e2:	67a1                	lui	a5,0x8
+
+000002e4 <.LM619>:
+ 2e4:	40012537          	lui	a0,0x40012
+
+000002e8 <.LM620>:
+ 2e8:	dff78793          	addi	a5,a5,-513 # 7dff <.LLST0+0x7769>
+
+000002ec <.LM621>:
+ 2ec:	004c                	addi	a1,sp,4
+ 2ee:	80050513          	addi	a0,a0,-2048 # 40011800 <.LLST0+0x4001116a>
+
+000002f2 <.LM622>:
+ 2f2:	827c                	.insn	2, 0x827c
+
+000002f4 <.LM623>:
+ 2f4:	c622                	sw	s0,12(sp)
+
+000002f6 <.LM625>:
+ 2f6:	00000097          	auipc	ra,0x0
+			2f6: R_RISCV_CALL_PLT	GPIO_Init
+			2f6: R_RISCV_RELAX	*ABS*
+ 2fa:	000080e7          	jalr	ra # 2f6 <.LM625>
+
+000002fe <.LM626>:
+ 2fe:	6795                	lui	a5,0x5
+ 300:	83f78793          	addi	a5,a5,-1985 # 483f <.LLST0+0x41a9>
+ 304:	bdd9                	j	1da <.L86>
+			304: R_RISCV_RVC_JUMP	.L86

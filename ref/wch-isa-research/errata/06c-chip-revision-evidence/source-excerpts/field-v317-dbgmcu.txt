@@ -1,0 +1,54 @@
+source	tmp/wch-evt/evt/QingkeV4F_CH32V317_EVT/EXAM/SRC/Peripheral/src/ch32v30x_dbgmcu.c
+sha256	7a407df222c506db7205bda981117badc004e3b2c1aa88df0023f0bafc11172b
+range	14-37
+000014	#define IDCODE_DEVID_MASK    ((uint32_t)0x0000FFFF)
+000015
+000016	/*********************************************************************
+000017	 * @fn      DBGMCU_GetREVID
+000018	 *
+000019	 * @brief   Returns the device revision identifier.
+000020	 *
+000021	 * @return  Revision identifier.
+000022	 */
+000023	uint32_t DBGMCU_GetREVID(void)
+000024	{
+000025	    return ((*(uint32_t *)0x1FFFF704) & IDCODE_DEVID_MASK);
+000026	}
+000027
+000028	/*********************************************************************
+000029	 * @fn      DBGMCU_GetDEVID
+000030	 *
+000031	 * @brief   Returns the device identifier.
+000032	 *
+000033	 * @return  Device identifier.
+000034	 */
+000035	uint32_t DBGMCU_GetDEVID(void)
+000036	{
+000037	    return ((*(uint32_t *)0x1FFFF704) >> 16);
+range	103-128
+000103	 * @fn      DBGMCU_GetCHIPID
+000104	 *
+000105	 * @brief   Returns the CHIP identifier.
+000106	 *
+000107	 * @return Device identifier.
+000108	 *          ChipID List-
+000109	 *          CH32V303CBT-0x303305x4
+000110	 *          CH32V303RBT-0x303205x4
+000111	 *          CH32V303RCT-0x303105x4
+000112	 *          CH32V303VCT-0x303005x4
+000113	 *          CH32V305FBP-0x305205x8
+000114	 *          CH32V305RBT-0x305005x8
+000115	 *          CH32V305GBU-0x305B05x8
+000116	 *          CH32V305CCT-0x305C05x8
+000117	 *          CH32V307WCU-0x307305x8
+000118	 *          CH32V307FBP-0x307205x8
+000119	 *          CH32V307RCT-0x307105x8
+000120	 *          CH32V307VCT-0x307005x8
+000121	 *          CH32V317VCT-0x3170B5X8
+000122	 *          CH32V317WCU-0x3173B5X8
+000123	 *          CH32V317TCU-0x3175B5X8
+000124	 */
+000125	uint32_t DBGMCU_GetCHIPID( void )
+000126	{
+000127	    return( *( uint32_t * )0x1FFFF704 );
+000128	}

@@ -1,0 +1,135 @@
+source	tmp/wch-evt/evt/QingkeV4F_CH32V317_EVT/EXAM/ETH/NetLib/eth_driver_RGMII.c
+sha256	e80662c706d45daa0ee357df986fea0af010ade69cc06d75a8c8ff4cca182614
+range	241-300
+000241	void ETH_PHYLink( void )
+000242	{
+000243	    u32 phy_stat;
+000244	#if !LINK_STAT_ACQUISITION_METHOD
+000245	    uint8_t timeout = 0;
+000246	#endif
+000247
+000248	    ETH_WritePHYRegister( gPHYAddress, 0x1F, 0x0a43 );
+000249	    /*In some cases the status is not updated in time,
+000250	     * so read this register twice to get the correct status value.*/
+000251	    ETH_ReadPHYRegister( gPHYAddress, 0x1A);
+000252	    phy_stat = ETH_ReadPHYRegister( gPHYAddress, 0x1A);
+000253	#if !LINK_STAT_ACQUISITION_METHOD
+000254	    if((ChipId & 0xf0) <= 0x20)
+000255	    {
+000256	        while(phy_stat == 0)
+000257	        {
+000258	            Delay_Us(100);
+000259	            phy_stat = ETH_ReadPHYRegister( gPHYAddress, 0x1A);
+000260	            if(timeout++ == 15)   break;
+000261	        }
+000262	        if(LastPhyStat == (phy_stat & 0x04)) return;
+000263	    }
+000264	    LastPhyStat = phy_stat & 0x04;
+000265	#endif
+000266	    WCHNET_PhyStatus( phy_stat );
+000267
+000268	    if( phy_stat & 0x04 )
+000269	    {
+000270	        /* Configure the polarity and delay of TXC */
+000271	        RGMII_TXC_Delay(0, 4);
+000272	        if( phy_stat & 0x08 )
+000273	        {
+000274	            ETH->MACCR |= ETH_Mode_FullDuplex;
+000275	        }
+000276	        else
+000277	        {
+000278	            ETH->MACCR &= ~ETH_Mode_FullDuplex;
+000279	        }
+000280	        if( (phy_stat & 0x30) == 0x00 )
+000281	        {
+000282	            ETH->MACCR &= ~(ETH_Speed_100M|ETH_Speed_1000M);
+000283	        }
+000284	        else if( (phy_stat & 0x30) == 0x10 )
+000285	        {
+000286	            ETH->MACCR &= ~(ETH_Speed_100M|ETH_Speed_1000M);
+000287	            ETH->MACCR |= ETH_Speed_100M;
+000288	        }
+000289	        else if( (phy_stat & 0x30) == 0x20 )
+000290	        {
+000291	            ETH->MACCR &= ~(ETH_Speed_100M|ETH_Speed_1000M);
+000292	            ETH->MACCR |= ETH_Speed_1000M;
+000293	            /* Configure the polarity and delay of TXC */
+000294	            if((ChipId & 0xf0) >= 0x60)
+000295	                RGMII_TXC_Delay(1, 2);
+000296	        }
+000297	        ETH_Start( );
+000298	    }
+000299	    phy_stat = ETH_ReadPHYRegister( gPHYAddress, 0x1D);   /* Clear the Interrupt status */
+000300	}
+range	610-680
+000610	 * @brief   Receiving related processing
+000611	 *
+000612	 * @param   none.
+000613	 *
+000614	 * @return  none.
+000615	 */
+000616	void WCHNET_RecProcess(void)
+000617	{
+000618	    if(((ChipId & 0xf0) <= 0x20) && \
+000619	            ((ETH->DMAMFBOCR & 0x1FFE0000) != 0))
+000620	    {
+000621	        ReInitMACReg();
+000622	        /* Resume DMA transport */
+000623	        ETH->DMARPDR = 0;
+000624	        ETH->DMATPDR = 0;
+000625	    }
+000626	}
+000627
+000628	/*********************************************************************
+000629	 * @fn      WCHNET_ETHIsr
+000630	 *
+000631	 * @brief   Ethernet Interrupt Service Routine
+000632	 *
+000633	 * @return  none
+000634	 */
+000635	void WCHNET_ETHIsr(void)
+000636	{
+000637	    uint32_t int_sta;
+000638
+000639	    int_sta = ETH->DMASR;
+000640	    if (int_sta & ETH_DMA_IT_AIS)
+000641	    {
+000642	        if (int_sta & ETH_DMA_IT_RBU)
+000643	        {
+000644	            WCHNET_RecProcess();
+000645	            ETH_DMAClearITPendingBit(ETH_DMA_IT_RBU);
+000646	        }
+000647	        ETH_DMAClearITPendingBit(ETH_DMA_IT_AIS);
+000648	    }
+000649
+000650	    if( int_sta & ETH_DMA_IT_NIS )
+000651	    {
+000652	        if( int_sta & ETH_DMA_IT_R )
+000653	        {
+000654	            /*If you don't use the Ethernet library,
+000655	             * you can do some data processing operations here*/
+000656	            ETH_DMAClearITPendingBit(ETH_DMA_IT_R);
+000657	        }
+000658	        if( int_sta & ETH_DMA_IT_T )
+000659	        {
+000660	            ETH_DMAClearITPendingBit(ETH_DMA_IT_T);
+000661	        }
+000662	        ETH_DMAClearITPendingBit(ETH_DMA_IT_NIS);
+000663	    }
+000664	}
+000665
+000666	/*********************************************************************
+000667	 * @fn      ETH_Init
+000668	 *
+000669	 * @brief   Ethernet initialization.
+000670	 *
+000671	 * @return  none
+000672	 */
+000673	void ETH_Init( uint8_t *macAddr )
+000674	{
+000675	    ChipId = DBGMCU_GetCHIPID();
+000676	    ETH_Configuration( macAddr );
+000677	    ETH_DMATxDescChainInit(DMATxDscrTab, MACTxBuf, ETH_TXBUFNB);
+000678	    ETH_DMARxDescChainInit(DMARxDscrTab, MACRxBuf, ETH_RXBUFNB);
+000679	    pDMARxSet = DMARxDscrTab;
+000680	    pDMATxSet = DMATxDscrTab;

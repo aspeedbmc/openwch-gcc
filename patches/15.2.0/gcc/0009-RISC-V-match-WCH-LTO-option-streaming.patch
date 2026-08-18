@@ -1,0 +1,70 @@
+From d14602eb4df12e4660c69d88f389cce509bf7f56 Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 3 <phase3@openwch.local>
+Date: Fri, 14 Aug 2026 18:13:18 +0900
+Subject: [PATCH 9/9] RISC-V: match WCH LTO option streaming
+
+Register the highcode section-name parameter as an optimization option so
+GCC saves, hashes, and streams it in cl_optimization.  Give XW its target
+mask and map the parsed extension into x_target_flags so target attributes
+retain XW across LTO.
+
+These are the two missing entries in the official generated option state.
+With fixed random seeds, both ordinary and XW target-attribute slim LTO
+objects now match the WCH compiler byte-for-byte, and each lto-dump
+accepts the other compiler's streams.  The versioned two-platform gate for
+this surface lives in tests/xw-lto.
+
+gcc/ChangeLog:
+
+	* common/config/riscv/riscv-common.cc (riscv_ext_flag_table): Map xw
+	to MASK_XW.
+	* config/riscv/riscv.opt: Add the XW target mask.
+	* params.opt: Make --param=highcode-gen-section-name= an
+	optimization option.
+---
+ gcc/common/config/riscv/riscv-common.cc | 1 +
+ gcc/config/riscv/riscv.opt              | 2 ++
+ gcc/params.opt                          | 2 +-
+ 3 files changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/common/config/riscv/riscv-common.cc b/gcc/common/config/riscv/riscv-common.cc
+index 46c5d85b4..c799d4cb5 100644
+--- a/gcc/common/config/riscv/riscv-common.cc
++++ b/gcc/common/config/riscv/riscv-common.cc
+@@ -1610,6 +1610,7 @@ static const riscv_ext_flag_table_t riscv_ext_flag_table[] =
+   RISCV_EXT_FLAG_ENTRY ("c", x_target_flags, MASK_RVC),
+   RISCV_EXT_FLAG_ENTRY ("v", x_target_flags, MASK_FULL_V),
+   RISCV_EXT_FLAG_ENTRY ("v", x_target_flags, MASK_VECTOR),
++  RISCV_EXT_FLAG_ENTRY ("xw", x_target_flags, MASK_XW),
+ 
+   RISCV_EXT_FLAG_ENTRY ("zicsr",    x_riscv_zi_subext, MASK_ZICSR),
+   RISCV_EXT_FLAG_ENTRY ("zifencei", x_riscv_zi_subext, MASK_ZIFENCEI),
+diff --git a/gcc/config/riscv/riscv.opt b/gcc/config/riscv/riscv.opt
+index 7515c8ea1..7d2ef9690 100644
+--- a/gcc/config/riscv/riscv.opt
++++ b/gcc/config/riscv/riscv.opt
+@@ -186,6 +186,8 @@ Mask(VECTOR)
+ 
+ Mask(FULL_V)
+ 
++Mask(XW)
++
+ mriscv-attribute
+ Target Var(riscv_emit_attribute_p) Init(-1)
+ Emit RISC-V ELF attribute.
+diff --git a/gcc/params.opt b/gcc/params.opt
+index 53eae79e7..a41e4f560 100644
+--- a/gcc/params.opt
++++ b/gcc/params.opt
+@@ -210,7 +210,7 @@ Common Joined UInteger Var(param_hash_table_verification_limit) Init(10) Param
+ The number of elements for which hash table verification is done for each searched element.
+ 
+ -param=highcode-gen-section-name=
+-Common Joined UInteger Var(param_highcode_gen_section_name) Init(0) IntegerRange(0, 1) Param
++Common Joined UInteger Var(param_highcode_gen_section_name) Init(0) IntegerRange(0, 1) Param Optimization
+ __attribute__((section(.highcode))) generate new section name.
+ 
+ -param=hot-bb-count-fraction=
+-- 
+2.55.0
+

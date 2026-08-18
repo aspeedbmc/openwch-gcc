@@ -1,0 +1,655 @@
+From 84e34beb7bd84a20cd9c15782da2dccc6f2f5e99 Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 3 <phase3@openwch.local>
+Date: Sun, 16 Aug 2026 02:13:08 +0900
+Subject: [PATCH 4/7] RISC-V: make the attribute section write-out opt-in
+
+Upstream synthesises the RISC-V attribute section at finish time whenever
+riscv_opts.arch_attr or an explicit .attribute directive asks for it.  The
+official WCH 15.2.0 assembler does not: on the same inputs it writes no
+.riscv.attributes at all, and 43 EVT objects differed from ours for that
+reason alone.
+
+Probing the official assembler shows what decides it: a long option
+--w_priv_spec that it accepts, that neither --help nor --target-help
+lists, that rejects an argument, and that turns synthesis on.  The
+upstream condition survives underneath it, so the gate is
+
+  w_priv_spec && (riscv_opts.arch_attr || explicit_attr)
+
+Each factor is separately observable.  -mno-arch-attr still suppresses
+synthesis with the option given, which is only possible if
+DEFAULT_RISCV_ATTR is still 1 -- and that in turn is why -march-attr looks
+like a no-op there: it sets a flag that is already set.  An explicit
+.attribute directive keeps recording its operand with the option off, but
+the operand stays verbatim; only synthesis rewrites it into canonical
+form, which is where a bare xw becomes xw2p2.
+
+A run-time flag is also the only shape that keeps the assembler whole.
+TARGET_VENDOR is a compile-time string literal, so gating on it folds to a
+constant: riscv_set_public_attributes loses its only call to
+riscv_write_out_attrs, and the function disappears together with its
+exclusive diagnostic
+
+  internal: bad RISC-V privileged spec (%s)
+
+which both upstream builds and the official assembler retain.  No object
+under test reaches that path, so the product bytes cannot show such a
+loss; only a strings differential against a matching upstream build can.
+
+The flag defaults to 0 unconditionally rather than through a
+target-dependent configure default, and that choice deserves its reasons
+stated:
+
+  * It is the whole of the observable difference.  The default is what the
+    official assembler does, and every surface that can distinguish the
+    two -- the presence and exact bytes of .riscv.attributes across the
+    four gate combinations, --help and --target-help, the rejection of an
+    argument -- was probed against it and agrees.  A configure-time
+    default reached through gas/configure.tgt, in the manner of
+    DEFAULT_RISCV_ATTR itself, would produce byte-identical behaviour on
+    this target; it differs only in what other RISC-V targets would
+    default to.
+
+  * A configure default cannot be added without regenerating the generated
+    configure script.  That regeneration is sensitive to the exact
+    autoconf version, produces a diff far larger than the change it
+    carries, and would put a generated file whose contents affect the
+    built binaries into the series for the sake of targets this series
+    does not build.
+
+  * Nothing here is built for another target.  Writing a target
+    conditional now would be speculative generality: the behaviour it
+    would protect is not exercised, not tested, and not compared against
+    anything.
+
+The tests carry the consequence honestly.  Because the flag rather than
+the target decides, the upstream attribute tests keep running on this
+target: the invocations that need the section pass --w_priv_spec, which
+also keeps their upstream expectations intact -- the priv-spec the
+csr-insns-pseudo tests pass to objdump by hand, the optional
+.riscv.attributes symbol in imply and option-norvc, and the gas/elf
+section2 expectation, whose upstream file matches once the one invocation
+that inspects the section asks for it.  Five new cases pin the quadrants
+the upstream tests do not cover: the section absent by default,
+-march-attr not changing that, an explicit directive recorded verbatim
+with the option off, and the same directive canonicalised with it on.  The
+fifth, wch-attribute-w-priv-spec-off.d, is the one that shows the second
+factor still bites once the option is open: with --w_priv_spec given and
+-mno-arch-attr clearing arch_attr, nothing is written.  Without that case
+the gate would be indistinguishable from a single factor.
+
+Behavior sources:
+  analysis/toolchain/phase2-diff-inventory.md sections "Non-XW
+  diagnostics: v3a-gpio" and "Difference classification"
+  analysis/toolchain/wch-gcc-toolchain-survey.md section 5.2
+Option shape, gate shape and every expectation added here were captured
+from the official WCH 15.2.0 assembler.
+---
+ gas/config/tc-riscv.c                         | 33 ++++++++++++++++++-
+ gas/testsuite/gas/elf/elf.exp                 |  6 ++--
+ gas/testsuite/gas/riscv/attribute-01.d        |  2 +-
+ gas/testsuite/gas/riscv/attribute-02.d        |  2 +-
+ gas/testsuite/gas/riscv/attribute-03.d        |  2 +-
+ gas/testsuite/gas/riscv/attribute-04.d        |  2 +-
+ gas/testsuite/gas/riscv/attribute-05.d        |  2 +-
+ gas/testsuite/gas/riscv/attribute-06.d        |  2 +-
+ gas/testsuite/gas/riscv/attribute-07.d        |  2 +-
+ gas/testsuite/gas/riscv/attribute-09.d        |  2 +-
+ gas/testsuite/gas/riscv/attribute-10.d        |  2 +-
+ gas/testsuite/gas/riscv/attribute-11.d        |  2 +-
+ gas/testsuite/gas/riscv/attribute-12.d        |  2 +-
+ gas/testsuite/gas/riscv/attribute-13.d        |  2 +-
+ gas/testsuite/gas/riscv/attribute-14a.d       |  2 +-
+ gas/testsuite/gas/riscv/attribute-14b.d       |  2 +-
+ gas/testsuite/gas/riscv/attribute-14c.d       |  2 +-
+ gas/testsuite/gas/riscv/attribute-14d.d       |  2 +-
+ gas/testsuite/gas/riscv/attribute-15.d        |  2 +-
+ gas/testsuite/gas/riscv/attribute-16.d        |  2 +-
+ gas/testsuite/gas/riscv/attribute-17.d        |  2 +-
+ gas/testsuite/gas/riscv/attribute-18.d        |  2 +-
+ gas/testsuite/gas/riscv/attribute-19.d        |  2 +-
+ gas/testsuite/gas/riscv/attribute-20.d        |  2 +-
+ gas/testsuite/gas/riscv/attribute-rva23s.d    |  2 +-
+ gas/testsuite/gas/riscv/attribute-rvb23s.d    |  2 +-
+ gas/testsuite/gas/riscv/attribute-unknown.d   |  2 +-
+ .../gas/riscv/attribute-xw-version.d          |  2 +-
+ gas/testsuite/gas/riscv/attribute-xw.d        |  2 +-
+ .../gas/riscv/csr-insns-pseudo-noalias.d      |  2 +-
+ .../gas/riscv/csr-insns-pseudo-zfinx.d        |  2 +-
+ gas/testsuite/gas/riscv/csr-insns-pseudo.d    |  2 +-
+ .../imply-zicsr-zifencei-i2p0-misa-spec-2p2.d |  2 +-
+ gas/testsuite/gas/riscv/imply.d               |  2 +-
+ gas/testsuite/gas/riscv/march-ok-reorder.d    |  2 +-
+ gas/testsuite/gas/riscv/option-arch-attr.d    |  2 +-
+ gas/testsuite/gas/riscv/option-norvc.d        |  2 +-
+ .../gas/riscv/wch-attribute-default-off.d     |  3 ++
+ .../gas/riscv/wch-attribute-explicit.d        |  7 ++++
+ .../gas/riscv/wch-attribute-explicit.s        |  3 ++
+ .../gas/riscv/wch-attribute-march-attr-off.d  |  3 ++
+ .../wch-attribute-w-priv-spec-explicit.d      |  9 +++++
+ .../gas/riscv/wch-attribute-w-priv-spec-off.d |  3 ++
+ 43 files changed, 99 insertions(+), 38 deletions(-)
+ create mode 100644 gas/testsuite/gas/riscv/wch-attribute-default-off.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-attribute-explicit.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-attribute-explicit.s
+ create mode 100644 gas/testsuite/gas/riscv/wch-attribute-march-attr-off.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-attribute-w-priv-spec-explicit.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-attribute-w-priv-spec-off.d
+
+diff --git a/gas/config/tc-riscv.c b/gas/config/tc-riscv.c
+index c2d38f43..9e89c6c6 100644
+--- a/gas/config/tc-riscv.c
++++ b/gas/config/tc-riscv.c
+@@ -474,6 +474,14 @@ const char FLT_CHARS[] = "rRsSfFdDxXpPhHbB";
+ /* Indicate ELF attributes are explicitly set.  */
+ static bool explicit_attr = false;
+ 
++/* Indicate the synthesised RISC-V ELF attributes should be written out.
++   WCH leaves them out of an object unless --w_priv_spec is given, so the
++   arch, stack alignment and privileged spec tags that finish-time synthesis
++   would add are opt-in; an explicit .attribute directive still records its
++   operand, and records it verbatim rather than canonicalised.  The name is
++   the one the official assembler accepts.  */
++static bool w_priv_spec = false;
++
+ /* Indicate CSR or priv instructions are explicitly used.  */
+ static bool explicit_priv_attr = false;
+ 
+@@ -4537,6 +4545,7 @@ enum options
+   OPTION_NO_RELAX,
+   OPTION_ARCH_ATTR,
+   OPTION_NO_ARCH_ATTR,
++  OPTION_W_PRIV_SPEC,
+   OPTION_CSR_CHECK,
+   OPTION_NO_CSR_CHECK,
+   OPTION_MISA_SPEC,
+@@ -4557,6 +4566,9 @@ const struct option md_longopts[] =
+   {"mno-relax", no_argument, NULL, OPTION_NO_RELAX},
+   {"march-attr", no_argument, NULL, OPTION_ARCH_ATTR},
+   {"mno-arch-attr", no_argument, NULL, OPTION_NO_ARCH_ATTR},
++  /* Deliberately absent from md_show_usage: the official assembler accepts
++     this option but neither --help nor --target-help lists it.  */
++  {"w_priv_spec", no_argument, NULL, OPTION_W_PRIV_SPEC},
+   {"mcsr-check", no_argument, NULL, OPTION_CSR_CHECK},
+   {"mno-csr-check", no_argument, NULL, OPTION_NO_CSR_CHECK},
+   {"misa-spec", required_argument, NULL, OPTION_MISA_SPEC},
+@@ -4633,6 +4645,10 @@ md_parse_option (int c, const char *arg)
+       riscv_opts.arch_attr = false;
+       break;
+ 
++    case OPTION_W_PRIV_SPEC:
++      w_priv_spec = true;
++      break;
++
+     case OPTION_CSR_CHECK:
+       riscv_opts.csr_check = true;
+       break;
+@@ -5794,7 +5810,22 @@ riscv_write_out_attrs (void)
+ static void
+ riscv_set_public_attributes (void)
+ {
+-  if (riscv_opts.arch_attr || explicit_attr)
++  /* WCH keeps the upstream condition and requires --w_priv_spec on top of
++     it, which is why -march-attr looks like a no-op there: it sets a flag
++     that DEFAULT_RISCV_ATTR already set.  The four combinations, all of
++     them probed on the official 15.2.0 assembler, are
++
++       --w_priv_spec  arch_attr || explicit_attr  .riscv.attributes
++       no             either                      absent, or exactly what
++						  a .attribute directive
++						  wrote, uncanonicalised
++       yes            false                       absent
++       yes            true                        synthesised as upstream
++
++     so -mno-arch-attr still switches synthesis off with the option given,
++     and the section an explicit .attribute directive creates is rewritten
++     into canonical form only when synthesis runs.  */
++  if (w_priv_spec && (riscv_opts.arch_attr || explicit_attr))
+     riscv_write_out_attrs ();
+ }
+ 
+diff --git a/gas/testsuite/gas/elf/elf.exp b/gas/testsuite/gas/elf/elf.exp
+index 1f42c3f3..2c82ceb3 100644
+--- a/gas/testsuite/gas/elf/elf.exp
++++ b/gas/testsuite/gas/elf/elf.exp
+@@ -89,7 +89,9 @@ if { [is_elf_format] } then {
+     }
+     if {[istarget "riscv*-*-*"]} then {
+ 	set target_machine -riscv
+-	set dump_opts {{as -mno-relax}}
++	# The RISC-V attribute section these expectations include is written
++	# out only when asked for.
++	set dump_opts {{as -mno-relax --w_priv_spec}}
+     }
+     if {[istarget "rl78-*-*"]} then {
+ 	set target_machine -rl78
+@@ -211,7 +213,7 @@ if { [is_elf_format] } then {
+ 		set as_flags "$as_flags -mx86-used-note=no"
+ 	    }
+ 	    riscv*-*-* {
+-		set as_flags "$as_flags -march-attr"
++		set as_flags "$as_flags -march-attr --w_priv_spec"
+ 	    }
+ 	    mips*-*-irix* {
+ 		# Irix has no pdr section by default.
+diff --git a/gas/testsuite/gas/riscv/attribute-01.d b/gas/testsuite/gas/riscv/attribute-01.d
+index 5615d590..37bc7025 100644
+--- a/gas/testsuite/gas/riscv/attribute-01.d
++++ b/gas/testsuite/gas/riscv/attribute-01.d
+@@ -1,4 +1,4 @@
+-#as: -march=rv32g -march-attr -misa-spec=2.2
++#as: --w_priv_spec -march=rv32g -march-attr -misa-spec=2.2
+ #readelf: -A
+ #source: empty.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-02.d b/gas/testsuite/gas/riscv/attribute-02.d
+index 134cc41b..945d1abd 100644
+--- a/gas/testsuite/gas/riscv/attribute-02.d
++++ b/gas/testsuite/gas/riscv/attribute-02.d
+@@ -1,4 +1,4 @@
+-#as: -march=rv32gxargle2p0 -march-attr -misa-spec=2.2
++#as: --w_priv_spec -march=rv32gxargle2p0 -march-attr -misa-spec=2.2
+ #readelf: -A
+ #source: empty.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-03.d b/gas/testsuite/gas/riscv/attribute-03.d
+index 70e07e3b..37fd8bb7 100644
+--- a/gas/testsuite/gas/riscv/attribute-03.d
++++ b/gas/testsuite/gas/riscv/attribute-03.d
+@@ -1,4 +1,4 @@
+-#as: -march=rv32gxargle2p0_xfoo3p0 -march-attr -misa-spec=2.2
++#as: --w_priv_spec -march=rv32gxargle2p0_xfoo3p0 -march-attr -misa-spec=2.2
+ #readelf: -A
+ #source: empty.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-04.d b/gas/testsuite/gas/riscv/attribute-04.d
+index 21575b4a..b041a4fd 100644
+--- a/gas/testsuite/gas/riscv/attribute-04.d
++++ b/gas/testsuite/gas/riscv/attribute-04.d
+@@ -1,4 +1,4 @@
+-#as: -march-attr -misa-spec=2.2
++#as: --w_priv_spec -march-attr -misa-spec=2.2
+ #readelf: -A
+ #source: attribute-04.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-05.d b/gas/testsuite/gas/riscv/attribute-05.d
+index 5cd63b95..631bc164 100644
+--- a/gas/testsuite/gas/riscv/attribute-05.d
++++ b/gas/testsuite/gas/riscv/attribute-05.d
+@@ -1,4 +1,4 @@
+-#as: -march-attr -misa-spec=2.2
++#as: --w_priv_spec -march-attr -misa-spec=2.2
+ #readelf: -A
+ #source: attribute-05.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-06.d b/gas/testsuite/gas/riscv/attribute-06.d
+index a2dd9fbb..352b5a50 100644
+--- a/gas/testsuite/gas/riscv/attribute-06.d
++++ b/gas/testsuite/gas/riscv/attribute-06.d
+@@ -1,4 +1,4 @@
+-#as: -march=rv32g2p0 -march-attr -misa-spec=2.2
++#as: --w_priv_spec -march=rv32g2p0 -march-attr -misa-spec=2.2
+ #readelf: -A
+ #source: attribute-06.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-07.d b/gas/testsuite/gas/riscv/attribute-07.d
+index 342a5375..1dfe3103 100644
+--- a/gas/testsuite/gas/riscv/attribute-07.d
++++ b/gas/testsuite/gas/riscv/attribute-07.d
+@@ -1,4 +1,4 @@
+-#as: -march=rv64g2p0 -march-attr -misa-spec=2.2
++#as: --w_priv_spec -march=rv64g2p0 -march-attr -misa-spec=2.2
+ #readelf: -A
+ #source: attribute-07.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-09.d b/gas/testsuite/gas/riscv/attribute-09.d
+index c92dc970..728eca53 100644
+--- a/gas/testsuite/gas/riscv/attribute-09.d
++++ b/gas/testsuite/gas/riscv/attribute-09.d
+@@ -1,4 +1,4 @@
+-#as: -march-attr -march=rv32i2p2m_zicsr -misa-spec=20191213
++#as: --w_priv_spec -march-attr -march=rv32i2p2m_zicsr -misa-spec=20191213
+ #readelf: -A
+ #source: empty.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-10.d b/gas/testsuite/gas/riscv/attribute-10.d
+index cb3ae5a8..4cba6251 100644
+--- a/gas/testsuite/gas/riscv/attribute-10.d
++++ b/gas/testsuite/gas/riscv/attribute-10.d
+@@ -1,4 +1,4 @@
+-#as: -march-attr -march=rv32gc_zicsr -misa-spec=20191213
++#as: --w_priv_spec -march-attr -march=rv32gc_zicsr -misa-spec=20191213
+ #readelf: -A
+ #source: empty.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-11.d b/gas/testsuite/gas/riscv/attribute-11.d
+index 4bd66f0b..1defe450 100644
+--- a/gas/testsuite/gas/riscv/attribute-11.d
++++ b/gas/testsuite/gas/riscv/attribute-11.d
+@@ -1,4 +1,4 @@
+-#as: -march-attr
++#as: --w_priv_spec -march-attr
+ #readelf: -A
+ #source: attribute-11.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-12.d b/gas/testsuite/gas/riscv/attribute-12.d
+index 1441df41..447990bf 100644
+--- a/gas/testsuite/gas/riscv/attribute-12.d
++++ b/gas/testsuite/gas/riscv/attribute-12.d
+@@ -1,4 +1,4 @@
+-#as: -march-attr -mpriv-spec=1.12
++#as: --w_priv_spec -march-attr -mpriv-spec=1.12
+ #readelf: -A
+ #source: attribute-11.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-13.d b/gas/testsuite/gas/riscv/attribute-13.d
+index b6a160c4..0055bb30 100644
+--- a/gas/testsuite/gas/riscv/attribute-13.d
++++ b/gas/testsuite/gas/riscv/attribute-13.d
+@@ -1,4 +1,4 @@
+-#as: -march-attr -mpriv-spec=1.12
++#as: --w_priv_spec -march-attr -mpriv-spec=1.12
+ #readelf: -A
+ #source: empty.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-14a.d b/gas/testsuite/gas/riscv/attribute-14a.d
+index 7b66f0fa..efef0ee7 100644
+--- a/gas/testsuite/gas/riscv/attribute-14a.d
++++ b/gas/testsuite/gas/riscv/attribute-14a.d
+@@ -1,4 +1,4 @@
+-#as: -march-attr --defsym priv_insn_a=1
++#as: --w_priv_spec -march-attr --defsym priv_insn_a=1
+ #readelf: -A
+ #source: attribute-14.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-14b.d b/gas/testsuite/gas/riscv/attribute-14b.d
+index e044f4ff..3995b81c 100644
+--- a/gas/testsuite/gas/riscv/attribute-14b.d
++++ b/gas/testsuite/gas/riscv/attribute-14b.d
+@@ -1,4 +1,4 @@
+-#as: -march-attr --defsym priv_insn_b=1
++#as: --w_priv_spec -march-attr --defsym priv_insn_b=1
+ #readelf: -A
+ #source: attribute-14.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-14c.d b/gas/testsuite/gas/riscv/attribute-14c.d
+index 6311a9d7..e6708f34 100644
+--- a/gas/testsuite/gas/riscv/attribute-14c.d
++++ b/gas/testsuite/gas/riscv/attribute-14c.d
+@@ -1,4 +1,4 @@
+-#as: -march-attr --defsym priv_insn_c=1
++#as: --w_priv_spec -march-attr --defsym priv_insn_c=1
+ #readelf: -A
+ #source: attribute-14.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-14d.d b/gas/testsuite/gas/riscv/attribute-14d.d
+index f0f2d63b..a8d46c3d 100644
+--- a/gas/testsuite/gas/riscv/attribute-14d.d
++++ b/gas/testsuite/gas/riscv/attribute-14d.d
+@@ -1,4 +1,4 @@
+-#as: -march-attr --defsym priv_insn_d=1
++#as: --w_priv_spec -march-attr --defsym priv_insn_d=1
+ #readelf: -A
+ #source: attribute-14.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-15.d b/gas/testsuite/gas/riscv/attribute-15.d
+index 929631a6..4bad5fa6 100644
+--- a/gas/testsuite/gas/riscv/attribute-15.d
++++ b/gas/testsuite/gas/riscv/attribute-15.d
+@@ -1,4 +1,4 @@
+-#as: -march-attr -mpriv-spec=1.13
++#as: --w_priv_spec -march-attr -mpriv-spec=1.13
+ #readelf: -A
+ #source: attribute-11.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-16.d b/gas/testsuite/gas/riscv/attribute-16.d
+index 928d8d77..10e24557 100644
+--- a/gas/testsuite/gas/riscv/attribute-16.d
++++ b/gas/testsuite/gas/riscv/attribute-16.d
+@@ -1,4 +1,4 @@
+-#as: -march-attr -mpriv-spec=1.13
++#as: --w_priv_spec -march-attr -mpriv-spec=1.13
+ #readelf: -A
+ #source: empty.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-17.d b/gas/testsuite/gas/riscv/attribute-17.d
+index f431b044..ca8ad32e 100644
+--- a/gas/testsuite/gas/riscv/attribute-17.d
++++ b/gas/testsuite/gas/riscv/attribute-17.d
+@@ -1,4 +1,4 @@
+-#as: -march=rva20u64 -misa-spec=20191213
++#as: --w_priv_spec -march=rva20u64 -misa-spec=20191213
+ #readelf: -A
+ #source: empty.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-18.d b/gas/testsuite/gas/riscv/attribute-18.d
+index 2bec0df9..73f6535d 100644
+--- a/gas/testsuite/gas/riscv/attribute-18.d
++++ b/gas/testsuite/gas/riscv/attribute-18.d
+@@ -1,4 +1,4 @@
+-#as: -march=rvi20u32_d -misa-spec=20191213
++#as: --w_priv_spec -march=rvi20u32_d -misa-spec=20191213
+ #readelf: -A
+ #source: empty.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-19.d b/gas/testsuite/gas/riscv/attribute-19.d
+index b9b5a402..3532688a 100644
+--- a/gas/testsuite/gas/riscv/attribute-19.d
++++ b/gas/testsuite/gas/riscv/attribute-19.d
+@@ -1,4 +1,4 @@
+-#as: -march=rva23u64 -misa-spec=20191213
++#as: --w_priv_spec -march=rva23u64 -misa-spec=20191213
+ #readelf: -A
+ #source: empty.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-20.d b/gas/testsuite/gas/riscv/attribute-20.d
+index 7fbfda03..d7eb4d86 100644
+--- a/gas/testsuite/gas/riscv/attribute-20.d
++++ b/gas/testsuite/gas/riscv/attribute-20.d
+@@ -1,4 +1,4 @@
+-#as: -march=rvb23u64 -misa-spec=20191213
++#as: --w_priv_spec -march=rvb23u64 -misa-spec=20191213
+ #readelf: -A
+ #source: empty.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-rva23s.d b/gas/testsuite/gas/riscv/attribute-rva23s.d
+index b38b7b9f..2da597dc 100644
+--- a/gas/testsuite/gas/riscv/attribute-rva23s.d
++++ b/gas/testsuite/gas/riscv/attribute-rva23s.d
+@@ -1,4 +1,4 @@
+-#as: -march=rva23s64 -misa-spec=20191213
++#as: --w_priv_spec -march=rva23s64 -misa-spec=20191213
+ #readelf: -A
+ #source: empty.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-rvb23s.d b/gas/testsuite/gas/riscv/attribute-rvb23s.d
+index 87e243ca..e6b285c7 100644
+--- a/gas/testsuite/gas/riscv/attribute-rvb23s.d
++++ b/gas/testsuite/gas/riscv/attribute-rvb23s.d
+@@ -1,4 +1,4 @@
+-#as: -march=rvb23s64 -misa-spec=20191213
++#as: --w_priv_spec -march=rvb23s64 -misa-spec=20191213
+ #readelf: -A
+ #source: empty.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-unknown.d b/gas/testsuite/gas/riscv/attribute-unknown.d
+index 667f21ac..832381d3 100644
+--- a/gas/testsuite/gas/riscv/attribute-unknown.d
++++ b/gas/testsuite/gas/riscv/attribute-unknown.d
+@@ -1,4 +1,4 @@
+-#as: -march-attr
++#as: --w_priv_spec -march-attr
+ #readelf: -A
+ #source: attribute-unknown.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-xw-version.d b/gas/testsuite/gas/riscv/attribute-xw-version.d
+index 3c40e719..6aead567 100644
+--- a/gas/testsuite/gas/riscv/attribute-xw-version.d
++++ b/gas/testsuite/gas/riscv/attribute-xw-version.d
+@@ -1,4 +1,4 @@
+-#as: -misa-spec=2.2
++#as: --w_priv_spec -misa-spec=2.2
+ #readelf: -A
+ #source: attribute-xw-version.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/attribute-xw.d b/gas/testsuite/gas/riscv/attribute-xw.d
+index 83ed0075..3c6d1b7b 100644
+--- a/gas/testsuite/gas/riscv/attribute-xw.d
++++ b/gas/testsuite/gas/riscv/attribute-xw.d
+@@ -1,4 +1,4 @@
+-#as: -misa-spec=2.2
++#as: --w_priv_spec -misa-spec=2.2
+ #readelf: -A
+ #source: attribute-xw.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/csr-insns-pseudo-noalias.d b/gas/testsuite/gas/riscv/csr-insns-pseudo-noalias.d
+index b9300cea..7fd7b55f 100644
+--- a/gas/testsuite/gas/riscv/csr-insns-pseudo-noalias.d
++++ b/gas/testsuite/gas/riscv/csr-insns-pseudo-noalias.d
+@@ -1,5 +1,5 @@
+ #source: csr-insns-pseudo.s
+-#as: -march=rv32if
++#as: --w_priv_spec -march=rv32if
+ #objdump: -dr -Mno-aliases
+ 
+ .*:[ 	]+file format .*
+diff --git a/gas/testsuite/gas/riscv/csr-insns-pseudo-zfinx.d b/gas/testsuite/gas/riscv/csr-insns-pseudo-zfinx.d
+index 6e86398c..3d7054b5 100644
+--- a/gas/testsuite/gas/riscv/csr-insns-pseudo-zfinx.d
++++ b/gas/testsuite/gas/riscv/csr-insns-pseudo-zfinx.d
+@@ -1,5 +1,5 @@
+ #source: csr-insns-pseudo.s
+-#as: -march=rv32i_zfinx
++#as: --w_priv_spec -march=rv32i_zfinx
+ #objdump: -dr
+ 
+ .*:[ 	]+file format .*
+diff --git a/gas/testsuite/gas/riscv/csr-insns-pseudo.d b/gas/testsuite/gas/riscv/csr-insns-pseudo.d
+index 3df7b4b1..86391ca0 100644
+--- a/gas/testsuite/gas/riscv/csr-insns-pseudo.d
++++ b/gas/testsuite/gas/riscv/csr-insns-pseudo.d
+@@ -1,5 +1,5 @@
+ #source: csr-insns-pseudo.s
+-#as: -march=rv32if
++#as: --w_priv_spec -march=rv32if
+ #objdump: -dr
+ 
+ .*:[ 	]+file format .*
+diff --git a/gas/testsuite/gas/riscv/imply-zicsr-zifencei-i2p0-misa-spec-2p2.d b/gas/testsuite/gas/riscv/imply-zicsr-zifencei-i2p0-misa-spec-2p2.d
+index 2f5ed993..1f381ea8 100644
+--- a/gas/testsuite/gas/riscv/imply-zicsr-zifencei-i2p0-misa-spec-2p2.d
++++ b/gas/testsuite/gas/riscv/imply-zicsr-zifencei-i2p0-misa-spec-2p2.d
+@@ -1,4 +1,4 @@
+-#as: -march=rv32i -march-attr -misa-spec=2.2
++#as: --w_priv_spec -march=rv32i -march-attr -misa-spec=2.2
+ #readelf: -A
+ #source: imply-zicsr-zifencei.s
+ Attribute Section: riscv
+diff --git a/gas/testsuite/gas/riscv/imply.d b/gas/testsuite/gas/riscv/imply.d
+index c60711c7..a8572fb4 100644
+--- a/gas/testsuite/gas/riscv/imply.d
++++ b/gas/testsuite/gas/riscv/imply.d
+@@ -1,5 +1,5 @@
+ #source: imply.s
+-#as: -misa-spec=20191213
++#as: --w_priv_spec -misa-spec=20191213
+ #objdump: --syms --special-syms
+ 
+ .*file format.*riscv.*
+diff --git a/gas/testsuite/gas/riscv/march-ok-reorder.d b/gas/testsuite/gas/riscv/march-ok-reorder.d
+index 883d6a2e..0d6ef16f 100644
+--- a/gas/testsuite/gas/riscv/march-ok-reorder.d
++++ b/gas/testsuite/gas/riscv/march-ok-reorder.d
+@@ -1,4 +1,4 @@
+-#as: -misa-spec=20191213 -march=rv32i2azicsr_fc2p0dxfoo2p0_m1_xbar2p0_zba
++#as: --w_priv_spec -misa-spec=20191213 -march=rv32i2azicsr_fc2p0dxfoo2p0_m1_xbar2p0_zba
+ #source: empty.s
+ #readelf: -A
+ 
+diff --git a/gas/testsuite/gas/riscv/option-arch-attr.d b/gas/testsuite/gas/riscv/option-arch-attr.d
+index 27df69dc..65434ad4 100644
+--- a/gas/testsuite/gas/riscv/option-arch-attr.d
++++ b/gas/testsuite/gas/riscv/option-arch-attr.d
+@@ -1,4 +1,4 @@
+-#as: -misa-spec=2.2
++#as: --w_priv_spec -misa-spec=2.2
+ #source: option-arch.s
+ #readelf: -A
+ 
+diff --git a/gas/testsuite/gas/riscv/option-norvc.d b/gas/testsuite/gas/riscv/option-norvc.d
+index 5a4b9768..cce9af4c 100644
+--- a/gas/testsuite/gas/riscv/option-norvc.d
++++ b/gas/testsuite/gas/riscv/option-norvc.d
+@@ -1,4 +1,4 @@
+-#as: -misa-spec=2.2 -march=rv64i
++#as: --w_priv_spec -misa-spec=2.2 -march=rv64i
+ #source: option-norvc.s
+ #objdump: -d --syms --special-syms -Mno-aliases
+ 
+diff --git a/gas/testsuite/gas/riscv/wch-attribute-default-off.d b/gas/testsuite/gas/riscv/wch-attribute-default-off.d
+new file mode 100644
+index 00000000..e95eaec6
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-attribute-default-off.d
+@@ -0,0 +1,3 @@
++#as: -misa-spec=2.2 --defsym priv_insn_a=1
++#readelf: -A
++#source: attribute-14.s
+diff --git a/gas/testsuite/gas/riscv/wch-attribute-explicit.d b/gas/testsuite/gas/riscv/wch-attribute-explicit.d
+new file mode 100644
+index 00000000..31931938
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-attribute-explicit.d
+@@ -0,0 +1,7 @@
++#as: -misa-spec=2.2
++#readelf: -A
++#source: wch-attribute-explicit.s
++Attribute Section: riscv
++File Attributes
++  Tag_RISCV_stack_align: 4-bytes
++  Tag_RISCV_arch: "rv32imac_xw"
+diff --git a/gas/testsuite/gas/riscv/wch-attribute-explicit.s b/gas/testsuite/gas/riscv/wch-attribute-explicit.s
+new file mode 100644
+index 00000000..7e7b2fd2
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-attribute-explicit.s
+@@ -0,0 +1,3 @@
++	.attribute stack_align, 4
++	.attribute arch, "rv32imac_xw"
++	csrr a0, mstatus
+diff --git a/gas/testsuite/gas/riscv/wch-attribute-march-attr-off.d b/gas/testsuite/gas/riscv/wch-attribute-march-attr-off.d
+new file mode 100644
+index 00000000..79da901b
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-attribute-march-attr-off.d
+@@ -0,0 +1,3 @@
++#as: -march=rv32imac_xw -march-attr -misa-spec=2.2 --defsym priv_insn_a=1
++#readelf: -A
++#source: attribute-14.s
+diff --git a/gas/testsuite/gas/riscv/wch-attribute-w-priv-spec-explicit.d b/gas/testsuite/gas/riscv/wch-attribute-w-priv-spec-explicit.d
+new file mode 100644
+index 00000000..6ed46bc0
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-attribute-w-priv-spec-explicit.d
+@@ -0,0 +1,9 @@
++#as: --w_priv_spec -mno-arch-attr -misa-spec=2.2
++#readelf: -A
++#source: wch-attribute-explicit.s
++Attribute Section: riscv
++File Attributes
++  Tag_RISCV_stack_align: 4-bytes
++  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_c2p0_zmmul1p0_zaamo1p0_zalrsc1p0_zca1p0_xw2p2"
++  Tag_RISCV_priv_spec: 1
++  Tag_RISCV_priv_spec_minor: 11
+diff --git a/gas/testsuite/gas/riscv/wch-attribute-w-priv-spec-off.d b/gas/testsuite/gas/riscv/wch-attribute-w-priv-spec-off.d
+new file mode 100644
+index 00000000..9b8fef04
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-attribute-w-priv-spec-off.d
+@@ -0,0 +1,3 @@
++#as: --w_priv_spec -mno-arch-attr -misa-spec=2.2 --defsym priv_insn_a=1
++#readelf: -A
++#source: attribute-14.s
+-- 
+2.55.0
+

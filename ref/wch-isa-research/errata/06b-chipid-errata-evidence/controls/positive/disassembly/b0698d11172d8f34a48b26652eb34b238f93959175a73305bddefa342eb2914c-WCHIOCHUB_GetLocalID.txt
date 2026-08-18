@@ -1,0 +1,137 @@
+
+<RUN_ROOT>/controls/positive-r2/objects/b0698d11172d8f34a48b26652eb34b238f93959175a73305bddefa342eb2914c.o:     file format elf32-littleriscv
+
+
+Disassembly of section .text.IoCHub_MsgSend.part.2:
+
+Disassembly of section .text.IoCHub_MsgSend:
+
+Disassembly of section .text.IoCHub_DataSend:
+
+Disassembly of section .text.IoCHub_SahodyFrame:
+
+Disassembly of section .text.IoCHub_SendFrame:
+
+Disassembly of section .text.IoCHub_FrameInit:
+
+Disassembly of section .text.IoCHub_CliConnAutoReg:
+
+Disassembly of section .text.IoCHub_CliConnLogin:
+
+Disassembly of section .text.IoCHub_CliConnSer:
+
+Disassembly of section .text.IoCHub_CliUdpNatConnProbe:
+
+Disassembly of section .text.IoCHub_CliTcpUploadUdpProbeStatus:
+
+Disassembly of section .text.IoCHub_CliAConnReq:
+
+Disassembly of section .text.IoCHub_CliAConnResultRecvCallback:
+
+Disassembly of section .text.IoCHub_SerNotiCliBReplySend:
+
+Disassembly of section .text.IoCHub_SerNotiCliHoldingRespSend:
+
+Disassembly of section .text.IoCHub_CliExchangeHoldingSend:
+
+Disassembly of section .text.IoCHub_CliUploadP2pConnResSend:
+
+Disassembly of section .text.IoCHub_SerNotiCliP2pResRespSend:
+
+Disassembly of section .text.IoCHub_DataTimeoutSend:
+
+Disassembly of section .text.IoCHub_CliDataTransferSend:
+
+Disassembly of section .text.IoCHub_CliDataTransferRespSend:
+
+Disassembly of section .text.IoCHub_CliDataKeepliveSend:
+
+Disassembly of section .text.IoCHub_CliDataSend:
+
+Disassembly of section .text.IoCHub_CliCloseDataConnSend:
+
+Disassembly of section .text.IoCHub_CliCloseDataConnRespSend:
+
+Disassembly of section .text.IoCHub_SerAutoHbTcpSend:
+
+Disassembly of section .text.IoCHub_SerAutoHbTcpRecv:
+
+Disassembly of section .text.IoCHub_SerAutoHbUdpSend:
+
+Disassembly of section .text.IoCHub_SerAutoHbUdpRecv:
+
+Disassembly of section .text.IoCHub_CliLanConnReqSend:
+
+Disassembly of section .text.IoCHub_CliLanConnReqRespSend:
+
+Disassembly of section .text.IoCHub_CliUdpBroadcastScanSend:
+
+Disassembly of section .text.IoCHub_SessionCreatSucc:
+
+Disassembly of section .text.IoCHub_SessionClose:
+
+Disassembly of section .text.IocServerSocketRecv:
+
+Disassembly of section .text.WCHIOCHUB_Init:
+
+Disassembly of section .text.WCHIOCHUB_DeInit:
+
+Disassembly of section .text.WCHIOCHUB_GetCurrentCfg:
+
+Disassembly of section .text.WCHIOCHUB_Start:
+
+Disassembly of section .text.WCHIOCHUB_Stop:
+
+Disassembly of section .text.WCHIOCHUB_OpenSession:
+
+Disassembly of section .text.WCHIOCHUB_CloseSession:
+
+Disassembly of section .text.WCHIOCHUB_DataSend:
+
+Disassembly of section .text.WCHIOCHUB_GetSessionSendableLen:
+
+Disassembly of section .text.WCHIOCHUB_DataRecv:
+
+Disassembly of section .text.WCHIOCHUB_GetSessionRecvLen:
+
+Disassembly of section .text.WCHIOCHUB_SetBrdcstAddr:
+
+Disassembly of section .text.WCHIOCHUB_SetLanScan:
+
+Disassembly of section .text.WCHIOCHUB_LanScan:
+
+Disassembly of section .text.IoCHub_SessionEventProcess:
+
+Disassembly of section .text.WCHIOCHUB_TcpConnectRetry:
+
+Disassembly of section .text.IoCHub_ProcessEvent:
+
+Disassembly of section .text.WCHIOCHUB_SetAccessMode:
+
+Disassembly of section .text.WCHIOCHUB_GetAccessMode:
+
+Disassembly of section .text.WCHIOCHUB_GetSDKVer:
+
+Disassembly of section .text.WCHIOCHUB_GetLocalID:
+
+00000000 <WCHIOCHUB_GetLocalID>:
+   0:	000005b7          	lui	a1,0x0	0: R_RISCV_HI20	.LANCHOR13
+	0: R_RISCV_RELAX	*ABS*
+   4:	4621                	li	a2,8
+   6:	00058593          	mv	a1,a1	6: R_RISCV_LO12_I	.LANCHOR13
+	6: R_RISCV_RELAX	*ABS*
+   a:	00000317          	auipc	t1,0x0	a: R_RISCV_CALL	iocos_memcpy
+	a: R_RISCV_RELAX	*ABS*
+   e:	00030067          	jr	t1 # a <WCHIOCHUB_GetLocalID+0xa>
+
+Disassembly of section .text.WCHIOCHUB_GetNodeID:
+
+Disassembly of section .text.WCHIOCHUB_GetNodeIP:
+
+Disassembly of section .text.WCHIOCHUB_GetNATType:
+
+Disassembly of section .text.WCHIOCHUB_GetTransferType:
+
+Disassembly of section .text.WCHIOCHUB_NetDataToUsrData:
+
+Disassembly of section .text.WCHIOCHUB_GetDeviceSerState:

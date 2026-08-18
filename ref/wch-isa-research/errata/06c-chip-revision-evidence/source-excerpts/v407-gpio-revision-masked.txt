@@ -1,0 +1,21 @@
+source	tmp/wch-evt/evt/QingkeV3V_CH32V407_EVT/EXAM/SRC/Peripheral/src/ch32v4x7_gpio.c
+sha256	fd5329a00ed149596c6e20f1bdd7beb3280bf381ea184cb483b1a409f26b45b7
+range	593-610
+000593	void GPIO_IPD_Unused(void)
+000594	{
+000595	    GPIO_InitTypeDef GPIO_InitStructure = {0};
+000596	    uint32_t chip = 0;
+000597	    RCC_PB2PeriphClockCmd(RCC_PB2Periph_GPIOA | RCC_PB2Periph_GPIOB | RCC_PB2Periph_GPIOC|\
+000598	                           RCC_PB2Periph_GPIOD | RCC_PB2Periph_GPIOE, ENABLE);
+000599	    chip =  *( uint32_t * )0x1FFFF704 & (~0x000000F0);
+000600
+000601	    switch(chip)
+000602	    {
+000603	        case 0x46720002: /*CH32V407RET*/
+000604	        {
+000605	            GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2;
+000606	            GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
+000607	            GPIO_Init(GPIOB, &GPIO_InitStructure);
+000608	            GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6|GPIO_Pin_7|GPIO_Pin_8\
+000609	                                         |GPIO_Pin_9;
+000610	            GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;

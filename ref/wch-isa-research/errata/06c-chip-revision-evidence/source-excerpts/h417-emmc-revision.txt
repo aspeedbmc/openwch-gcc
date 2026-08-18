@@ -1,0 +1,24 @@
+source	tmp/wch-evt/evt/QingkeV5F_CH32H417_EVT/EXAM/SDMMC/SDMMC_eMMC/Common/sdmmc_emmc.c
+sha256	c53f011547db2ceea279beb501f16751dd7c38501a6dba89d07e81fb9c430ed2
+range	92-112
+000092	 * @return  None.
+000093	 */
+000094	void eMMC_GPIO_Init()
+000095	{
+000096	    u32 ChipID;
+000097	    GPIO_InitTypeDef GPIO_Initure={0};
+000098	    ChipID=DBGMCU_GetCHIPID();
+000099	    if((ChipID&0xF0)==0){
+000100		RCC_HB1PeriphClockCmd(RCC_HB1Periph_SWPMI, ENABLE);
+000101	    SWPMI->OR|=(1<<0);
+000102	    }
+000103	    RCC_HBPeriphClockCmd(RCC_HBPeriph_SDMMC|RCC_HBPeriph_DMA1, ENABLE);
+000104	    //Data4,Data5
+000105	    RCC_HB2PeriphClockCmd(RCC_HB2Periph_GPIOA|RCC_HB2Periph_AFIO,ENABLE);
+000106	    GPIO_Initure.GPIO_Pin=GPIO_Pin_14|GPIO_Pin_15;
+000107	    GPIO_Initure.GPIO_Mode=GPIO_Mode_AF_PP;
+000108	    GPIO_Initure.GPIO_Speed=GPIO_Speed_Very_High;
+000109	    GPIO_Init(GPIOA,&GPIO_Initure);
+000110
+000111	    //Data0,Data1,Data2,Data3,Data6,Data7,clk
+000112	    RCC_HB2PeriphClockCmd(RCC_HB2Periph_GPIOC|RCC_HB2Periph_AFIO,ENABLE);

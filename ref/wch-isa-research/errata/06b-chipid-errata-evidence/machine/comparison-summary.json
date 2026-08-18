@@ -1,0 +1,25 @@
+{
+  "archive_rows_compared": 3221,
+  "mismatch_count": 0,
+  "mismatch_fields": {},
+  "native_unique_units": 165673,
+  "occurrence_rows_compared": 682142,
+  "relevant_semantic_source_count": 2,
+  "rom_payloads_compared": 5,
+  "schema_version": "2",
+  "status": "pass",
+  "unique_unit_candidate_totals": {
+    "address-form-opcode": 4601786,
+    "csr-opcode": 24830,
+    "literal-pointer": 22625459,
+    "relocation-source": 2,
+    "symbol-string-debug": 58794,
+    "xw-slot": 462014
+  },
+  "unique_unit_domain_totals_nonphysical_nonadditive": {
+    "alloc_bytes": 180778878,
+    "exec_bytes": 138988742,
+    "relocation_entries": 27364764
+  },
+  "unit_rows_compared": 235234
+}

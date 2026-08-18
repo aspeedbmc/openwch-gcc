@@ -1,0 +1,166 @@
+From 17c63fe0621b03a4df5f0b9b5d8cc62367d9d0b9 Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 3 <phase3@openwch.local>
+Date: Sun, 16 Aug 2026 02:17:47 +0900
+Subject: [PATCH 1/7] RISC-V: accept bare XW arch attributes in EVT assembly
+
+Register XW with the version WCH's own assembler canonicalises to.  A bare
+xw, whether spelled concatenated or with a separating underscore, comes
+back as xw2p2 there -- in the $x mapping symbol, in -march=help, and in
+the Tag_RISCV_arch string once attribute write-out is asked for -- while
+an explicit xw2p0 or xw9p9 passes through untouched.  The common ISA
+parser needs nothing beyond the table row for all of that.
+
+This does not change what GCC produces for a bare -march=rv32imac_xw: GCC
+writes its own arch string into the .s it hands to gas, and that string
+already carries an explicit xw2p0, which gas preserves.  The two faces are
+independent and both are tested.
+
+Behavior specification:
+  analysis/toolchain/wch-gcc-toolchain-survey.md sections 5.1 and 5.2
+  ref/wch-isa-research/isa/custom/wch-custom-isa-reference.md section 4.1
+Direct WCH 15.2.0 probes establish the bare-form canonicalisation, the
+explicit-version passthrough and the -march=help entry.
+---
+ bfd/elfxx-riscv.c                                  |  1 +
+ gas/testsuite/gas/riscv/attribute-xw-version.d     |  6 ++++++
+ gas/testsuite/gas/riscv/attribute-xw-version.s     |  1 +
+ gas/testsuite/gas/riscv/attribute-xw.d             |  6 ++++++
+ gas/testsuite/gas/riscv/attribute-xw.s             |  1 +
+ gas/testsuite/gas/riscv/march-help.l               |  1 +
+ gas/testsuite/gas/riscv/wch-xw-mapping-default.d   | 14 ++++++++++++++
+ .../gas/riscv/wch-xw-mapping-explicit-2p0.d        | 14 ++++++++++++++
+ .../gas/riscv/wch-xw-mapping-explicit-9p9.d        | 14 ++++++++++++++
+ 9 files changed, 58 insertions(+)
+ create mode 100644 gas/testsuite/gas/riscv/attribute-xw-version.d
+ create mode 100644 gas/testsuite/gas/riscv/attribute-xw-version.s
+ create mode 100644 gas/testsuite/gas/riscv/attribute-xw.d
+ create mode 100644 gas/testsuite/gas/riscv/attribute-xw.s
+ create mode 100644 gas/testsuite/gas/riscv/wch-xw-mapping-default.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-xw-mapping-explicit-2p0.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-xw-mapping-explicit-9p9.d
+
+diff --git a/bfd/elfxx-riscv.c b/bfd/elfxx-riscv.c
+index 12000322..d0529ef4 100644
+--- a/bfd/elfxx-riscv.c
++++ b/bfd/elfxx-riscv.c
+@@ -1627,6 +1627,7 @@ static struct riscv_supported_ext riscv_supported_vendor_x_ext[] =
+   {"xtheadvdot",	ISA_SPEC_CLASS_DRAFT,	1, 0, 0 },
+   {"xtheadzvamo",	ISA_SPEC_CLASS_DRAFT,	1, 0, 0 },
+   {"xventanacondops",	ISA_SPEC_CLASS_DRAFT,	1, 0, 0 },
++  {"xw",		ISA_SPEC_CLASS_DRAFT,	2, 2, 0 },
+   {"xsfvcp",		ISA_SPEC_CLASS_DRAFT,	1, 0, 0 },
+   {"xsfcease",		ISA_SPEC_CLASS_DRAFT,	1, 0, 0 },
+   {"xsfvqmaccqoq",	ISA_SPEC_CLASS_DRAFT,	1, 0, 0},
+diff --git a/gas/testsuite/gas/riscv/attribute-xw-version.d b/gas/testsuite/gas/riscv/attribute-xw-version.d
+new file mode 100644
+index 00000000..3c40e719
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/attribute-xw-version.d
+@@ -0,0 +1,6 @@
++#as: -misa-spec=2.2
++#readelf: -A
++#source: attribute-xw-version.s
++Attribute Section: riscv
++File Attributes
++  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_c2p0_zmmul1p0_zaamo1p0_zalrsc1p0_zca1p0_xw9p9"
+diff --git a/gas/testsuite/gas/riscv/attribute-xw-version.s b/gas/testsuite/gas/riscv/attribute-xw-version.s
+new file mode 100644
+index 00000000..bb6a753c
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/attribute-xw-version.s
+@@ -0,0 +1 @@
++	.attribute arch,"rv32imacxw9p9"
+diff --git a/gas/testsuite/gas/riscv/attribute-xw.d b/gas/testsuite/gas/riscv/attribute-xw.d
+new file mode 100644
+index 00000000..83ed0075
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/attribute-xw.d
+@@ -0,0 +1,6 @@
++#as: -misa-spec=2.2
++#readelf: -A
++#source: attribute-xw.s
++Attribute Section: riscv
++File Attributes
++  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_c2p0_zmmul1p0_zaamo1p0_zalrsc1p0_zca1p0_xw2p2"
+diff --git a/gas/testsuite/gas/riscv/attribute-xw.s b/gas/testsuite/gas/riscv/attribute-xw.s
+new file mode 100644
+index 00000000..3d03ef97
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/attribute-xw.s
+@@ -0,0 +1 @@
++	.attribute arch,"rv32imac_xw"
+diff --git a/gas/testsuite/gas/riscv/march-help.l b/gas/testsuite/gas/riscv/march-help.l
+index 709ccff2..04aff1cf 100644
+--- a/gas/testsuite/gas/riscv/march-help.l
++++ b/gas/testsuite/gas/riscv/march-help.l
+@@ -175,6 +175,7 @@ All available -march extensions for RISC-V:
+ 	xtheadvdot                              1.0
+ 	xtheadzvamo                             1.0
+ 	xventanacondops                         1.0
++	xw                                      2.2
+ 	xsfvcp                                  1.0
+ 	xsfcease                                1.0
+ 	xsfvqmaccqoq                            1.0
+diff --git a/gas/testsuite/gas/riscv/wch-xw-mapping-default.d b/gas/testsuite/gas/riscv/wch-xw-mapping-default.d
+new file mode 100644
+index 00000000..5bd359be
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-xw-mapping-default.d
+@@ -0,0 +1,14 @@
++#as: -march=rv32imac_xw -misa-spec=2.2 --defsym priv_insn_a=1
++#objdump: --syms --special-syms
++#source: attribute-14.s
++## Every input that could vary by target is pinned above and the expectation
++## is the mapping symbol alone, but this has only ever been measured on the
++## WCH target, so the check stays scoped to the target it was measured on.
++#target: riscv*-wch-elf
++
++.*:[ 	]+file format .*
++
++SYMBOL TABLE:
++#...
++[0-9a-f]+ l       .text	0+ \$xrv32i2p0_m2p0_a2p0_c2p0_zmmul1p0_zaamo1p0_zalrsc1p0_zca1p0_xw2p2
++#pass
+diff --git a/gas/testsuite/gas/riscv/wch-xw-mapping-explicit-2p0.d b/gas/testsuite/gas/riscv/wch-xw-mapping-explicit-2p0.d
+new file mode 100644
+index 00000000..9a0eeb4c
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-xw-mapping-explicit-2p0.d
+@@ -0,0 +1,14 @@
++#as: -march=rv32imac_xw2p0 -misa-spec=2.2 --defsym priv_insn_a=1
++#objdump: --syms --special-syms
++#source: attribute-14.s
++## Every input that could vary by target is pinned above and the expectation
++## is the mapping symbol alone, but this has only ever been measured on the
++## WCH target, so the check stays scoped to the target it was measured on.
++#target: riscv*-wch-elf
++
++.*:[ 	]+file format .*
++
++SYMBOL TABLE:
++#...
++[0-9a-f]+ l       .text	0+ \$xrv32i2p0_m2p0_a2p0_c2p0_zmmul1p0_zaamo1p0_zalrsc1p0_zca1p0_xw2p0
++#pass
+diff --git a/gas/testsuite/gas/riscv/wch-xw-mapping-explicit-9p9.d b/gas/testsuite/gas/riscv/wch-xw-mapping-explicit-9p9.d
+new file mode 100644
+index 00000000..73edcb43
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-xw-mapping-explicit-9p9.d
+@@ -0,0 +1,14 @@
++#as: -march=rv32imac_xw9p9 -misa-spec=2.2 --defsym priv_insn_a=1
++#objdump: --syms --special-syms
++#source: attribute-14.s
++## Every input that could vary by target is pinned above and the expectation
++## is the mapping symbol alone, but this has only ever been measured on the
++## WCH target, so the check stays scoped to the target it was measured on.
++#target: riscv*-wch-elf
++
++.*:[ 	]+file format .*
++
++SYMBOL TABLE:
++#...
++[0-9a-f]+ l       .text	0+ \$xrv32i2p0_m2p0_a2p0_c2p0_zmmul1p0_zaamo1p0_zalrsc1p0_zca1p0_xw9p9
++#pass
+-- 
+2.55.0
+

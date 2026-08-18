@@ -1,0 +1,34 @@
+source	tmp/wch-evt/evt/QingkeV3V_CH32V407_EVT/EXAM/ETH/NetLib/eth_driver.c
+sha256	8f9ffd09d7fa16c4dac6aeaa16d0d3eb01cba23fa3565cd7c0c452588ca94a00
+range	670-700
+000670	}
+000671
+000672	/*********************************************************************
+000673	 * @fn      ETH_LibInit
+000674	 *
+000675	 * @brief   Ethernet library initialization program
+000676	 *
+000677	 * @return  command status
+000678	 */
+000679	uint8_t ETH_LibInit( uint8_t *ip, uint8_t *gwip, uint8_t *mask, uint8_t *macaddr )
+000680	{
+000681	    uint8_t s;
+000682	    struct _WCH_CFG  cfg;
+000683
+000684	    ChipId = (DBGMCU_GetCHIPID() >> 16) & 0xf;
+000685	    memset(&cfg,0,sizeof(cfg));
+000686	    cfg.TxBufSize = ETH_TX_BUF_SZE;
+000687	    cfg.TCPMss   = WCHNET_TCP_MSS;
+000688	    cfg.HeapSize = WCHNET_MEM_HEAP_SIZE;
+000689	    cfg.ARPTableNum = WCHNET_NUM_ARP_TABLE;
+000690	    cfg.MiscConfig0 = WCHNET_MISC_CONFIG0;
+000691	    cfg.MiscConfig1 = WCHNET_MISC_CONFIG1;
+000692	    if(((*(uint32_t *)FEATURE_SIGN) & 0x01) == 0)
+000693	    {
+000694	        cfg.led_link = ETH_LedLinkSet;
+000695	        cfg.led_data = ETH_LedDataSet;
+000696	    }
+000697	    cfg.net_send = ETH_TxPktChainMode;
+000698	    cfg.CheckValid = WCHNET_CFG_VALID;
+000699	    s = WCHNET_ConfigLIB(&cfg);
+000700	    if( s ){

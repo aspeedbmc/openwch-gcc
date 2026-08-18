@@ -1,0 +1,145 @@
+From c397a553b1ab0bb3a7063077a825da74dd34519a Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 4 <phase4@openwch.local>
+Date: Thu, 13 Aug 2026 08:49:07 +0900
+Subject: [PATCH 7/7] RISC-V: emit the WCH soft-library ELF flag
+
+The official WCH 12.2 assembler accepts the hidden wchsoftlib compatibility option with either one or two leading dashes and marks output by ORing 0x01000000 into e_flags. Implement that option idempotently and independently of relaxation.
+
+WCH 12.2 behavior evidence: tmp/phase4-evidence/s4-final/strings-audit/wchsoftlib-probe.tsv and tmp/phase4-evidence/s4-final/strings-audit/wchsoftlib-control-flow.tsv.
+---
+ gas/config/tc-riscv.c                             | 14 ++++++++++++++
+ gas/testsuite/gas/riscv/wch-softlib-repeat.d      | 10 ++++++++++
+ gas/testsuite/gas/riscv/wch-softlib-single-dash.d | 10 ++++++++++
+ gas/testsuite/gas/riscv/wch-softlib.d             | 10 ++++++++++
+ gas/testsuite/gas/riscv/wch-softlib.s             |  3 +++
+ include/elf/riscv.h                               |  3 +++
+ 6 files changed, 50 insertions(+)
+ create mode 100644 gas/testsuite/gas/riscv/wch-softlib-repeat.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-softlib-single-dash.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-softlib.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-softlib.s
+
+diff --git a/gas/config/tc-riscv.c b/gas/config/tc-riscv.c
+index 6817646d..51d0d228 100644
+--- a/gas/config/tc-riscv.c
++++ b/gas/config/tc-riscv.c
+@@ -139,6 +139,12 @@ static unsigned elf_flags = 0;
+    so it is intentionally omitted from md_show_usage.  */
+ static bool w_priv_spec = false;
+ 
++/* Mark output for the WCH software library ABI.  This is a command-line
++   compatibility flag and is intentionally omitted from md_show_usage.
++   GAS parses with getopt_long_only, so the single-dash spelling
++   -wchsoftlib is accepted from this one entry as well.  */
++static bool wch_softlib;
++
+ /* Set the default_isa_spec.  Return 0 if the spec isn't supported.
+    Otherwise, return 1.  */
+ 
+@@ -3406,6 +3412,7 @@ enum options
+   OPTION_BIG_ENDIAN,
+   OPTION_LITTLE_ENDIAN,
+   OPTION_W_PRIV_SPEC,
++  OPTION_WCH_SOFTLIB,
+   OPTION_END_OF_ENUM
+ };
+ 
+@@ -3427,6 +3434,7 @@ struct option md_longopts[] =
+   {"mbig-endian", no_argument, NULL, OPTION_BIG_ENDIAN},
+   {"mlittle-endian", no_argument, NULL, OPTION_LITTLE_ENDIAN},
+   {"w_priv_spec", no_argument, NULL, OPTION_W_PRIV_SPEC},
++  {"wchsoftlib", no_argument, NULL, OPTION_WCH_SOFTLIB},
+ 
+   {NULL, no_argument, NULL, 0}
+ };
+@@ -3515,6 +3523,10 @@ md_parse_option (int c, const char *arg)
+       w_priv_spec = true;
+       break;
+ 
++    case OPTION_WCH_SOFTLIB:
++      wch_softlib = true;
++      break;
++
+     default:
+       return 0;
+     }
+@@ -4334,6 +4346,8 @@ void
+ riscv_elf_final_processing (void)
+ {
+   riscv_set_abi_by_arch ();
++  if (wch_softlib)
++    elf_flags |= EF_RISCV_WCH_SOFTLIB;
+   elf_elfheader (stdoutput)->e_flags |= elf_flags;
+ }
+ 
+diff --git a/gas/testsuite/gas/riscv/wch-softlib-repeat.d b/gas/testsuite/gas/riscv/wch-softlib-repeat.d
+new file mode 100644
+index 00000000..759e5330
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-softlib-repeat.d
+@@ -0,0 +1,10 @@
++#as: -march=rv32imac -mabi=ilp32 --wchsoftlib --wchsoftlib -mno-relax
++#readelf: -h
++#source: wch-softlib.s
++
++ELF Header:
++#...
++[ 	]+Class:[ 	]+ELF32
++#...
++[ 	]+Flags:[ 	]+0x1000001, RVC, soft-float ABI
++#...
+diff --git a/gas/testsuite/gas/riscv/wch-softlib-single-dash.d b/gas/testsuite/gas/riscv/wch-softlib-single-dash.d
+new file mode 100644
+index 00000000..d06f091f
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-softlib-single-dash.d
+@@ -0,0 +1,10 @@
++#as: -march=rv32imac -mabi=ilp32 -wchsoftlib
++#readelf: -h
++#source: wch-softlib.s
++
++ELF Header:
++#...
++[ 	]+Class:[ 	]+ELF32
++#...
++[ 	]+Flags:[ 	]+0x1000001, RVC, soft-float ABI
++#...
+diff --git a/gas/testsuite/gas/riscv/wch-softlib.d b/gas/testsuite/gas/riscv/wch-softlib.d
+new file mode 100644
+index 00000000..1903c1b2
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-softlib.d
+@@ -0,0 +1,10 @@
++#as: -march=rv32imac -mabi=ilp32 --wchsoftlib
++#readelf: -h
++#source: wch-softlib.s
++
++ELF Header:
++#...
++[ 	]+Class:[ 	]+ELF32
++#...
++[ 	]+Flags:[ 	]+0x1000001, RVC, soft-float ABI
++#...
+diff --git a/gas/testsuite/gas/riscv/wch-softlib.s b/gas/testsuite/gas/riscv/wch-softlib.s
+new file mode 100644
+index 00000000..47478810
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-softlib.s
+@@ -0,0 +1,3 @@
++	call	target
++target:
++	ret
+diff --git a/include/elf/riscv.h b/include/elf/riscv.h
+index d0acf688..7b3108fc 100644
+--- a/include/elf/riscv.h
++++ b/include/elf/riscv.h
+@@ -114,6 +114,9 @@ END_RELOC_NUMBERS (R_RISCV_max)
+ /* File uses the 32E base integer instruction.  */
+ #define EF_RISCV_RVE 0x0008
+ 
++/* File is intended for the WCH software library ABI.  */
++#define EF_RISCV_WCH_SOFTLIB 0x01000000
++
+ /* The name of the global pointer symbol.  */
+ #define RISCV_GP_SYMBOL "__global_pointer$"
+ 

@@ -1,0 +1,350 @@
+From e9802a1b7cc63f4ca6c69746ba39e2edc84cef73 Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 3 <phase3@openwch.local>
+Date: Thu, 13 Aug 2026 20:10:45 +0900
+Subject: [PATCH 4/9] c-family: match WCH .highcode section semantics
+
+WCH 15.2.0 treats the exact, case-sensitive .highcode section as
+non-inlinable and optionally appends the source declaration name when
+--param=highcode-gen-section-name=1.  Match that named declaration
+surface.
+
+The change belongs in the front end rather than in the RISC-V back end
+because that is where the observed surface is decided: the section name is
+rewritten from DECL_NAME while the section attribute is handled, before
+any target hook sees the declaration, and the official compiler performs
+the same rewrite for variables as for functions, including a
+function-local static.  The parameter is correspondingly a Common
+parameter, which is what the whole-page --help=params comparison against
+the official compiler shows.
+
+The attribute handler admits only variable or function declarations.  A
+bounded 30-shape C/C++ matrix found no accepted unnamed declaration and no
+ICE in either the official or patched compiler.  The unguarded DECL_NAME
+access therefore follows the observed front-end invariant; it is not
+claimed as fidelity to an observed official ICE.
+
+The 37-case official matrix matches in every field of RC01, the .highcode
+repair round; the only two whole-page help differences are the parameter
+of the separate RC05 ccv-abi round.  Directed DejaGnu has C 339 PASS and
+C++ 3 PASS; the dual-lane suite diff retains every baseline PASS, the
+selected EVT gate remains 274/274, and the RC01 full run has zero MATCH
+regressions.
+
+Behavior evidence:
+  tmp/phase3d-t2-research/rc01/results
+  tmp/phase3d-evidence/t2-rc01/testsuite-final
+  tmp/phase3d-evidence/t2-rc01/suite-diff
+  tmp/phase3d-evidence/t2-rc01/full-audit-v2
+Unnamed-shape evidence:
+  tmp/phase3d-evidence/rc01-unnamed-ice-probe-20260815
+
+gcc/ChangeLog:
+
+	* params.opt: Add --param=highcode-gen-section-name=.
+
+gcc/c-family/ChangeLog:
+
+	* c-attribs.cc (handle_section_attribute): Make the exact .highcode
+	section uninlinable, and append the declaration name to it when
+	--param=highcode-gen-section-name=1.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.target/riscv/wch-highcode-overload.C: New test.
+	* gcc.target/riscv/wch-highcode-always-inline-default.c: New test.
+	* gcc.target/riscv/wch-highcode-always-inline.c: New test.
+	* gcc.target/riscv/wch-highcode-noinline-param0.c: New test.
+	* gcc.target/riscv/wch-highcode-noinline.c: New test.
+	* gcc.target/riscv/wch-highcode-param-range.c: New test.
+	* gcc.target/riscv/wch-highcode-redeclaration.c: New test.
+	* gcc.target/riscv/wch-highcode-sections.c: New test.
+---
+ gcc/c-family/c-attribs.cc                     | 11 ++++
+ gcc/params.opt                                |  4 ++
+ .../g++.target/riscv/wch-highcode-overload.C  | 28 +++++++++
+ .../wch-highcode-always-inline-default.c      | 14 +++++
+ .../riscv/wch-highcode-always-inline.c        | 14 +++++
+ .../riscv/wch-highcode-noinline-param0.c      | 21 +++++++
+ .../gcc.target/riscv/wch-highcode-noinline.c  | 21 +++++++
+ .../riscv/wch-highcode-param-range.c          |  6 ++
+ .../riscv/wch-highcode-redeclaration.c        | 14 +++++
+ .../gcc.target/riscv/wch-highcode-sections.c  | 63 +++++++++++++++++++
+ 10 files changed, 196 insertions(+)
+ create mode 100644 gcc/testsuite/g++.target/riscv/wch-highcode-overload.C
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-highcode-always-inline-default.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-highcode-always-inline.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-highcode-noinline-param0.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-highcode-noinline.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-highcode-param-range.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-highcode-redeclaration.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-highcode-sections.c
+
+diff --git a/gcc/c-family/c-attribs.cc b/gcc/c-family/c-attribs.cc
+index 5a0e3d328..89293db97 100644
+--- a/gcc/c-family/c-attribs.cc
++++ b/gcc/c-family/c-attribs.cc
+@@ -2627,6 +2627,17 @@ handle_section_attribute (tree *node, tree name, tree args,
+      final processing.  */
+   if (!(*no_add_attrs))
+     {
++      if (strcmp (new_section_name, ".highcode") == 0)
++	{
++	  if (TREE_CODE (decl) == FUNCTION_DECL)
++	    DECL_UNINLINABLE (decl) = 1;
++
++	  if (param_highcode_gen_section_name)
++	    new_section_name = ACONCAT ((new_section_name, ".",
++					IDENTIFIER_POINTER (DECL_NAME (decl)),
++					NULL));
++	}
++
+       set_decl_section_name (decl, new_section_name);
+       return res;
+     }
+diff --git a/gcc/params.opt b/gcc/params.opt
+index 64e453d29..f38c17078 100644
+--- a/gcc/params.opt
++++ b/gcc/params.opt
+@@ -205,6 +205,10 @@ Maximum number of blocks for in-line -fharden-control-flow-redundancy.
+ Common Joined UInteger Var(param_hash_table_verification_limit) Init(10) Param
+ The number of elements for which hash table verification is done for each searched element.
+ 
++-param=highcode-gen-section-name=
++Common Joined UInteger Var(param_highcode_gen_section_name) Init(0) IntegerRange(0, 1) Param
++__attribute__((section(.highcode))) generate new section name.
++
+ -param=hot-bb-count-fraction=
+ Common Joined UInteger Var(param_hot_bb_count_fraction) Init(10000) Param
+ The denominator n of fraction 1/n of the maximal execution count of a basic block in the entire program that a basic block needs to at least have in order to be considered hot (used in non-LTO mode).
+diff --git a/gcc/testsuite/g++.target/riscv/wch-highcode-overload.C b/gcc/testsuite/g++.target/riscv/wch-highcode-overload.C
+new file mode 100644
+index 000000000..65ad41fb2
+--- /dev/null
++++ b/gcc/testsuite/g++.target/riscv/wch-highcode-overload.C
+@@ -0,0 +1,28 @@
++/* { dg-do compile } */
++/* { dg-options "-march=rv32imac -mabi=ilp32 --param=highcode-gen-section-name=1" } */
++
++namespace scope
++{
++int __attribute__ ((section (".highcode"), used))
++namespaced (int x)
++{
++  return x + 1;
++}
++}
++
++int __attribute__ ((section (".highcode"), used))
++overload (int x)
++{
++  return x + 2;
++}
++
++long __attribute__ ((section (".highcode"), used))
++overload (long x)
++{
++  return x + 3;
++}
++
++/* C++ sections use the source identifier, not namespace qualification or
++   mangled assembler names.  Both overloads therefore share one section.  */
++/* { dg-final { scan-assembler "\.section\[ \t\]+\.highcode\.namespaced," } } */
++/* { dg-final { scan-assembler-times "\.section\[ \t\]+\.highcode\.overload," 1 } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-highcode-always-inline-default.c b/gcc/testsuite/gcc.target/riscv/wch-highcode-always-inline-default.c
+new file mode 100644
+index 000000000..03e9f02e4
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-highcode-always-inline-default.c
+@@ -0,0 +1,14 @@
++/* { dg-do compile } */
++/* { dg-options "-march=rv32imac -mabi=ilp32 -O2" } */
++
++static __attribute__ ((always_inline, section (".highcode"))) inline int
++forced_callee (int x) /* { dg-error "inlining failed in call to 'always_inline'.*: function not inlinable" } */
++{
++  return x + 1;
++}
++
++int
++forced_caller (int x)
++{
++  return forced_callee (x); /* { dg-message "called from here" } */
++}
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-highcode-always-inline.c b/gcc/testsuite/gcc.target/riscv/wch-highcode-always-inline.c
+new file mode 100644
+index 000000000..394544a5e
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-highcode-always-inline.c
+@@ -0,0 +1,14 @@
++/* { dg-do compile } */
++/* { dg-options "-march=rv32imac -mabi=ilp32 -O2 --param=highcode-gen-section-name=1" } */
++
++static __attribute__ ((always_inline, section (".highcode"))) inline int
++forced_callee (int x) /* { dg-error "inlining failed in call to 'always_inline'.*: function not inlinable" } */
++{
++  return x + 1;
++}
++
++int
++forced_caller (int x)
++{
++  return forced_callee (x); /* { dg-message "called from here" } */
++}
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-highcode-noinline-param0.c b/gcc/testsuite/gcc.target/riscv/wch-highcode-noinline-param0.c
+new file mode 100644
+index 000000000..5b2aafbb4
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-highcode-noinline-param0.c
+@@ -0,0 +1,21 @@
++/* { dg-do compile } */
++/* { dg-options "-march=rv32imac -mabi=ilp32 -O2 -fdump-ipa-inline-details --param=highcode-gen-section-name=0" } */
++
++static int __attribute__ ((section (".highcode")))
++highcode_callee (int x)
++{
++  return x + 1;
++}
++
++int
++caller (int x)
++{
++  return highcode_callee (x);
++}
++
++/* Explicit value zero only disables section splitting; it does not permit
++   exact .highcode functions to be inlined.  */
++/* { dg-final { scan-assembler "\.section\[ \t\]+\.highcode," } } */
++/* { dg-final { scan-assembler-not "\.highcode\.highcode_callee" } } */
++/* { dg-final { scan-assembler "highcode_callee:" } } */
++/* { dg-final { scan-ipa-dump "function not inlinable" "inline" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-highcode-noinline.c b/gcc/testsuite/gcc.target/riscv/wch-highcode-noinline.c
+new file mode 100644
+index 000000000..6926b2da6
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-highcode-noinline.c
+@@ -0,0 +1,21 @@
++/* { dg-do compile } */
++/* { dg-options "-march=rv32imac -mabi=ilp32 -O2 -fdump-ipa-inline-details" } */
++
++static int __attribute__ ((section (".highcode")))
++highcode_callee (int x)
++{
++  return x + 1;
++}
++
++int
++caller (int x)
++{
++  return highcode_callee (x);
++}
++
++/* Exact .highcode functions are non-inlinable even when section splitting is
++   left at its default value.  */
++/* { dg-final { scan-assembler "\.section\[ \t\]+\.highcode," } } */
++/* { dg-final { scan-assembler-not "\.highcode\.highcode_callee" } } */
++/* { dg-final { scan-assembler "highcode_callee:" } } */
++/* { dg-final { scan-ipa-dump "function not inlinable" "inline" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-highcode-param-range.c b/gcc/testsuite/gcc.target/riscv/wch-highcode-param-range.c
+new file mode 100644
+index 000000000..0b81a9a04
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-highcode-param-range.c
+@@ -0,0 +1,6 @@
++/* { dg-do compile } */
++/* { dg-options "--param=highcode-gen-section-name=2" } */
++
++/* { dg-error "argument to '--param=highcode-gen-section-name=' is not between 0 and 1" "" { target *-*-* } 0 } */
++
++int i;
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-highcode-redeclaration.c b/gcc/testsuite/gcc.target/riscv/wch-highcode-redeclaration.c
+new file mode 100644
+index 000000000..b6307db01
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-highcode-redeclaration.c
+@@ -0,0 +1,14 @@
++/* { dg-do compile } */
++/* { dg-options "-march=rv32imac -mabi=ilp32 --param=highcode-gen-section-name=1" } */
++
++int high_fn (int) __attribute__ ((section (".highcode")));
++int high_fn (int x) { return x + 1; }
++
++extern int high_obj __attribute__ ((section (".highcode")));
++int high_obj = 7;
++
++/* The inherited section attribute is rewritten exactly once.  */
++/* { dg-final { scan-assembler "\.section\[ \t\]+\.highcode\.high_fn," } } */
++/* { dg-final { scan-assembler "\.section\[ \t\]+\.highcode\.high_obj," } } */
++/* { dg-final { scan-assembler-not "\.highcode\.high_fn\.high_fn" } } */
++/* { dg-final { scan-assembler-not "\.highcode\.high_obj\.high_obj" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-highcode-sections.c b/gcc/testsuite/gcc.target/riscv/wch-highcode-sections.c
+new file mode 100644
+index 000000000..3220b448c
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-highcode-sections.c
+@@ -0,0 +1,63 @@
++/* { dg-do compile } */
++/* { dg-options "-march=rv32imac -mabi=ilp32 --param highcode-gen-section-name=1" } */
++
++int source_name (int) __asm__ ("assembler_name");
++
++int __attribute__ ((section (".highcode"), used))
++source_name (int x)
++{
++  return x + 1;
++}
++
++int __attribute__ ((section (".highcode"), used)) highcode_object = 1;
++
++static int __attribute__ ((section (".highcode"), used))
++static_highcode_object = 2;
++
++int
++local_static_owner (void)
++{
++  static int __attribute__ ((section (".highcode"), used)) local_object = 3;
++  return local_object + static_highcode_object;
++}
++
++int __attribute__ ((section (".highcode.extra"), used))
++prefix_name (int x)
++{
++  return x + 2;
++}
++
++int __attribute__ ((section (".highcode_init"), used))
++init_name (int x)
++{
++  return x + 3;
++}
++
++int __attribute__ ((section (".Highcode"), used))
++case_name (int x)
++{
++  return x + 4;
++}
++
++int __attribute__ ((section (".highcode "), used))
++space_name (int x)
++{
++  return x + 5;
++}
++
++/* The suffix is the source declaration name, not the assembler name.  */
++/* { dg-final { scan-assembler "\.section\[ \t\]+\.highcode\.source_name," } } */
++/* { dg-final { scan-assembler "assembler_name:" } } */
++/* { dg-final { scan-assembler "\.section\[ \t\]+\.highcode\.highcode_object," } } */
++/* { dg-final { scan-assembler "\.section\[ \t\]+\.highcode\.static_highcode_object," } } */
++/* { dg-final { scan-assembler "\.section\[ \t\]+\.highcode\.local_object," } } */
++
++/* Only the exact, case-sensitive .highcode spelling is rewritten.  */
++/* { dg-final { scan-assembler "\.section\[ \t\]+\.highcode\.extra," } } */
++/* { dg-final { scan-assembler-not "\.highcode\.extra\.prefix_name" } } */
++/* { dg-final { scan-assembler "\.section\[ \t\]+\.highcode_init," } } */
++/* { dg-final { scan-assembler-not "\.highcode_init\.init_name" } } */
++/* { dg-final { scan-assembler "\.section\[ \t\]+\.Highcode," } } */
++/* { dg-final { scan-assembler-not "\.Highcode\.case_name" } } */
++/* { dg-final { scan-assembler "\.section\[ \t\]+\.highcode ," } } */
++/* { dg-final { scan-assembler-not "\.highcode \.space_name" } } */
+-- 
+2.55.0
+

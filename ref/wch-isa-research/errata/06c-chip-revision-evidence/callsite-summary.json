@@ -1,0 +1,71 @@
+{
+  "DBGMCU_GetCHIPID": {
+    "files": 980,
+    "text_occurrences": 998
+  },
+  "DBGMCU_GetDEVID": {
+    "behavior_uses_outside_declaration_definition": 0,
+    "files": 22,
+    "text_occurrences": 33
+  },
+  "DBGMCU_GetREVID": {
+    "behavior_uses_outside_declaration_definition": 0,
+    "files": 22,
+    "text_occurrences": 33
+  },
+  "behavior_groups": {
+    "h417_adc_revision_files": [
+      "tmp/wch-evt/evt/QingkeV5F_CH32H417_EVT/EXAM/ADC/DualADC_AlternateTrigger/Common/hardware.c",
+      "tmp/wch-evt/evt/QingkeV5F_CH32H417_EVT/EXAM/ADC/DualADC_Combined_RegInjectionSimul/Common/hardware.c",
+      "tmp/wch-evt/evt/QingkeV5F_CH32H417_EVT/EXAM/ADC/DualADC_FastInterleaved/Common/hardware.c",
+      "tmp/wch-evt/evt/QingkeV5F_CH32H417_EVT/EXAM/ADC/DualADC_InjectionSimul/Common/hardware.c",
+      "tmp/wch-evt/evt/QingkeV5F_CH32H417_EVT/EXAM/ADC/DualADC_RegSimul/Common/hardware.c",
+      "tmp/wch-evt/evt/QingkeV5F_CH32H417_EVT/EXAM/ADC/DualADC_SlowInterleaved/Common/hardware.c"
+    ],
+    "h417_emmc_revision_files": [
+      "tmp/wch-evt/evt/QingkeV5F_CH32H417_EVT/EXAM/APPLICATION/FATFS_eMMC/Common/sdmmc_emmc.c",
+      "tmp/wch-evt/evt/QingkeV5F_CH32H417_EVT/EXAM/SDMMC/SDMMC_eMMC/Common/sdmmc_emmc.c",
+      "tmp/wch-evt/evt/QingkeV5F_CH32H417_EVT/EXAM/SDMMC/SDMMC_eMMC_DDR/Common/sdmmc_emmc.c"
+    ],
+    "h417_usbss_revision_driver_files": [
+      "tmp/wch-evt/evt/QingkeV5F_CH32H417_EVT/EXAM/UHSIF/UHSIF_SLAVE/Common/ch32h417_usbss_device.c",
+      "tmp/wch-evt/evt/QingkeV5F_CH32H417_EVT/EXAM/USBSS/DEVICE/CH372Device/Common/ch32h417_usbss_device.c",
+      "tmp/wch-evt/evt/QingkeV5F_CH32H417_EVT/EXAM/USBSS/DEVICE/UVC/UVC-DVP/Common/ch32h417_usbss_device.c"
+    ],
+    "v317_eth_revision_files": [
+      "tmp/wch-evt/evt/QingkeV4F_CH32V317_EVT/EXAM/ETH/MAC_RAW/ETH_Driver/eth_driver_10M.c",
+      "tmp/wch-evt/evt/QingkeV4F_CH32V317_EVT/EXAM/ETH/MAC_RAW/ETH_Driver/eth_driver_MII.c",
+      "tmp/wch-evt/evt/QingkeV4F_CH32V317_EVT/EXAM/ETH/MAC_RAW/ETH_Driver/eth_driver_RGMII.c",
+      "tmp/wch-evt/evt/QingkeV4F_CH32V317_EVT/EXAM/ETH/MAC_RAW/ETH_Driver/eth_driver_RMII.c",
+      "tmp/wch-evt/evt/QingkeV4F_CH32V317_EVT/EXAM/ETH/NetLib/eth_driver_10M.c",
+      "tmp/wch-evt/evt/QingkeV4F_CH32V317_EVT/EXAM/ETH/NetLib/eth_driver_MII.c",
+      "tmp/wch-evt/evt/QingkeV4F_CH32V317_EVT/EXAM/ETH/NetLib/eth_driver_RGMII.c",
+      "tmp/wch-evt/evt/QingkeV4F_CH32V317_EVT/EXAM/ETH/NetLib/eth_driver_RMII.c",
+      "tmp/wch-evt/evt/QingkeV4F_CH32V317_EVT/EXAM/USB/USBHS/DEVICE/USB_ECM_NetWorkAdaptor/User/ETH_Driver/eth_driver_10M.c",
+      "tmp/wch-evt/evt/QingkeV4F_CH32V317_EVT/EXAM/USB/USBHS/DEVICE/USB_ECM_NetWorkAdaptor/User/ETH_Driver/eth_driver_MII.c",
+      "tmp/wch-evt/evt/QingkeV4F_CH32V317_EVT/EXAM/USB/USBHS/DEVICE/USB_ECM_NetWorkAdaptor/User/ETH_Driver/eth_driver_RGMII.c",
+      "tmp/wch-evt/evt/QingkeV4F_CH32V317_EVT/EXAM/USB/USBHS/DEVICE/USB_ECM_NetWorkAdaptor/User/ETH_Driver/eth_driver_RMII.c",
+      "tmp/wch-evt/evt/QingkeV4F_CH32V317_EVT/EXAM/USB/USBHS/DEVICE/USB_NCM_NetWorkAdaptor/User/ETH_Driver/eth_driver_10M.c",
+      "tmp/wch-evt/evt/QingkeV4F_CH32V317_EVT/EXAM/USB/USBHS/DEVICE/USB_NCM_NetWorkAdaptor/User/ETH_Driver/eth_driver_MII.c",
+      "tmp/wch-evt/evt/QingkeV4F_CH32V317_EVT/EXAM/USB/USBHS/DEVICE/USB_NCM_NetWorkAdaptor/User/ETH_Driver/eth_driver_RGMII.c",
+      "tmp/wch-evt/evt/QingkeV4F_CH32V317_EVT/EXAM/USB/USBHS/DEVICE/USB_NCM_NetWorkAdaptor/User/ETH_Driver/eth_driver_RMII.c",
+      "tmp/wch-evt/evt/QingkeV4F_CH32V317_EVT/EXAM/USB/USBHS/DEVICE/USB_RNDIS_NetWorkAdaptor/User/ETH_Driver/eth_driver_10M.c",
+      "tmp/wch-evt/evt/QingkeV4F_CH32V317_EVT/EXAM/USB/USBHS/DEVICE/USB_RNDIS_NetWorkAdaptor/User/ETH_Driver/eth_driver_MII.c",
+      "tmp/wch-evt/evt/QingkeV4F_CH32V317_EVT/EXAM/USB/USBHS/DEVICE/USB_RNDIS_NetWorkAdaptor/User/ETH_Driver/eth_driver_RGMII.c",
+      "tmp/wch-evt/evt/QingkeV4F_CH32V317_EVT/EXAM/USB/USBHS/DEVICE/USB_RNDIS_NetWorkAdaptor/User/ETH_Driver/eth_driver_RMII.c"
+    ]
+  },
+  "limits": [
+    "text occurrence counts are not behavior counts",
+    "selector groups were manually reviewed after broad text search",
+    "printed lot-code positions are not treated as REVID without a mapping source"
+  ],
+  "local_pdf_corpus": {
+    "content_hash_groups": 98,
+    "extraction_failures": 0,
+    "physical_files": 126
+  },
+  "schema_version": "1",
+  "source_files_scanned": 23988,
+  "source_scope": "tmp/wch-evt/evt/**/*.c,*.h"
+}

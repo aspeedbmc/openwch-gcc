@@ -1,0 +1,7 @@
+gcc/0001-riscv-regenerate-t-elf-multilib-from-the-WCH-GCC_MUL.patch
+host/0002-host-move-C-standard-header-includes-before-safe-cty.patch
+gcc/0003-riscv-accept-the-WCH-QingKe-xw-march-spelling.patch
+gcc/0004-riscv-accept-the-WCH-QingKe-WCH-Interrupt-fast-inter.patch
+gcc/0005-c-family-add-the-WCH-highcode-gen-section-name-param.patch
+binutils/0001-RISC-V-add-the-WCH-XW-compressed-byte-and-halfword-a.patch
+binutils/0002-RISC-V-decode-the-WCH-XW-compressed-accesses-under-o.patch

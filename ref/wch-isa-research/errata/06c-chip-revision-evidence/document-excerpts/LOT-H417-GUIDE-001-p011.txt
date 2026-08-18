@@ -1,0 +1,38 @@
+CH32H417 评估板说明及应用参考                                              https://wch.cn
+
+五、WCHISPTool.exe 下载
+       批号第五位不为零的 CH32H417 芯片支持使用 WCHISPTool 工具对芯片进行下载，并且支持 USB
+
+和串口两种下载方式。USB 管脚为 PA11（DM）、PA12（DP），串口管脚为 PB6(TX)、PB7（RX）。特殊的
+
+QFN88 封装（CH32H417MEU）串口管脚 PA9(TX)、PA10（RX），QFN68 封装（CH32H417WEU）不支持 BOOT
+
+功能。详见下表：
+
+                     PACKAGE             USB             USART
+
+       CH32H417QEU   QFN128    PA11（DM）、PA12（DP）    PB6(TX)、PB7（RX）
+
+       CH32H417MEU    QFN88    PA11（DM）、PA12（DP）    PA9(TX)、PA10（RX）
+
+       CH32H417WEU    QFN68               -                -
+
+       CH32H416RDU   QFN60X6   PA11（DM）、PA12（DP）    PB6(TX)、PB7（RX）
+
+       CH32H415REU   QFN60X6   PA11（DM）、PA12（DP）    PB6(TX)、PB7（RX）
+
+       具体下载流程如下：
+       1）USB 下载方式
+
+
+
+
+        1.选择MCU 系列和芯片型号；
+        2.选择USB下载方式，芯片重新上电，检测到DP脚高电平，进入BOOT；
+        3.识别设备，一般自动识别，如未能识别，需手动选择；
+        4.选择固件，选择下载的.hex 或.bin 目标程序文件；
+        5.根据要求选择下载配置；
+        6.点击下载。
+
+V1.4                                11
+

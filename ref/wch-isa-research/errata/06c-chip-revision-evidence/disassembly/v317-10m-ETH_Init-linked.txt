@@ -1,0 +1,52 @@
+
+/Users/apple/Projects/gccriscv-wch/tmp/chipid-revision-06c/runs/20260804T100258Z-27480e4af493-00/build-v317-eth-mac-raw/MAC_RAW.elf:     file format elf32-littleriscv
+
+
+Disassembly of section .init:
+
+Disassembly of section .vector:
+
+Disassembly of section .text:
+
+00000e7c <ETH_Init>:
+     e7c:	b78ff2ef          	jal	t0,1f4 <__riscv_save_0>
+     e80:	842a                	mv	s0,a0
+     e82:	06400513          	li	a0,100
+     e86:	29d1                	jal	135a <Delay_Ms>
+     e88:	2b71                	jal	1424 <DBGMCU_GetCHIPID>
+     e8a:	82a1ae23          	sw	a0,-1988(gp) # 2000022c <ChipId>
+     e8e:	303c                	.insn	2, 0x303c
+     e90:	2058                	.insn	2, 0x2058
+     e92:	8522                	mv	a0,s0
+     e94:	200024b7          	lui	s1,0x20002
+     e98:	8fb9                	xor	a5,a5,a4
+     e9a:	3058                	.insn	2, 0x3058
+     e9c:	20002437          	lui	s0,0x20002
+     ea0:	8fb9                	xor	a5,a5,a4
+     ea2:	00034737          	lui	a4,0x34
+     ea6:	40170713          	addi	a4,a4,1025 # 34401 <_data_lma+0x32149>
+     eaa:	02e787b3          	mul	a5,a5,a4
+     eae:	0026a737          	lui	a4,0x26a
+     eb2:	ec970713          	addi	a4,a4,-311 # 269ec9 <_data_lma+0x267c11>
+     eb6:	97ba                	add	a5,a5,a4
+     eb8:	82f1a223          	sw	a5,-2012(gp) # 20000214 <RandVal>
+     ebc:	3539                	jal	cca <ETH_Configuration>
+     ebe:	200005b7          	lui	a1,0x20000
+     ec2:	60440513          	addi	a0,s0,1540 # 20002604 <DMATxDscrTab>
+     ec6:	4609                	li	a2,2
+     ec8:	24c58593          	addi	a1,a1,588 # 2000024c <MACTxBuf>
+     ecc:	2d11                	jal	14e0 <ETH_DMATxDescChainInit>
+     ece:	200015b7          	lui	a1,0x20001
+     ed2:	62448513          	addi	a0,s1,1572 # 20002624 <DMARxDscrTab>
+     ed6:	4611                	li	a2,4
+     ed8:	e3458593          	addi	a1,a1,-460 # 20000e34 <MACRxBuf>
+     edc:	2599                	jal	1522 <ETH_DMARxDescChainInit>
+     ede:	62448493          	addi	s1,s1,1572
+     ee2:	8291aa23          	sw	s1,-1996(gp) # 20000224 <pDMARxSet>
+     ee6:	60440413          	addi	s0,s0,1540
+     eea:	8281a823          	sw	s0,-2000(gp) # 20000220 <pDMATxSet>
+     eee:	6709                	lui	a4,0x2
+     ef0:	e000e7b7          	lui	a5,0xe000e
+     ef4:	10e7a423          	sw	a4,264(a5) # e000e108 <_eusrstack+0xbfffe108>
+     ef8:	440786a3          	sb	zero,1101(a5)
+     efc:	b20ff06f          	j	21c <__riscv_restore_0>

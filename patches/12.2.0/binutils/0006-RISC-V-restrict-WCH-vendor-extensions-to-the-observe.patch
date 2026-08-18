@@ -1,0 +1,340 @@
+From 5aeff235f3666176eeafc9aa4456a4e801714b49 Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 4 <phase4@openwch.local>
+Date: Thu, 13 Aug 2026 08:32:02 +0900
+Subject: [PATCH 6/7] RISC-V: restrict WCH vendor extensions to the observed
+ set
+
+The official WCH 12.2 assembler rejects unknown X-prefixed extension names, with or without explicit versions, while accepting XW and the single-letter X extension. Add the bare X entry to the vendor table introduced earlier in this series, and use that table for recognition as well as for default-version lookup, so an unknown name is rejected instead of being accepted silently.
+
+Retarget the inherited generic-vendor tests onto the accepted names and add exact diagnostics for the march, attribute and option paths. march-fail-single-prefix-x.d is deleted rather than retargeted: it asserted that a bare rv32ix fails, which is no longer true, and the other single-letter prefixes stay covered by march-fail-single-prefix.l.
+
+WCH 12.2 behavior evidence: tmp/phase4-evidence/s1-official/diagnostics.tsv and the accept/reject matrix in tmp/phase4-evidence/vendor-x-calibration/, which records rv32ix, rv32ix1p0 and rv32ix9p9 as accepted and rv32imac_xq, rv32i_xargle and rv32i_xargle2p0 as rejected with the official diagnostic text.
+---
+ bfd/elfxx-riscv.c                                        | 5 ++---
+ gas/testsuite/gas/riscv/attribute-02.d                   | 4 ++--
+ gas/testsuite/gas/riscv/attribute-03.d                   | 4 ++--
+ gas/testsuite/gas/riscv/march-fail-isa-spec.l            | 3 +--
+ gas/testsuite/gas/riscv/march-fail-order-x-std.d         | 2 +-
+ gas/testsuite/gas/riscv/march-fail-order-x-z.d           | 2 +-
+ gas/testsuite/gas/riscv/march-fail-order-x-z.l           | 2 +-
+ gas/testsuite/gas/riscv/march-fail-order-x.d             | 2 +-
+ gas/testsuite/gas/riscv/march-fail-order-x.l             | 2 +-
+ gas/testsuite/gas/riscv/march-fail-single-prefix-x.d     | 3 ---
+ gas/testsuite/gas/riscv/march-fail-single-prefix.l       | 2 +-
+ gas/testsuite/gas/riscv/march-ok-nse-with-version.d      | 2 +-
+ gas/testsuite/gas/riscv/march-ok-two-nse.d               | 2 +-
+ gas/testsuite/gas/riscv/option-arch-01.s                 | 2 +-
+ gas/testsuite/gas/riscv/option-arch-02.d                 | 2 +-
+ gas/testsuite/gas/riscv/option-arch-02.s                 | 4 ++--
+ gas/testsuite/gas/riscv/wch-vendor-x-attribute-unknown.d | 3 +++
+ gas/testsuite/gas/riscv/wch-vendor-x-attribute-unknown.l | 2 ++
+ gas/testsuite/gas/riscv/wch-vendor-x-attribute-unknown.s | 1 +
+ gas/testsuite/gas/riscv/wch-vendor-x-option-unknown.d    | 3 +++
+ gas/testsuite/gas/riscv/wch-vendor-x-option-unknown.l    | 2 ++
+ gas/testsuite/gas/riscv/wch-vendor-x-option-unknown.s    | 1 +
+ gas/testsuite/gas/riscv/wch-vendor-x-unknown.d           | 3 +++
+ gas/testsuite/gas/riscv/wch-vendor-x-unknown.l           | 2 ++
+ gas/testsuite/gas/riscv/wch-vendor-x-version-unknown.d   | 3 +++
+ gas/testsuite/gas/riscv/wch-vendor-x-version-unknown.l   | 2 ++
+ gas/testsuite/gas/riscv/wch-vendor-x-version.d           | 6 ++++++
+ gas/testsuite/gas/riscv/wch-vendor-x.d                   | 6 ++++++
+ 28 files changed, 53 insertions(+), 24 deletions(-)
+ delete mode 100644 gas/testsuite/gas/riscv/march-fail-single-prefix-x.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-vendor-x-attribute-unknown.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-vendor-x-attribute-unknown.l
+ create mode 100644 gas/testsuite/gas/riscv/wch-vendor-x-attribute-unknown.s
+ create mode 100644 gas/testsuite/gas/riscv/wch-vendor-x-option-unknown.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-vendor-x-option-unknown.l
+ create mode 100644 gas/testsuite/gas/riscv/wch-vendor-x-option-unknown.s
+ create mode 100644 gas/testsuite/gas/riscv/wch-vendor-x-unknown.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-vendor-x-unknown.l
+ create mode 100644 gas/testsuite/gas/riscv/wch-vendor-x-version-unknown.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-vendor-x-version-unknown.l
+ create mode 100644 gas/testsuite/gas/riscv/wch-vendor-x-version.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-vendor-x.d
+
+diff --git a/bfd/elfxx-riscv.c b/bfd/elfxx-riscv.c
+index 8308939f..83bb8c98 100644
+--- a/bfd/elfxx-riscv.c
++++ b/bfd/elfxx-riscv.c
+@@ -1247,6 +1247,7 @@ static struct riscv_supported_ext riscv_supported_std_zxm_ext[] =
+ static struct riscv_supported_ext riscv_supported_std_x_ext[] =
+ {
+   {"xw", ISA_SPEC_CLASS_DRAFT, 1, 0, 0},
++  {"x", ISA_SPEC_CLASS_DRAFT, 1, 0, 0},
+   {NULL, 0, 0, 0, 0}
+ };
+ 
+@@ -1342,9 +1343,7 @@ riscv_recognized_prefixed_ext (const char *ext)
+   case RV_ISA_CLASS_H:
+     return riscv_known_prefixed_ext (ext, riscv_supported_std_h_ext);
+   case RV_ISA_CLASS_X:
+-    /* Only the single x is unrecognized.  */
+-    if (strcmp (ext, "x") != 0)
+-      return true;
++    return riscv_known_prefixed_ext (ext, riscv_supported_std_x_ext);
+   default:
+     break;
+   }
+diff --git a/gas/testsuite/gas/riscv/attribute-02.d b/gas/testsuite/gas/riscv/attribute-02.d
+index 45b89f2d..7262c03f 100644
+--- a/gas/testsuite/gas/riscv/attribute-02.d
++++ b/gas/testsuite/gas/riscv/attribute-02.d
+@@ -1,6 +1,6 @@
+-#as: -march=rv32gxargle2p0 -march-attr -misa-spec=2.2
++#as: -march=rv32gxw2p0 -march-attr -misa-spec=2.2
+ #readelf: -A
+ #source: empty.s
+ Attribute Section: riscv
+ File Attributes
+-  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_f2p0_d2p0_xargle2p0"
++  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_f2p0_d2p0_zmmul1p0_xw2p0"
+diff --git a/gas/testsuite/gas/riscv/attribute-03.d b/gas/testsuite/gas/riscv/attribute-03.d
+index 11416d63..2f928676 100644
+--- a/gas/testsuite/gas/riscv/attribute-03.d
++++ b/gas/testsuite/gas/riscv/attribute-03.d
+@@ -1,6 +1,6 @@
+-#as: -march=rv32gxargle2p0_xfoo3p0 -march-attr -misa-spec=2.2
++#as: -march=rv32g_x1p0_xw3p0 -march-attr -misa-spec=2.2
+ #readelf: -A
+ #source: empty.s
+ Attribute Section: riscv
+ File Attributes
+-  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_f2p0_d2p0_xargle2p0_xfoo3p0"
++  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_f2p0_d2p0_zmmul1p0_x1p0_xw3p0"
+diff --git a/gas/testsuite/gas/riscv/march-fail-isa-spec.l b/gas/testsuite/gas/riscv/march-fail-isa-spec.l
+index e714ddf7..2dfce2ae 100644
+--- a/gas/testsuite/gas/riscv/march-fail-isa-spec.l
++++ b/gas/testsuite/gas/riscv/march-fail-isa-spec.l
+@@ -1,5 +1,4 @@
+ .*Assembler messages:
+ .*Error: cannot find default versions of the ISA extension `l'
+ .*Error: cannot find default versions of the ISA extension `n'
+-.*Error: x ISA extension `xargle' must be set with the versions
+-.*Error: x ISA extension `xbargle' must be set with the versions
++.*Error: rv32iln_zicsr_xargle_xbargle: unknown prefixed ISA extension `xargle'
+diff --git a/gas/testsuite/gas/riscv/march-fail-order-x-std.d b/gas/testsuite/gas/riscv/march-fail-order-x-std.d
+index 4762f3dd..316e87f6 100644
+--- a/gas/testsuite/gas/riscv/march-fail-order-x-std.d
++++ b/gas/testsuite/gas/riscv/march-fail-order-x-std.d
+@@ -1,3 +1,3 @@
+-#as: -march=rv32i_xargle2p0_mafd
++#as: -march=rv32i_xw1p0_mafd
+ #source: empty.s
+ #error_output: march-fail-order-zx-std.l
+diff --git a/gas/testsuite/gas/riscv/march-fail-order-x-z.d b/gas/testsuite/gas/riscv/march-fail-order-x-z.d
+index 7245e68e..3e29e4f1 100644
+--- a/gas/testsuite/gas/riscv/march-fail-order-x-z.d
++++ b/gas/testsuite/gas/riscv/march-fail-order-x-z.d
+@@ -1,3 +1,3 @@
+-#as: -march=rv32i_xargle2p0_zicsr2p0
++#as: -march=rv32i_xw1p0_zicsr2p0
+ #source: empty.s
+ #error_output: march-fail-order-x-z.l
+diff --git a/gas/testsuite/gas/riscv/march-fail-order-x-z.l b/gas/testsuite/gas/riscv/march-fail-order-x-z.l
+index 53ea8201..894de5c0 100644
+--- a/gas/testsuite/gas/riscv/march-fail-order-x-z.l
++++ b/gas/testsuite/gas/riscv/march-fail-order-x-z.l
+@@ -1,2 +1,2 @@
+ .*Assembler messages:
+-.*Error: .*prefixed ISA extension `zicsr' is not in expected order.  It must come before `xargle'
++.*Error: .*prefixed ISA extension `zicsr' is not in expected order.  It must come before `xw'
+diff --git a/gas/testsuite/gas/riscv/march-fail-order-x.d b/gas/testsuite/gas/riscv/march-fail-order-x.d
+index 72a821ef..782df977 100644
+--- a/gas/testsuite/gas/riscv/march-fail-order-x.d
++++ b/gas/testsuite/gas/riscv/march-fail-order-x.d
+@@ -1,3 +1,3 @@
+-#as: -march=rv32i_xbargle2p0_xargle2p0
++#as: -march=rv32i_xw1p0_x1p0
+ #source: empty.s
+ #error_output: march-fail-order-x.l
+diff --git a/gas/testsuite/gas/riscv/march-fail-order-x.l b/gas/testsuite/gas/riscv/march-fail-order-x.l
+index cfb11852..c61c739f 100644
+--- a/gas/testsuite/gas/riscv/march-fail-order-x.l
++++ b/gas/testsuite/gas/riscv/march-fail-order-x.l
+@@ -1,2 +1,2 @@
+ .*Assembler messages:
+-.*Error: .*prefixed ISA extension `xargle' is not in expected order.  It must come before `xbargle'
++.*Error: .*prefixed ISA extension `x' is not in expected order.  It must come before `xw'
+diff --git a/gas/testsuite/gas/riscv/march-fail-single-prefix-x.d b/gas/testsuite/gas/riscv/march-fail-single-prefix-x.d
+deleted file mode 100644
+index 9e87801c..00000000
+--- a/gas/testsuite/gas/riscv/march-fail-single-prefix-x.d
++++ /dev/null
+@@ -1,3 +0,0 @@
+-#as: -march=rv32ix
+-#source: empty.s
+-#error_output: march-fail-single-prefix.l
+diff --git a/gas/testsuite/gas/riscv/march-fail-single-prefix.l b/gas/testsuite/gas/riscv/march-fail-single-prefix.l
+index 13942ed6..0016e6b8 100644
+--- a/gas/testsuite/gas/riscv/march-fail-single-prefix.l
++++ b/gas/testsuite/gas/riscv/march-fail-single-prefix.l
+@@ -1,2 +1,2 @@
+ .*Assembler messages:
+-.*Error: .*unknown prefixed ISA extension `(s|h|z|x|zxm)'
++.*Error: .*unknown prefixed ISA extension `(s|h|z|zxm)'
+diff --git a/gas/testsuite/gas/riscv/march-ok-nse-with-version.d b/gas/testsuite/gas/riscv/march-ok-nse-with-version.d
+index 8e2110ce..a0fe96dc 100644
+--- a/gas/testsuite/gas/riscv/march-ok-nse-with-version.d
++++ b/gas/testsuite/gas/riscv/march-ok-nse-with-version.d
+@@ -1,4 +1,4 @@
+-#as: -march=rv32imafd_xargle2p0
++#as: -march=rv32imafd_xw2p0
+ #objdump: -dr
+ #source: empty.s
+ 
+diff --git a/gas/testsuite/gas/riscv/march-ok-two-nse.d b/gas/testsuite/gas/riscv/march-ok-two-nse.d
+index 8cdf316f..dff5adb6 100644
+--- a/gas/testsuite/gas/riscv/march-ok-two-nse.d
++++ b/gas/testsuite/gas/riscv/march-ok-two-nse.d
+@@ -1,4 +1,4 @@
+-#as: -march=rv32imafd_xargle2p0_xbargle3p0
++#as: -march=rv32imafd_x1p0_xw3p0
+ #objdump: -dr
+ #source: empty.s
+ 
+diff --git a/gas/testsuite/gas/riscv/option-arch-01.s b/gas/testsuite/gas/riscv/option-arch-01.s
+index 50285fc8..201d8bc8 100644
+--- a/gas/testsuite/gas/riscv/option-arch-01.s
++++ b/gas/testsuite/gas/riscv/option-arch-01.s
+@@ -1,7 +1,7 @@
+ .attribute arch, "rv64ic"
+ add	a0, a0, a1
+ .option push
+-.option arch, +d2p0, -c, +xvendor1p0
++.option arch, +d2p0, -c, +xw1p0
+ add	a0, a0, a1
+ frcsr	a0	# Should add mapping symbol with ISA here, and then dump it to frcsr.
+ .option push
+diff --git a/gas/testsuite/gas/riscv/option-arch-02.d b/gas/testsuite/gas/riscv/option-arch-02.d
+index 9ca013e5..3e504363 100644
+--- a/gas/testsuite/gas/riscv/option-arch-02.d
++++ b/gas/testsuite/gas/riscv/option-arch-02.d
+@@ -4,5 +4,5 @@
+ 
+ Attribute Section: riscv
+ File Attributes
+-  Tag_RISCV_arch: "rv64i2p0_m3p0_f2p0_d3p0_c2p0_xvendor32x3p0"
++  Tag_RISCV_arch: "rv64i2p0_m3p0_f2p0_d3p0_c2p0_zmmul1p0_xw3p0"
+ #...
+diff --git a/gas/testsuite/gas/riscv/option-arch-02.s b/gas/testsuite/gas/riscv/option-arch-02.s
+index e0f5de32..012d99f0 100644
+--- a/gas/testsuite/gas/riscv/option-arch-02.s
++++ b/gas/testsuite/gas/riscv/option-arch-02.s
+@@ -1,8 +1,8 @@
+ .attribute arch, "rv64ic"
+ add	a0, a0, a1
+ .option push
+-.option arch, +d2p0, -c, +xvendor1p0
++.option arch, +d2p0, -c, +xw1p0
+ add	a0, a0, a1
+ frcsr	a0
+ .option pop
+-.option arch, +m3p0, +d3p0, +xvendor32x3p0
++.option arch, +m3p0, +d3p0, +xw3p0
+diff --git a/gas/testsuite/gas/riscv/wch-vendor-x-attribute-unknown.d b/gas/testsuite/gas/riscv/wch-vendor-x-attribute-unknown.d
+new file mode 100644
+index 00000000..f83aa473
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-vendor-x-attribute-unknown.d
+@@ -0,0 +1,3 @@
++#as: -misa-spec=2.2
++#source: wch-vendor-x-attribute-unknown.s
++#error_output: wch-vendor-x-attribute-unknown.l
+diff --git a/gas/testsuite/gas/riscv/wch-vendor-x-attribute-unknown.l b/gas/testsuite/gas/riscv/wch-vendor-x-attribute-unknown.l
+new file mode 100644
+index 00000000..bb54b2e6
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-vendor-x-attribute-unknown.l
+@@ -0,0 +1,2 @@
++.*Assembler messages:
++.*: Error: rv32i_xargle2p0: unknown prefixed ISA extension `xargle'
+diff --git a/gas/testsuite/gas/riscv/wch-vendor-x-attribute-unknown.s b/gas/testsuite/gas/riscv/wch-vendor-x-attribute-unknown.s
+new file mode 100644
+index 00000000..eac80f8c
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-vendor-x-attribute-unknown.s
+@@ -0,0 +1 @@
++	.attribute arch,"rv32i_xargle2p0"
+diff --git a/gas/testsuite/gas/riscv/wch-vendor-x-option-unknown.d b/gas/testsuite/gas/riscv/wch-vendor-x-option-unknown.d
+new file mode 100644
+index 00000000..c1ef2695
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-vendor-x-option-unknown.d
+@@ -0,0 +1,3 @@
++#as: -misa-spec=2.2 -march=rv32i
++#source: wch-vendor-x-option-unknown.s
++#error_output: wch-vendor-x-option-unknown.l
+diff --git a/gas/testsuite/gas/riscv/wch-vendor-x-option-unknown.l b/gas/testsuite/gas/riscv/wch-vendor-x-option-unknown.l
+new file mode 100644
+index 00000000..22eea1c5
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-vendor-x-option-unknown.l
+@@ -0,0 +1,2 @@
++.*Assembler messages:
++.*: Error: unknown ISA extension `xargle' in .option arch `\+xargle2p0'
+diff --git a/gas/testsuite/gas/riscv/wch-vendor-x-option-unknown.s b/gas/testsuite/gas/riscv/wch-vendor-x-option-unknown.s
+new file mode 100644
+index 00000000..9993438a
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-vendor-x-option-unknown.s
+@@ -0,0 +1 @@
++	.option arch,+xargle2p0
+diff --git a/gas/testsuite/gas/riscv/wch-vendor-x-unknown.d b/gas/testsuite/gas/riscv/wch-vendor-x-unknown.d
+new file mode 100644
+index 00000000..7fcdfb9c
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-vendor-x-unknown.d
+@@ -0,0 +1,3 @@
++#as: -misa-spec=2.2 -march=rv32imac_xq
++#source: empty.s
++#error_output: wch-vendor-x-unknown.l
+diff --git a/gas/testsuite/gas/riscv/wch-vendor-x-unknown.l b/gas/testsuite/gas/riscv/wch-vendor-x-unknown.l
+new file mode 100644
+index 00000000..a40be9da
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-vendor-x-unknown.l
+@@ -0,0 +1,2 @@
++.*Assembler messages:
++.*Error: rv32imac_xq: unknown prefixed ISA extension `xq'
+diff --git a/gas/testsuite/gas/riscv/wch-vendor-x-version-unknown.d b/gas/testsuite/gas/riscv/wch-vendor-x-version-unknown.d
+new file mode 100644
+index 00000000..cd746b45
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-vendor-x-version-unknown.d
+@@ -0,0 +1,3 @@
++#as: -misa-spec=2.2 -march=rv32i_xargle2p0
++#source: empty.s
++#error_output: wch-vendor-x-version-unknown.l
+diff --git a/gas/testsuite/gas/riscv/wch-vendor-x-version-unknown.l b/gas/testsuite/gas/riscv/wch-vendor-x-version-unknown.l
+new file mode 100644
+index 00000000..5b614b9d
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-vendor-x-version-unknown.l
+@@ -0,0 +1,2 @@
++.*Assembler messages:
++.*Error: rv32i_xargle2p0: unknown prefixed ISA extension `xargle'
+diff --git a/gas/testsuite/gas/riscv/wch-vendor-x-version.d b/gas/testsuite/gas/riscv/wch-vendor-x-version.d
+new file mode 100644
+index 00000000..eb38bd3a
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-vendor-x-version.d
+@@ -0,0 +1,6 @@
++#as: -misa-spec=2.2 -march=rv32ix9p9
++#readelf: -A
++#source: empty.s
++Attribute Section: riscv
++File Attributes
++  Tag_RISCV_arch: "rv32i2p0_x9p9"
+diff --git a/gas/testsuite/gas/riscv/wch-vendor-x.d b/gas/testsuite/gas/riscv/wch-vendor-x.d
+new file mode 100644
+index 00000000..a3c3cd2e
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-vendor-x.d
+@@ -0,0 +1,6 @@
++#as: -misa-spec=2.2 -march=rv32ix
++#readelf: -A
++#source: empty.s
++Attribute Section: riscv
++File Attributes
++  Tag_RISCV_arch: "rv32i2p0_x1p0"

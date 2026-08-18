@@ -1,0 +1,227 @@
+From 489056185e13eb28897a81f3f8d9cec3528b6e6b Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 3 <phase3@openwch.local>
+Date: Thu, 13 Aug 2026 23:13:22 +0900
+Subject: [PATCH 7/9] RISC-V: match WCH fast-interrupt vector saves
+
+WCH fast interrupt handlers do not software-save vector registers by
+default.  The existing frame logic instead treated them like ordinary
+functions and emitted vlenb-based vector spills in four EVT projects.
+
+Add the observed --param=ccv-abi= control as per-function optimization
+state.  Its default and value zero suppress all fast-interrupt vector
+software saves; value one preserves only live vector-ABI callee-saved
+registers.  Cover the accepted range, default and explicit-zero behavior,
+mixed live registers, and the nonleaf ABI save set.
+
+The behavior comes from an official O0/O2/Os by unset/0/1 matrix, exact
+option diagnostics, and an LTO-linked probe.  The four affected projects
+now match 100/100 gate artifacts, the selected EVT gate remains 274/274,
+and all 30279 PASS tuples of the RC04 (mret repair round) RISC-V suite
+baseline remain PASS.
+
+Behavior evidence:
+  tmp/phase3d-evidence/t3-rc05/probe-compare-final
+  tmp/phase3d-evidence/t3-rc05/cluster-run-final
+  tmp/phase3d-evidence/t3-rc05/suite-diff-riscv-final
+  tmp/phase3d-evidence/t3-rc05/quick-gate-final
+  tmp/phase3d-evidence/posthoc-rc05-darwin-full-stage-a
+
+gcc/ChangeLog:
+
+	* params.opt: Add --param=ccv-abi=.
+	* config/riscv/riscv.cc (riscv_wch_fast_interrupt_saved_reg_p): Add
+	the vector registers, honouring --param=ccv-abi=.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/riscv/wch-fast-interrupt-vector-default.c: New test.
+	* gcc.target/riscv/wch-fast-interrupt-vector-param-range.c: New
+	test.
+	* gcc.target/riscv/wch-fast-interrupt-vector-param0.c: New test.
+	* gcc.target/riscv/wch-fast-interrupt-vector-param1-nonleaf.c: New
+	test.
+	* gcc.target/riscv/wch-fast-interrupt-vector-param1.c: New test.
+---
+ gcc/config/riscv/riscv.cc                     | 20 +++++++++++-------
+ gcc/params.opt                                |  4 ++++
+ .../riscv/wch-fast-interrupt-vector-default.c | 20 ++++++++++++++++++
+ .../wch-fast-interrupt-vector-param-range.c   |  6 ++++++
+ .../riscv/wch-fast-interrupt-vector-param0.c  | 20 ++++++++++++++++++
+ ...wch-fast-interrupt-vector-param1-nonleaf.c | 21 +++++++++++++++++++
+ .../riscv/wch-fast-interrupt-vector-param1.c  | 19 +++++++++++++++++
+ 7 files changed, 102 insertions(+), 8 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-vector-default.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-vector-param-range.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-vector-param0.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-vector-param1-nonleaf.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-vector-param1.c
+
+diff --git a/gcc/config/riscv/riscv.cc b/gcc/config/riscv/riscv.cc
+index ed7af3682..3f62b00aa 100644
+--- a/gcc/config/riscv/riscv.cc
++++ b/gcc/config/riscv/riscv.cc
+@@ -7506,18 +7506,22 @@ riscv_save_return_addr_reg_p (void)
+ 
+ /* Return true if REGNO is saved by the WCH fast-interrupt hardware prologue,
+    so the software prologue must leave it alone: the GPRs a call may clobber,
+-   plus the fixed ones that no prologue would save in any case.  ra is named
+-   separately rather than left to call_used_or_fixed_reg_p, because
+-   -fcall-saved-ra clears both of that predicate's inputs for it --
+-   fix_register() declines only the stack and frame pointers -- while the
+-   hardware saves it either way.  */
++   plus the fixed ones that no prologue would save in any case, and -- unless
++   --param=ccv-abi=1 asks for the vector ABI's callee-saved half -- the vector
++   registers.  ra is named separately rather than left to
++   call_used_or_fixed_reg_p, because -fcall-saved-ra clears both of that
++   predicate's inputs for it -- fix_register() declines only the stack and
++   frame pointers -- while the hardware saves it either way.  */
+ 
+ static bool
+ riscv_wch_fast_interrupt_saved_reg_p (unsigned int regno)
+ {
+-  return (GP_REG_P (regno)
+-	  && (call_used_or_fixed_reg_p (regno)
+-	      || regno == RETURN_ADDR_REGNUM));
++  return ((GP_REG_P (regno)
++	   && (call_used_or_fixed_reg_p (regno)
++	       || regno == RETURN_ADDR_REGNUM))
++	  || (V_REG_P (regno)
++	      && (!param_ccv_abi
++		  || riscv_v_abi ().clobbers_full_reg_p (regno))));
+ }
+ 
+ /* Return true if the current function must save register REGNO.  */
+diff --git a/gcc/params.opt b/gcc/params.opt
+index f38c17078..53eae79e7 100644
+--- a/gcc/params.opt
++++ b/gcc/params.opt
+@@ -114,6 +114,10 @@ The maximum length of a constant string for a builtin string cmp call eligible f
+ Common Joined UInteger Var(param_case_values_threshold) Param Optimization
+ The smallest number of different values for which it is best to use a jump-table instead of a tree of conditional branches, if 0, use the default for the machine.
+ 
++-param=ccv-abi=
++Common Joined UInteger Var(param_ccv_abi) Init(0) IntegerRange(0, 1) Param Optimization
++save v register.
++
+ -param=comdat-sharing-probability=
+ Common Joined UInteger Var(param_comdat_sharing_probability) Init(20) Param Optimization
+ Probability that COMDAT function will be shared with different compilation unit.
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-vector-default.c b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-vector-default.c
+new file mode 100644
+index 000000000..a65c6ed57
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-vector-default.c
+@@ -0,0 +1,20 @@
++/* WCH fast interrupts do not software-save vector registers by default.  */
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv32gcv -mabi=ilp32d" } */
++/* { dg-skip-if "" { *-*-* } { "-flto" } } */
++
++void __attribute__ ((interrupt ("WCH-Interrupt-fast")))
++handler (void)
++{
++  asm volatile ("" ::: "v0",  "v1",  "v2",  "v3",  "v4",  "v5",
++		       "v6",  "v7",  "v8",  "v9",  "v10", "v11",
++		       "v12", "v13", "v14", "v15", "v16", "v17",
++		       "v18", "v19", "v20", "v21", "v22", "v23",
++		       "v24", "v25", "v26", "v27", "v28", "v29",
++		       "v30", "v31");
++}
++
++/* { dg-final { scan-assembler-not {csrr\s+[atx][0-9]+,\s*vlenb} } } */
++/* { dg-final { scan-assembler-not {vs[1248]r\.v} } } */
++/* { dg-final { scan-assembler-not {vl[1248]re(8|16|32|64)\.v} } } */
++/* { dg-final { scan-assembler-times {\mmret\M} 1 } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-vector-param-range.c b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-vector-param-range.c
+new file mode 100644
+index 000000000..bf14d4224
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-vector-param-range.c
+@@ -0,0 +1,6 @@
++/* { dg-do compile } */
++/* { dg-options "-march=rv32gcv -mabi=ilp32d --param=ccv-abi=2" } */
++
++/* { dg-error "argument to '--param=ccv-abi=' is not between 0 and 1" "" { target *-*-* } 0 } */
++
++int i;
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-vector-param0.c b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-vector-param0.c
+new file mode 100644
+index 000000000..09fe79a21
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-vector-param0.c
+@@ -0,0 +1,20 @@
++/* Explicit ccv-abi=0 is the WCH fast interrupt default.  */
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv32gcv -mabi=ilp32d --param=ccv-abi=0" } */
++/* { dg-skip-if "" { *-*-* } { "-flto" } } */
++
++void __attribute__ ((interrupt ("WCH-Interrupt-fast")))
++handler (void)
++{
++  asm volatile ("" ::: "v0",  "v1",  "v2",  "v3",  "v4",  "v5",
++		       "v6",  "v7",  "v8",  "v9",  "v10", "v11",
++		       "v12", "v13", "v14", "v15", "v16", "v17",
++		       "v18", "v19", "v20", "v21", "v22", "v23",
++		       "v24", "v25", "v26", "v27", "v28", "v29",
++		       "v30", "v31");
++}
++
++/* { dg-final { scan-assembler-not {csrr\s+[atx][0-9]+,\s*vlenb} } } */
++/* { dg-final { scan-assembler-not {vs[1248]r\.v} } } */
++/* { dg-final { scan-assembler-not {vl[1248]re(8|16|32|64)\.v} } } */
++/* { dg-final { scan-assembler-times {\mmret\M} 1 } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-vector-param1-nonleaf.c b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-vector-param1-nonleaf.c
+new file mode 100644
+index 000000000..76bd9cd13
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-vector-param1-nonleaf.c
+@@ -0,0 +1,21 @@
++/* Non-leaf ccv-abi=1 handlers preserve all vector-ABI callee-saved regs.  */
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv32gcv -mabi=ilp32d --param=ccv-abi=1" } */
++/* { dg-skip-if "" { *-*-* } { "-flto" } } */
++
++extern void callee (void);
++
++void __attribute__ ((interrupt ("WCH-Interrupt-fast")))
++handler (void)
++{
++  callee ();
++}
++
++/* { dg-final { scan-assembler-times {csrr\s+[atx][0-9]+,\s*vlenb} 2 } } */
++/* { dg-final { scan-assembler-times {vs1r\.v} 15 } } */
++/* { dg-final { scan-assembler-times {vs1r\.v\s+v(1|2|3|4|5|6|7|24|25|26|27|28|29|30|31),} 15 } } */
++/* { dg-final { scan-assembler-not {vs[248]r\.v} } } */
++/* { dg-final { scan-assembler-times {vl1re(8|16|32|64)\.v} 15 } } */
++/* { dg-final { scan-assembler-times {vl1re64\.v\s+v(1|2|3|4|5|6|7|24|25|26|27|28|29|30|31),} 15 } } */
++/* { dg-final { scan-assembler-not {vl[248]re(8|16|32|64)\.v} } } */
++/* { dg-final { scan-assembler-times {\mmret\M} 1 } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-vector-param1.c b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-vector-param1.c
+new file mode 100644
+index 000000000..0671195e4
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-vector-param1.c
+@@ -0,0 +1,19 @@
++/* ccv-abi=1 preserves only vector-ABI callee-saved registers.  */
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv32gcv -mabi=ilp32d --param=ccv-abi=1" } */
++/* { dg-skip-if "" { *-*-* } { "-flto" } } */
++
++void __attribute__ ((interrupt ("WCH-Interrupt-fast")))
++handler (void)
++{
++  asm volatile ("" ::: "v0", "v1", "v7", "v8", "v23", "v24", "v31");
++}
++
++/* { dg-final { scan-assembler-times {csrr\s+[atx][0-9]+,\s*vlenb} 2 } } */
++/* { dg-final { scan-assembler-times {vs1r\.v} 4 } } */
++/* { dg-final { scan-assembler-times {vs1r\.v\s+v(1|7|24|31),} 4 } } */
++/* { dg-final { scan-assembler-not {vs[248]r\.v} } } */
++/* { dg-final { scan-assembler-times {vl1re(8|16|32|64)\.v} 4 } } */
++/* { dg-final { scan-assembler-times {vl1re64\.v\s+v(1|7|24|31),} 4 } } */
++/* { dg-final { scan-assembler-not {vl[248]re(8|16|32|64)\.v} } } */
++/* { dg-final { scan-assembler-times {\mmret\M} 1 } } */
+-- 
+2.55.0
+

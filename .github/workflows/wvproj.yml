@@ -1,0 +1,65 @@
+name: WCH EVT wvproj builds
+
+on:
+  push:
+    paths:
+      - "ref/wch-evt/**"
+      - ".github/workflows/wvproj.yml"
+  pull_request:
+    paths:
+      - "ref/wch-evt/**"
+      - ".github/workflows/wvproj.yml"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Projects to compile
+        required: true
+        type: choice
+        options:
+          - fast
+          - full
+        default: fast
+
+permissions:
+  contents: read
+
+env:
+  MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'fast' }}
+
+jobs:
+  wvproj:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # The archive is large, so keep the verified MRS source package between
+      # runs.  fetch_wch_toolchain.py rejects a cache hit unless both its size
+      # and SHA-256 match the pinned MRS 2.5.0 package.
+      - name: Cache WCH toolchain archive
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/wch-evt-cache
+          key: wch-evt-linux-amd64-gcc15-${{ hashFiles('ref/wch-evt/tools/fetch_wch_toolchain.py') }}
+
+      - name: Provision WCH GCC15
+        run: |
+          set -eu
+          if [ -n "${COMPILER_PATH:-}" ]; then
+            test -x "$COMPILER_PATH"
+          else
+            python3 ref/wch-evt/tools/fetch_wch_toolchain.py \
+              --destination "$RUNNER_TEMP/wch-evt-toolchain" \
+              --cache-dir "$RUNNER_TEMP/wch-evt-cache"
+            COMPILER_PATH="$RUNNER_TEMP/wch-evt-toolchain/bin/riscv32-wch-elf-gcc"
+            echo "COMPILER_PATH=$COMPILER_PATH" >> "$GITHUB_ENV"
+          fi
+          "$COMPILER_PATH" --version | head -n 1
+          test "$($COMPILER_PATH -dumpmachine)" = riscv32-wch-elf
+
+      - name: Build and clean EVT projects
+        env:
+          MAKE_JOBS: 2
+          WVPROJ_WORKERS: 2
+        run: python3 ref/wch-evt/tests/test_wvproj_to_make.py

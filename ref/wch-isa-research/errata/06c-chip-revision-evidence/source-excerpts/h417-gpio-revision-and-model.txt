@@ -1,0 +1,47 @@
+source	tmp/wch-evt/evt/QingkeV5F_CH32H417_EVT/EXAM/SRC/Peripheral/src/ch32h417_gpio.c
+sha256	6f2760b13e2da9ac5aacd02fab9f19a64ef76a83cf31f98486757c8b36ce751c
+range	582-625
+000582	void GPIO_IPD_Unused(void)
+000583	{
+000584	    GPIO_InitTypeDef GPIO_InitStructure = {0};
+000585	    uint32_t chip = 0;
+000586	    RCC_HB2PeriphClockCmd(RCC_HB2Periph_GPIOA | RCC_HB2Periph_GPIOB | RCC_HB2Periph_GPIOC|\
+000587	                           RCC_HB2Periph_GPIOD | RCC_HB2Periph_GPIOE | RCC_HB2Periph_GPIOF, ENABLE);
+000588
+000589	    volatile uint32_t tmp;
+000590	    tmp = (*(volatile uint32_t*)0x4002a010) & (uint32_t) (~(0xFF));
+000591	    tmp |= (uint32_t)0x1B;
+000592	    *(volatile uint32_t*)0x4002a010 = tmp;
+000593
+000594	    tmp = (*(volatile uint32_t*)0x4002a014) & (uint32_t) (~(0x3F));
+000595	    tmp |= (uint32_t)0x0E;
+000596	    *(volatile uint32_t*)0x4002a014 = tmp;
+000597
+000598	    FLASH_BOOT_GetMode();
+000599	    if( ((*(uint32_t *)0x1FFFF704) & (0x000000F0))  == 0 )
+000600	    {
+000601	        RCC_HB1PeriphClockCmd(RCC_HB1Periph_SWPMI,ENABLE);
+000602	        SWPMI->OR |= 0x1;
+000603	        RCC_HB1PeriphClockCmd(RCC_HB1Periph_SWPMI,DISABLE);
+000604	    }
+000605	    chip =  *(uint32_t *)0x1FFFF704 & (~0x000000F0);
+000606
+000607	    switch(chip)
+000608	    {
+000609	        case 0x4171050D:     //CH32H417MEU
+000610	        {
+000611	            GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1|GPIO_Pin_2|GPIO_Pin_3\
+000612	                                          |GPIO_Pin_6|GPIO_Pin_7|GPIO_Pin_8;
+000613	            GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
+000614	            GPIO_Init(GPIOA, &GPIO_InitStructure);
+000615	            GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2|GPIO_Pin_5|GPIO_Pin_6\
+000616	                                          |GPIO_Pin_7|GPIO_Pin_15;
+000617	            GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
+000618	            GPIO_Init(GPIOB, &GPIO_InitStructure);
+000619	            GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4|GPIO_Pin_5|GPIO_Pin_13\
+000620	                                          |GPIO_Pin_14|GPIO_Pin_15;
+000621	            GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
+000622	            GPIO_Init(GPIOC, &GPIO_InitStructure);
+000623	            GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8|GPIO_Pin_9;
+000624	            GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
+000625	            GPIO_Init(GPIOD, &GPIO_InitStructure);

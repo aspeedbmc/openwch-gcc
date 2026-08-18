@@ -1,0 +1,94 @@
+From 8b704197c940ba72df884f700078cd9414de28bc Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 4 <phase4@openwch.local>
+Date: Thu, 13 Aug 2026 06:30:46 +0900
+Subject: [PATCH 1/7] RISC-V: accept WCH XW 1.0 arch attributes
+
+The official WCH 12.2 assembler accepts unversioned XW in both concatenated and underscore spellings and canonicalizes it to xw1p0, while preserving explicit versions. Register XW 1.0 in the normal vendor-extension default table.
+
+WCH 12.2 behavior evidence: tmp/phase4-evidence/s1-official/bare-xw.tsv and tmp/phase4-evidence/s1-official/isa-spec.tsv.
+---
+ bfd/elfxx-riscv.c                              | 11 +++++++++--
+ gas/testsuite/gas/riscv/attribute-xw-version.d |  6 ++++++
+ gas/testsuite/gas/riscv/attribute-xw-version.s |  1 +
+ gas/testsuite/gas/riscv/attribute-xw.d         |  6 ++++++
+ gas/testsuite/gas/riscv/attribute-xw.s         |  1 +
+ 5 files changed, 23 insertions(+), 2 deletions(-)
+ create mode 100644 gas/testsuite/gas/riscv/attribute-xw-version.d
+ create mode 100644 gas/testsuite/gas/riscv/attribute-xw-version.s
+ create mode 100644 gas/testsuite/gas/riscv/attribute-xw.d
+ create mode 100644 gas/testsuite/gas/riscv/attribute-xw.s
+
+diff --git a/bfd/elfxx-riscv.c b/bfd/elfxx-riscv.c
+index 9f52bb54..ba470cdf 100644
+--- a/bfd/elfxx-riscv.c
++++ b/bfd/elfxx-riscv.c
+@@ -1241,6 +1241,13 @@ static struct riscv_supported_ext riscv_supported_std_zxm_ext[] =
+   {NULL, 0, 0, 0, 0}
+ };
+ 
++/* Vendor extensions with observed default versions.  */
++static struct riscv_supported_ext riscv_supported_std_x_ext[] =
++{
++  {"xw", ISA_SPEC_CLASS_DRAFT, 1, 0, 0},
++  {NULL, 0, 0, 0, 0}
++};
++
+ const struct riscv_supported_ext *riscv_all_supported_ext[] =
+ {
+   riscv_supported_std_ext,
+@@ -1248,6 +1255,7 @@ const struct riscv_supported_ext *riscv_all_supported_ext[] =
+   riscv_supported_std_s_ext,
+   riscv_supported_std_h_ext,
+   riscv_supported_std_zxm_ext,
++  riscv_supported_std_x_ext,
+   NULL
+ };
+ 
+@@ -1513,8 +1521,7 @@ riscv_get_default_ext_version (enum riscv_spec_class *default_isa_spec,
+     case RV_ISA_CLASS_Z: table = riscv_supported_std_z_ext; break;
+     case RV_ISA_CLASS_S: table = riscv_supported_std_s_ext; break;
+     case RV_ISA_CLASS_H: table = riscv_supported_std_h_ext; break;
+-    case RV_ISA_CLASS_X:
+-      break;
++    case RV_ISA_CLASS_X: table = riscv_supported_std_x_ext; break;
+     default:
+       table = riscv_supported_std_ext;
+     }
+diff --git a/gas/testsuite/gas/riscv/attribute-xw-version.d b/gas/testsuite/gas/riscv/attribute-xw-version.d
+new file mode 100644
+index 00000000..a74a6801
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/attribute-xw-version.d
+@@ -0,0 +1,6 @@
++#as: -misa-spec=2.2
++#readelf: -A
++#source: attribute-xw-version.s
++Attribute Section: riscv
++File Attributes
++  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_c2p0_zmmul1p0_xw9p9"
+diff --git a/gas/testsuite/gas/riscv/attribute-xw-version.s b/gas/testsuite/gas/riscv/attribute-xw-version.s
+new file mode 100644
+index 00000000..bb6a753c
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/attribute-xw-version.s
+@@ -0,0 +1 @@
++	.attribute arch,"rv32imacxw9p9"
+diff --git a/gas/testsuite/gas/riscv/attribute-xw.d b/gas/testsuite/gas/riscv/attribute-xw.d
+new file mode 100644
+index 00000000..33c01ca9
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/attribute-xw.d
+@@ -0,0 +1,6 @@
++#as: -misa-spec=2.2
++#readelf: -A
++#source: attribute-xw.s
++Attribute Section: riscv
++File Attributes
++  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_c2p0_zmmul1p0_xw1p0"
+diff --git a/gas/testsuite/gas/riscv/attribute-xw.s b/gas/testsuite/gas/riscv/attribute-xw.s
+new file mode 100644
+index 00000000..3d03ef97
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/attribute-xw.s
+@@ -0,0 +1 @@
++	.attribute arch,"rv32imac_xw"

@@ -1,0 +1,850 @@
+
+/Users/apple/Projects/gccriscv-wch/tmp/wch-evt/validation/round2/byte-identical-r12b-run/wch/QingkeV5F_CH32H417_EVT_EXAM_CAN_TestMode_V3F--258624070cce/obj/0007_ch32h417_can.o:     file format elf32-littleriscv
+
+
+Disassembly of section .text.CAN_DeInit:
+
+Disassembly of section .text.CAN_Init:
+
+00000000 <CAN_Init>:
+   0:	00000317          	auipc	t1,0x0
+			0: R_RISCV_CALL_PLT	__riscv_save_1
+			0: R_RISCV_RELAX	*ABS*
+   4:	000302e7          	jalr	t0,t1 # 0 <CAN_Init>
+
+00000008 <.LM22>:
+   8:	1141                	addi	sp,sp,-16
+
+0000000a <.LM26>:
+   a:	c62e                	sw	a1,12(sp)
+   c:	842a                	mv	s0,a0
+
+0000000e <.LM27>:
+   e:	00000097          	auipc	ra,0x0
+			e: R_RISCV_CALL_PLT	DBGMCU_GetCHIPID
+			e: R_RISCV_RELAX	*ABS*
+  12:	000080e7          	jalr	ra # e <.LM27>
+
+00000016 <.LM28>:
+  16:	0f057513          	andi	a0,a0,240
+
+0000001a <.LM30>:
+  1a:	45b2                	lw	a1,12(sp)
+  1c:	1e051a63          	bnez	a0,210 <.L8>
+			1c: R_RISCV_BRANCH	.L8
+
+00000020 <.LM31>:
+  20:	400067b7          	lui	a5,0x40006
+  24:	40078793          	addi	a5,a5,1024 # 40006400 <.LASF16+0x40005be6>
+  28:	04f41663          	bne	s0,a5,74 <.L9>
+			28: R_RISCV_BRANCH	.L9
+
+0000002c <.LM33>:
+  2c:	400217b7          	lui	a5,0x40021
+  30:	4bd8                	lw	a4,20(a5)
+
+00000032 <.LM35>:
+  32:	29971713          	bseti	a4,a4,0x19
+  36:	cbd8                	sw	a4,20(a5)
+
+00000038 <.LM36>:
+  38:	4bd8                	lw	a4,20(a5)
+  3a:	49971713          	bclri	a4,a4,0x19
+
+0000003e <.L75>:
+  3e:	cbd8                	sw	a4,20(a5)
+
+00000040 <.L10>:
+  40:	401c                	lw	a5,0(s0)
+
+00000042 <.LM41>:
+  42:	76c1                	lui	a3,0xffff0
+
+00000044 <.LM42>:
+  44:	4701                	li	a4,0
+
+00000046 <.LM43>:
+  46:	9bf5                	andi	a5,a5,-3
+  48:	c01c                	sw	a5,0(s0)
+
+0000004a <.LM44>:
+  4a:	401c                	lw	a5,0(s0)
+
+0000004c <.LM46>:
+  4c:	0685                	addi	a3,a3,1 # ffff0001 <.LASF16+0xfffef7e7>
+
+0000004e <.LM47>:
+  4e:	0017e793          	ori	a5,a5,1
+  52:	c01c                	sw	a5,0(s0)
+
+00000054 <.L12>:
+  54:	405c                	lw	a5,4(s0)
+
+00000056 <.LM51>:
+  56:	00d70633          	add	a2,a4,a3
+  5a:	c601                	beqz	a2,62 <.L46>
+			5a: R_RISCV_RVC_BRANCH	.L46
+  5c:	4807d793          	bexti	a5,a5,0x0
+  60:	cbb1                	beqz	a5,b4 <.L13>
+			60: R_RISCV_RVC_BRANCH	.L13
+
+00000062 <.L46>:
+  62:	4058                	lw	a4,4(s0)
+
+00000064 <.LM54>:
+  64:	8b05                	andi	a4,a4,1
+
+00000066 <.LM55>:
+  66:	eb29                	bnez	a4,b8 <.L15>
+			66: R_RISCV_RVC_BRANCH	.L15
+
+00000068 <.L21>:
+  68:	4501                	li	a0,0
+
+0000006a <.L16>:
+  6a:	0141                	addi	sp,sp,16
+
+0000006c <.LM58>:
+  6c:	00000317          	auipc	t1,0x0
+			6c: R_RISCV_CALL_PLT	__riscv_restore_1
+			6c: R_RISCV_RELAX	*ABS*
+  70:	00030067          	jr	t1 # 6c <.LM58>
+
+00000074 <.L9>:
+  74:	400077b7          	lui	a5,0x40007
+  78:	80078793          	addi	a5,a5,-2048 # 40006800 <.LASF16+0x40005fe6>
+  7c:	00f41c63          	bne	s0,a5,94 <.L11>
+			7c: R_RISCV_BRANCH	.L11
+
+00000080 <.LM61>:
+  80:	400217b7          	lui	a5,0x40021
+  84:	4bd8                	lw	a4,20(a5)
+
+00000086 <.LM63>:
+  86:	29a71713          	bseti	a4,a4,0x1a
+  8a:	cbd8                	sw	a4,20(a5)
+
+0000008c <.LM64>:
+  8c:	4bd8                	lw	a4,20(a5)
+  8e:	49a71713          	bclri	a4,a4,0x1a
+  92:	b775                	j	3e <.L75>
+			92: R_RISCV_RVC_JUMP	.L75
+
+00000094 <.L11>:
+  94:	400087b7          	lui	a5,0x40008
+  98:	80078793          	addi	a5,a5,-2048 # 40007800 <.LASF16+0x40006fe6>
+  9c:	faf412e3          	bne	s0,a5,40 <.L10>
+			9c: R_RISCV_BRANCH	.L10
+
+000000a0 <.LM68>:
+  a0:	400217b7          	lui	a5,0x40021
+  a4:	4bd8                	lw	a4,20(a5)
+
+000000a6 <.LM70>:
+  a6:	29871713          	bseti	a4,a4,0x18
+  aa:	cbd8                	sw	a4,20(a5)
+
+000000ac <.LM71>:
+  ac:	4bd8                	lw	a4,20(a5)
+  ae:	49871713          	bclri	a4,a4,0x18
+  b2:	b771                	j	3e <.L75>
+			b2: R_RISCV_RVC_JUMP	.L75
+
+000000b4 <.L13>:
+  b4:	0705                	addi	a4,a4,1
+
+000000b6 <.LM75>:
+  b6:	bf79                	j	54 <.L12>
+			b6: R_RISCV_RVC_JUMP	.L12
+
+000000b8 <.L15>:
+  b8:	400216b7          	lui	a3,0x40021
+  bc:	42d0                	lw	a2,4(a3)
+
+000000be <.LM78>:
+  be:	000007b7          	lui	a5,0x0
+			be: R_RISCV_HI20	SystemCoreClock
+			be: R_RISCV_RELAX	*ABS*
+  c2:	0007a783          	lw	a5,0(a5) # 0 <CAN_Init>
+			c2: R_RISCV_LO12_I	SystemCoreClock
+			c2: R_RISCV_RELAX	*ABS*
+
+000000c6 <.LM79>:
+  c6:	40067613          	andi	a2,a2,1024
+
+000000ca <.LM80>:
+  ca:	0691                	addi	a3,a3,4 # 40021004 <.LASF16+0x400207ea>
+
+000000cc <.LM81>:
+  cc:	c619                	beqz	a2,da <.L17>
+			cc: R_RISCV_RVC_BRANCH	.L17
+
+000000ce <.LM82>:
+  ce:	4294                	lw	a3,0(a3)
+
+000000d0 <.LM83>:
+  d0:	4709                	li	a4,2
+
+000000d2 <.LM84>:
+  d2:	82a1                	srli	a3,a3,0x8
+
+000000d4 <.LM85>:
+  d4:	8a8d                	andi	a3,a3,3
+
+000000d6 <.LM86>:
+  d6:	00d71733          	sll	a4,a4,a3
+
+000000da <.L17>:
+  da:	02e7d7b3          	divu	a5,a5,a4
+
+000000de <.LM88>:
+  de:	003d1737          	lui	a4,0x3d1
+  e2:	90070713          	addi	a4,a4,-1792 # 3d0900 <.LASF16+0x3d00e6>
+  e6:	02e7d7b3          	divu	a5,a5,a4
+
+000000ea <.LM89>:
+  ea:	c1100737          	lui	a4,0xc1100
+
+000000ee <.LM90>:
+  ee:	17fd                	addi	a5,a5,-1
+
+000000f0 <.LM91>:
+  f0:	8fd9                	or	a5,a5,a4
+
+000000f2 <.LM92>:
+  f2:	cc5c                	sw	a5,28(s0)
+
+000000f4 <.LM93>:
+  f4:	401c                	lw	a5,0(s0)
+
+000000f6 <.LM95>:
+  f6:	7741                	lui	a4,0xffff0
+  f8:	0705                	addi	a4,a4,1 # ffff0001 <.LASF16+0xfffef7e7>
+
+000000fa <.LM96>:
+  fa:	9bf9                	andi	a5,a5,-2
+  fc:	c01c                	sw	a5,0(s0)
+
+000000fe <.L18>:
+  fe:	405c                	lw	a5,4(s0)
+
+00000100 <.LM101>:
+ 100:	00e506b3          	add	a3,a0,a4
+ 104:	c681                	beqz	a3,10c <.L47>
+			104: R_RISCV_RVC_BRANCH	.L47
+ 106:	8b85                	andi	a5,a5,1
+ 108:	1c079a63          	bnez	a5,2dc <.L19>
+			108: R_RISCV_BRANCH	.L19
+
+0000010c <.L47>:
+ 10c:	405c                	lw	a5,4(s0)
+
+0000010e <.LM104>:
+ 10e:	8b85                	andi	a5,a5,1
+
+00000110 <.LM105>:
+ 110:	ffa1                	bnez	a5,68 <.L21>
+			110: R_RISCV_RVC_BRANCH	.L21
+
+00000112 <.LM106>:
+ 112:	400067b7          	lui	a5,0x40006
+ 116:	60c78793          	addi	a5,a5,1548 # 4000660c <.LASF16+0x40005df2>
+ 11a:	4398                	lw	a4,0(a5)
+
+0000011c <.LM108>:
+ 11c:	100006b7          	lui	a3,0x10000
+ 120:	16fd                	addi	a3,a3,-1 # fffffff <.LASF16+0xffff7e5>
+ 122:	8f55                	or	a4,a4,a3
+ 124:	c398                	sw	a4,0(a5)
+
+00000126 <.LM109>:
+ 126:	400067b7          	lui	a5,0x40006
+ 12a:	62078793          	addi	a5,a5,1568 # 40006620 <.LASF16+0x40005e06>
+ 12e:	4398                	lw	a4,0(a5)
+
+00000130 <.LM111>:
+ 130:	3ff76713          	ori	a4,a4,1023
+ 134:	c398                	sw	a4,0(a5)
+
+00000136 <.LM112>:
+ 136:	40006737          	lui	a4,0x40006
+ 13a:	64072023          	sw	zero,1600(a4) # 40006640 <.LASF16+0x40005e26>
+
+0000013e <.LM114>:
+ 13e:	64072223          	sw	zero,1604(a4)
+
+00000142 <.LM116>:
+ 142:	64072423          	sw	zero,1608(a4)
+
+00000146 <.LM118>:
+ 146:	64072623          	sw	zero,1612(a4)
+
+0000014a <.LM120>:
+ 14a:	64072823          	sw	zero,1616(a4)
+
+0000014e <.LM122>:
+ 14e:	64072a23          	sw	zero,1620(a4)
+
+00000152 <.LM124>:
+ 152:	61c70713          	addi	a4,a4,1564
+ 156:	4310                	lw	a2,0(a4)
+
+00000158 <.LM126>:
+ 158:	8ed1                	or	a3,a3,a2
+ 15a:	c314                	sw	a3,0(a4)
+
+0000015c <.LM127>:
+ 15c:	4398                	lw	a4,0(a5)
+
+0000015e <.LM129>:
+ 15e:	3ff76713          	ori	a4,a4,1023
+ 162:	c398                	sw	a4,0(a5)
+
+00000164 <.LM130>:
+ 164:	400067b7          	lui	a5,0x40006
+ 168:	2a010737          	lui	a4,0x2a010
+ 16c:	60078793          	addi	a5,a5,1536 # 40006600 <.LASF16+0x40005de6>
+ 170:	10170713          	addi	a4,a4,257 # 2a010101 <.LASF16+0x2a00f8e7>
+ 174:	c398                	sw	a4,0(a5)
+
+00000176 <.LM132>:
+ 176:	4398                	lw	a4,0(a5)
+ 178:	9b79                	andi	a4,a4,-2
+ 17a:	c398                	sw	a4,0(a5)
+
+0000017c <.LM134>:
+ 17c:	400067b7          	lui	a5,0x40006
+ 180:	40078793          	addi	a5,a5,1024 # 40006400 <.LASF16+0x40005be6>
+ 184:	14f41e63          	bne	s0,a5,2e0 <.L22>
+			184: R_RISCV_BRANCH	.L22
+
+00000188 <.LM136>:
+ 188:	400067b7          	lui	a5,0x40006
+ 18c:	58078793          	addi	a5,a5,1408 # 40006580 <.LASF16+0x40005d66>
+ 190:	4398                	lw	a4,0(a5)
+
+00000192 <.LM138>:
+ 192:	00376713          	ori	a4,a4,3
+ 196:	c398                	sw	a4,0(a5)
+
+00000198 <.LM139>:
+ 198:	400067b7          	lui	a5,0x40006
+ 19c:	40c78793          	addi	a5,a5,1036 # 4000640c <.LASF16+0x40005bf2>
+
+000001a0 <.L23>:
+ 1a0:	4398                	lw	a4,0(a5)
+
+000001a2 <.LM143>:
+ 1a2:	8b0d                	andi	a4,a4,3
+
+000001a4 <.LM144>:
+ 1a4:	df75                	beqz	a4,1a0 <.L23>
+			1a4: R_RISCV_RVC_BRANCH	.L23
+
+000001a6 <.LM145>:
+ 1a6:	03800713          	li	a4,56
+ 1aa:	c398                	sw	a4,0(a5)
+
+000001ac <.LM147>:
+ 1ac:	400217b7          	lui	a5,0x40021
+ 1b0:	4bd8                	lw	a4,20(a5)
+
+000001b2 <.LM150>:
+ 1b2:	29971713          	bseti	a4,a4,0x19
+ 1b6:	cbd8                	sw	a4,20(a5)
+
+000001b8 <.LM151>:
+ 1b8:	4bd8                	lw	a4,20(a5)
+ 1ba:	49971713          	bclri	a4,a4,0x19
+
+000001be <.L76>:
+ 1be:	cbd8                	sw	a4,20(a5)
+
+000001c0 <.L24>:
+ 1c0:	400067b7          	lui	a5,0x40006
+ 1c4:	60078793          	addi	a5,a5,1536 # 40006600 <.LASF16+0x40005de6>
+ 1c8:	4398                	lw	a4,0(a5)
+
+000001ca <.LM156>:
+ 1ca:	100006b7          	lui	a3,0x10000
+ 1ce:	16fd                	addi	a3,a3,-1 # fffffff <.LASF16+0xffff7e5>
+
+000001d0 <.LM157>:
+ 1d0:	00176713          	ori	a4,a4,1
+ 1d4:	c398                	sw	a4,0(a5)
+
+000001d6 <.LM158>:
+ 1d6:	40006737          	lui	a4,0x40006
+ 1da:	60c70713          	addi	a4,a4,1548 # 4000660c <.LASF16+0x40005df2>
+ 1de:	4310                	lw	a2,0(a4)
+
+000001e0 <.LM160>:
+ 1e0:	8e55                	or	a2,a2,a3
+ 1e2:	c310                	sw	a2,0(a4)
+
+000001e4 <.LM161>:
+ 1e4:	40006737          	lui	a4,0x40006
+ 1e8:	61c70713          	addi	a4,a4,1564 # 4000661c <.LASF16+0x40005e02>
+ 1ec:	4310                	lw	a2,0(a4)
+
+000001ee <.LM163>:
+ 1ee:	8ed1                	or	a3,a3,a2
+ 1f0:	c314                	sw	a3,0(a4)
+
+000001f2 <.LM164>:
+ 1f2:	4398                	lw	a4,0(a5)
+ 1f4:	9b79                	andi	a4,a4,-2
+ 1f6:	c398                	sw	a4,0(a5)
+
+000001f8 <.LM166>:
+ 1f8:	4398                	lw	a4,0(a5)
+
+000001fa <.LM168>:
+ 1fa:	00176713          	ori	a4,a4,1
+ 1fe:	c398                	sw	a4,0(a5)
+
+00000200 <.LM169>:
+ 200:	2a010737          	lui	a4,0x2a010
+ 204:	10170713          	addi	a4,a4,257 # 2a010101 <.LASF16+0x2a00f8e7>
+ 208:	c398                	sw	a4,0(a5)
+
+0000020a <.LM171>:
+ 20a:	4398                	lw	a4,0(a5)
+ 20c:	9b79                	andi	a4,a4,-2
+ 20e:	c398                	sw	a4,0(a5)
+
+00000210 <.L8>:
+ 210:	401c                	lw	a5,0(s0)
+
+00000212 <.LM176>:
+ 212:	76c1                	lui	a3,0xffff0
+
+00000214 <.LM177>:
+ 214:	4701                	li	a4,0
+
+00000216 <.LM178>:
+ 216:	9bf5                	andi	a5,a5,-3
+ 218:	c01c                	sw	a5,0(s0)
+
+0000021a <.LM179>:
+ 21a:	401c                	lw	a5,0(s0)
+
+0000021c <.LM181>:
+ 21c:	0685                	addi	a3,a3,1 # ffff0001 <.LASF16+0xfffef7e7>
+
+0000021e <.LM182>:
+ 21e:	0017e793          	ori	a5,a5,1
+ 222:	c01c                	sw	a5,0(s0)
+
+00000224 <.L28>:
+ 224:	405c                	lw	a5,4(s0)
+
+00000226 <.LM186>:
+ 226:	00d70633          	add	a2,a4,a3
+ 22a:	c609                	beqz	a2,234 <.L48>
+			22a: R_RISCV_RVC_BRANCH	.L48
+ 22c:	4807d793          	bexti	a5,a5,0x0
+ 230:	12078c63          	beqz	a5,368 <.L29>
+			230: R_RISCV_BRANCH	.L29
+
+00000234 <.L48>:
+ 234:	405c                	lw	a5,4(s0)
+
+00000236 <.LM189>:
+ 236:	8b85                	andi	a5,a5,1
+
+00000238 <.LM190>:
+ 238:	e20788e3          	beqz	a5,68 <.L21>
+			238: R_RISCV_BRANCH	.L21
+
+0000023c <.LM191>:
+ 23c:	4598                	lw	a4,8(a1)
+
+0000023e <.LM193>:
+ 23e:	4785                	li	a5,1
+ 240:	12f71663          	bne	a4,a5,36c <.L31>
+			240: R_RISCV_BRANCH	.L31
+
+00000244 <.LM194>:
+ 244:	401c                	lw	a5,0(s0)
+
+00000246 <.LM196>:
+ 246:	0807e793          	ori	a5,a5,128
+
+0000024a <.L77>:
+ 24a:	45d8                	lw	a4,12(a1)
+
+0000024c <.LM198>:
+ 24c:	c01c                	sw	a5,0(s0)
+
+0000024e <.LM199>:
+ 24e:	4785                	li	a5,1
+ 250:	12f71263          	bne	a4,a5,374 <.L33>
+			250: R_RISCV_BRANCH	.L33
+
+00000254 <.LM201>:
+ 254:	401c                	lw	a5,0(s0)
+
+00000256 <.LM203>:
+ 256:	0407e793          	ori	a5,a5,64
+
+0000025a <.L78>:
+ 25a:	4998                	lw	a4,16(a1)
+
+0000025c <.LM205>:
+ 25c:	c01c                	sw	a5,0(s0)
+
+0000025e <.LM206>:
+ 25e:	4785                	li	a5,1
+ 260:	10f71e63          	bne	a4,a5,37c <.L35>
+			260: R_RISCV_BRANCH	.L35
+
+00000264 <.LM208>:
+ 264:	401c                	lw	a5,0(s0)
+
+00000266 <.LM210>:
+ 266:	0207e793          	ori	a5,a5,32
+
+0000026a <.L79>:
+ 26a:	49d8                	lw	a4,20(a1)
+
+0000026c <.LM212>:
+ 26c:	c01c                	sw	a5,0(s0)
+
+0000026e <.LM213>:
+ 26e:	4785                	li	a5,1
+ 270:	10f71a63          	bne	a4,a5,384 <.L37>
+			270: R_RISCV_BRANCH	.L37
+
+00000274 <.LM215>:
+ 274:	401c                	lw	a5,0(s0)
+
+00000276 <.LM217>:
+ 276:	0107e793          	ori	a5,a5,16
+
+0000027a <.L80>:
+ 27a:	4d98                	lw	a4,24(a1)
+
+0000027c <.LM219>:
+ 27c:	c01c                	sw	a5,0(s0)
+
+0000027e <.LM220>:
+ 27e:	4785                	li	a5,1
+ 280:	10f71563          	bne	a4,a5,38a <.L39>
+			280: R_RISCV_BRANCH	.L39
+
+00000284 <.LM222>:
+ 284:	401c                	lw	a5,0(s0)
+
+00000286 <.LM224>:
+ 286:	0087e793          	ori	a5,a5,8
+
+0000028a <.L81>:
+ 28a:	4dd8                	lw	a4,28(a1)
+
+0000028c <.LM226>:
+ 28c:	c01c                	sw	a5,0(s0)
+
+0000028e <.LM227>:
+ 28e:	4785                	li	a5,1
+ 290:	10f71063          	bne	a4,a5,390 <.L41>
+			290: R_RISCV_BRANCH	.L41
+
+00000294 <.LM229>:
+ 294:	401c                	lw	a5,0(s0)
+
+00000296 <.LM231>:
+ 296:	0047e793          	ori	a5,a5,4
+
+0000029a <.L82>:
+ 29a:	c01c                	sw	a5,0(s0)
+
+0000029c <.LM233>:
+ 29c:	21bc                	.insn	2, 0x21bc
+
+0000029e <.LM235>:
+ 29e:	31b8                	.insn	2, 0x31b8
+
+000002a0 <.LM236>:
+ 2a0:	76c1                	lui	a3,0xffff0
+
+000002a2 <.LM237>:
+ 2a2:	07fa                	slli	a5,a5,0x1e
+
+000002a4 <.LM238>:
+ 2a4:	0762                	slli	a4,a4,0x18
+
+000002a6 <.LM239>:
+ 2a6:	8fd9                	or	a5,a5,a4
+
+000002a8 <.LM240>:
+ 2a8:	21d8                	.insn	2, 0x21d8
+
+000002aa <.LM241>:
+ 2aa:	0685                	addi	a3,a3,1 # ffff0001 <.LASF16+0xfffef7e7>
+
+000002ac <.LM242>:
+ 2ac:	0742                	slli	a4,a4,0x10
+
+000002ae <.LM243>:
+ 2ae:	8fd9                	or	a5,a5,a4
+
+000002b0 <.LM244>:
+ 2b0:	31d8                	.insn	2, 0x31d8
+
+000002b2 <.LM245>:
+ 2b2:	0752                	slli	a4,a4,0x14
+
+000002b4 <.LM246>:
+ 2b4:	8fd9                	or	a5,a5,a4
+
+000002b6 <.LM247>:
+ 2b6:	219a                	.insn	2, 0x219a
+
+000002b8 <.LM248>:
+ 2b8:	177d                	addi	a4,a4,-1
+
+000002ba <.LM249>:
+ 2ba:	8fd9                	or	a5,a5,a4
+
+000002bc <.LM250>:
+ 2bc:	cc5c                	sw	a5,28(s0)
+
+000002be <.LM251>:
+ 2be:	401c                	lw	a5,0(s0)
+
+000002c0 <.LM253>:
+ 2c0:	4701                	li	a4,0
+
+000002c2 <.LM254>:
+ 2c2:	9bf9                	andi	a5,a5,-2
+ 2c4:	c01c                	sw	a5,0(s0)
+
+000002c6 <.L43>:
+ 2c6:	405c                	lw	a5,4(s0)
+
+000002c8 <.LM259>:
+ 2c8:	00d70633          	add	a2,a4,a3
+ 2cc:	c219                	beqz	a2,2d2 <.L49>
+			2cc: R_RISCV_RVC_BRANCH	.L49
+ 2ce:	8b85                	andi	a5,a5,1
+ 2d0:	e3f9                	bnez	a5,396 <.L44>
+			2d0: R_RISCV_RVC_BRANCH	.L44
+
+000002d2 <.L49>:
+ 2d2:	4048                	lw	a0,4(s0)
+
+000002d4 <.LM262>:
+ 2d4:	fff54513          	not	a0,a0
+ 2d8:	8905                	andi	a0,a0,1
+ 2da:	bb41                	j	6a <.L16>
+			2da: R_RISCV_RVC_JUMP	.L16
+
+000002dc <.L19>:
+ 2dc:	0505                	addi	a0,a0,1
+
+000002de <.LM265>:
+ 2de:	b505                	j	fe <.L18>
+			2de: R_RISCV_RVC_JUMP	.L18
+
+000002e0 <.L22>:
+ 2e0:	400077b7          	lui	a5,0x40007
+ 2e4:	80078793          	addi	a5,a5,-2048 # 40006800 <.LASF16+0x40005fe6>
+ 2e8:	02f41e63          	bne	s0,a5,324 <.L25>
+			2e8: R_RISCV_BRANCH	.L25
+
+000002ec <.LM268>:
+ 2ec:	400077b7          	lui	a5,0x40007
+ 2f0:	98078793          	addi	a5,a5,-1664 # 40006980 <.LASF16+0x40006166>
+ 2f4:	4398                	lw	a4,0(a5)
+
+000002f6 <.LM270>:
+ 2f6:	00376713          	ori	a4,a4,3
+ 2fa:	c398                	sw	a4,0(a5)
+
+000002fc <.LM271>:
+ 2fc:	400077b7          	lui	a5,0x40007
+ 300:	80c78793          	addi	a5,a5,-2036 # 4000680c <.LASF16+0x40005ff2>
+
+00000304 <.L26>:
+ 304:	4398                	lw	a4,0(a5)
+
+00000306 <.LM275>:
+ 306:	8b0d                	andi	a4,a4,3
+
+00000308 <.LM276>:
+ 308:	df75                	beqz	a4,304 <.L26>
+			308: R_RISCV_RVC_BRANCH	.L26
+
+0000030a <.LM277>:
+ 30a:	03800713          	li	a4,56
+ 30e:	c398                	sw	a4,0(a5)
+
+00000310 <.LM279>:
+ 310:	400217b7          	lui	a5,0x40021
+ 314:	4bd8                	lw	a4,20(a5)
+
+00000316 <.LM283>:
+ 316:	29a71713          	bseti	a4,a4,0x1a
+ 31a:	cbd8                	sw	a4,20(a5)
+
+0000031c <.LM284>:
+ 31c:	4bd8                	lw	a4,20(a5)
+ 31e:	49a71713          	bclri	a4,a4,0x1a
+ 322:	bd71                	j	1be <.L76>
+			322: R_RISCV_RVC_JUMP	.L76
+
+00000324 <.L25>:
+ 324:	400087b7          	lui	a5,0x40008
+ 328:	80078793          	addi	a5,a5,-2048 # 40007800 <.LASF16+0x40006fe6>
+ 32c:	e8f41ae3          	bne	s0,a5,1c0 <.L24>
+			32c: R_RISCV_BRANCH	.L24
+
+00000330 <.LM288>:
+ 330:	400087b7          	lui	a5,0x40008
+ 334:	98078793          	addi	a5,a5,-1664 # 40007980 <.LASF16+0x40007166>
+ 338:	4398                	lw	a4,0(a5)
+
+0000033a <.LM290>:
+ 33a:	00376713          	ori	a4,a4,3
+ 33e:	c398                	sw	a4,0(a5)
+
+00000340 <.LM291>:
+ 340:	400087b7          	lui	a5,0x40008
+ 344:	80c78793          	addi	a5,a5,-2036 # 4000780c <.LASF16+0x40006ff2>
+
+00000348 <.L27>:
+ 348:	4398                	lw	a4,0(a5)
+
+0000034a <.LM295>:
+ 34a:	8b0d                	andi	a4,a4,3
+
+0000034c <.LM296>:
+ 34c:	df75                	beqz	a4,348 <.L27>
+			34c: R_RISCV_RVC_BRANCH	.L27
+
+0000034e <.LM297>:
+ 34e:	03800713          	li	a4,56
+ 352:	c398                	sw	a4,0(a5)
+
+00000354 <.LM299>:
+ 354:	400217b7          	lui	a5,0x40021
+ 358:	4bd8                	lw	a4,20(a5)
+
+0000035a <.LM303>:
+ 35a:	29871713          	bseti	a4,a4,0x18
+ 35e:	cbd8                	sw	a4,20(a5)
+
+00000360 <.LM304>:
+ 360:	4bd8                	lw	a4,20(a5)
+ 362:	49871713          	bclri	a4,a4,0x18
+ 366:	bda1                	j	1be <.L76>
+			366: R_RISCV_RVC_JUMP	.L76
+
+00000368 <.L29>:
+ 368:	0705                	addi	a4,a4,1
+
+0000036a <.LM308>:
+ 36a:	bd6d                	j	224 <.L28>
+			36a: R_RISCV_RVC_JUMP	.L28
+
+0000036c <.L31>:
+ 36c:	401c                	lw	a5,0(s0)
+
+0000036e <.LM311>:
+ 36e:	f7f7f793          	andi	a5,a5,-129
+ 372:	bde1                	j	24a <.L77>
+			372: R_RISCV_RVC_JUMP	.L77
+
+00000374 <.L33>:
+ 374:	401c                	lw	a5,0(s0)
+
+00000376 <.LM314>:
+ 376:	fbf7f793          	andi	a5,a5,-65
+ 37a:	b5c5                	j	25a <.L78>
+			37a: R_RISCV_RVC_JUMP	.L78
+
+0000037c <.L35>:
+ 37c:	401c                	lw	a5,0(s0)
+
+0000037e <.LM317>:
+ 37e:	fdf7f793          	andi	a5,a5,-33
+ 382:	b5e5                	j	26a <.L79>
+			382: R_RISCV_RVC_JUMP	.L79
+
+00000384 <.L37>:
+ 384:	401c                	lw	a5,0(s0)
+
+00000386 <.LM320>:
+ 386:	9bbd                	andi	a5,a5,-17
+ 388:	bdcd                	j	27a <.L80>
+			388: R_RISCV_RVC_JUMP	.L80
+
+0000038a <.L39>:
+ 38a:	401c                	lw	a5,0(s0)
+
+0000038c <.LM323>:
+ 38c:	9bdd                	andi	a5,a5,-9
+ 38e:	bdf5                	j	28a <.L81>
+			38e: R_RISCV_RVC_JUMP	.L81
+
+00000390 <.L41>:
+ 390:	401c                	lw	a5,0(s0)
+
+00000392 <.LM326>:
+ 392:	9bed                	andi	a5,a5,-5
+ 394:	b719                	j	29a <.L82>
+			394: R_RISCV_RVC_JUMP	.L82
+
+00000396 <.L44>:
+ 396:	0705                	addi	a4,a4,1
+
+00000398 <.LM329>:
+ 398:	b73d                	j	2c6 <.L43>
+			398: R_RISCV_RVC_JUMP	.L43
+
+Disassembly of section .text.CAN_FilterInit:
+
+Disassembly of section .text.CAN_StructInit:
+
+Disassembly of section .text.CAN_SlaveStartBank:
+
+Disassembly of section .text.CAN_DBGFreeze:
+
+Disassembly of section .text.CAN_TTComModeCmd:
+
+Disassembly of section .text.CAN_Transmit:
+
+Disassembly of section .text.CAN_TransmitStatus:
+
+Disassembly of section .text.CAN_CancelTransmit:
+
+Disassembly of section .text.CAN_Receive:
+
+Disassembly of section .text.CAN_FIFORelease:
+
+Disassembly of section .text.CAN_MessagePending:
+
+Disassembly of section .text.CAN_OperatingModeRequest:
+
+Disassembly of section .text.CAN_Sleep:
+
+Disassembly of section .text.CAN_WakeUp:
+
+Disassembly of section .text.CAN_GetLastErrorCode:
+
+Disassembly of section .text.CAN_GetReceiveErrorCounter:
+
+Disassembly of section .text.CAN_GetLSBTransmitErrorCounter:
+
+Disassembly of section .text.CAN_ITConfig:
+
+Disassembly of section .text.CAN_GetFlagStatus:
+
+Disassembly of section .text.CAN_ClearFlag:
+
+Disassembly of section .text.CAN_GetITStatus:
+
+Disassembly of section .text.CAN_ClearITPendingBit:
+
+Disassembly of section .text.CAN_BusOff_ErrCntConfig:

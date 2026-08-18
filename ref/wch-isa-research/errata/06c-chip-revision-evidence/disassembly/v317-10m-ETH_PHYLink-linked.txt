@@ -1,0 +1,153 @@
+
+/Users/apple/Projects/gccriscv-wch/tmp/chipid-revision-06c/runs/20260804T100258Z-27480e4af493-00/build-v317-eth-mac-raw/MAC_RAW.elf:     file format elf32-littleriscv
+
+
+Disassembly of section .init:
+
+Disassembly of section .vector:
+
+Disassembly of section .text:
+
+0000086c <ETH_PHYLink>:
+     86c:	96dff2ef          	jal	t0,1d8 <__riscv_save_4>
+     870:	8441d503          	lhu	a0,-1980(gp) # 20000234 <gPHYAddress>
+     874:	4585                	li	a1,1
+     876:	3cd000ef          	jal	1442 <ETH_ReadPHYRegister>
+     87a:	892a                	mv	s2,a0
+     87c:	8441d503          	lhu	a0,-1980(gp) # 20000234 <gPHYAddress>
+     880:	4581                	li	a1,0
+     882:	3c1000ef          	jal	1442 <ETH_ReadPHYRegister>
+     886:	8a2a                	mv	s4,a0
+     888:	8441d503          	lhu	a0,-1980(gp) # 20000234 <gPHYAddress>
+     88c:	4595                	li	a1,5
+     88e:	3b5000ef          	jal	1442 <ETH_ReadPHYRegister>
+     892:	00497793          	andi	a5,s2,4
+     896:	12078463          	beqz	a5,9be <ETH_PHYLink+0x152>
+     89a:	013a1793          	slli	a5,s4,0x13
+     89e:	6485                	lui	s1,0x1
+     8a0:	1007d663          	bgez	a5,9ac <ETH_PHYLink+0x140>
+     8a4:	89aa                	mv	s3,a0
+     8a6:	02097793          	andi	a5,s2,32
+     8aa:	ed41                	bnez	a0,942 <ETH_PHYLink+0xd6>
+     8ac:	cfb1                	beqz	a5,908 <ETH_PHYLink+0x9c>
+     8ae:	400286b7          	lui	a3,0x40028
+     8b2:	429c                	lw	a5,0(a3)
+     8b4:	777d                	lui	a4,0xfffff
+     8b6:	7ff70713          	addi	a4,a4,2047 # fffff7ff <_eusrstack+0xdffef7ff>
+     8ba:	8ff9                	and	a5,a5,a4
+     8bc:	c29c                	sw	a5,0(a3)
+     8be:	854a                	mv	a0,s2
+     8c0:	37b9                	jal	80e <ETH_LinkUpCfg>
+     8c2:	83c1a783          	lw	a5,-1988(gp) # 2000022c <ChipId>
+     8c6:	02000713          	li	a4,32
+     8ca:	0f07f793          	andi	a5,a5,240
+     8ce:	02e79063          	bne	a5,a4,8ee <ETH_PHYLink+0x82>
+     8d2:	8441d503          	lhu	a0,-1980(gp) # 20000234 <gPHYAddress>
+     8d6:	8101c783          	lbu	a5,-2032(gp) # 20000200 <phyNegoStat>
+     8da:	8b89                	andi	a5,a5,2
+     8dc:	cb99                	beqz	a5,8f2 <ETH_PHYLink+0x86>
+     8de:	4611                	li	a2,4
+     8e0:	45f9                	li	a1,30
+     8e2:	3b5000ef          	jal	1496 <ETH_WritePHYRegister>
+     8e6:	8401a703          	lw	a4,-1984(gp) # 20000230 <LocalTime>
+     8ea:	80e1a623          	sw	a4,-2036(gp) # 200001fc <phyNegoLinkTime>
+     8ee:	923ff06f          	j	210 <__riscv_restore_4>
+     8f2:	4601                	li	a2,0
+     8f4:	45f9                	li	a1,30
+     8f6:	3a1000ef          	jal	1496 <ETH_WritePHYRegister>
+     8fa:	8101c783          	lbu	a5,-2032(gp) # 20000200 <phyNegoStat>
+     8fe:	0017e793          	ori	a5,a5,1
+     902:	80f18823          	sb	a5,-2032(gp) # 20000200 <phyNegoStat>
+     906:	b7c5                	j	8e6 <ETH_PHYLink+0x7a>
+     908:	8441d503          	lhu	a0,-1980(gp) # 20000234 <gPHYAddress>
+     90c:	6621                	lui	a2,0x8
+     90e:	4581                	li	a1,0
+     910:	387000ef          	jal	1496 <ETH_WritePHYRegister>
+     914:	82018623          	sb	zero,-2004(gp) # 2000021c <phyStatus>
+     918:	82018523          	sb	zero,-2006(gp) # 2000021a <phySucCnt>
+     91c:	820185a3          	sb	zero,-2005(gp) # 2000021b <phyLinkCnt>
+     920:	8441d503          	lhu	a0,-1980(gp) # 20000234 <gPHYAddress>
+     924:	820184a3          	sb	zero,-2007(gp) # 20000219 <TRDetectStep>
+     928:	80018c23          	sb	zero,-2024(gp) # 20000208 <PhyPolarityDetect>
+     92c:	4621                	li	a2,8
+     92e:	820186a3          	sb	zero,-2003(gp) # 2000021d <phyLinkStatus>
+     932:	45f9                	li	a1,30
+     934:	200007b7          	lui	a5,0x20000
+     938:	1ec788a3          	sb	a2,497(a5) # 200001f1 <phyPN>
+     93c:	35b000ef          	jal	1496 <ETH_WritePHYRegister>
+     940:	b77d                	j	8ee <ETH_PHYLink+0x82>
+     942:	80018823          	sb	zero,-2032(gp) # 20000200 <phyNegoStat>
+     946:	cf8d                	beqz	a5,980 <ETH_PHYLink+0x114>
+     948:	8441d503          	lhu	a0,-1980(gp) # 20000234 <gPHYAddress>
+     94c:	45c1                	li	a1,16
+     94e:	2f5000ef          	jal	1442 <ETH_ReadPHYRegister>
+     952:	8911                	andi	a0,a0,4
+     954:	400287b7          	lui	a5,0x40028
+     958:	c909                	beqz	a0,96a <ETH_PHYLink+0xfe>
+     95a:	4398                	lw	a4,0(a5)
+     95c:	80048493          	addi	s1,s1,-2048 # 800 <__stack_size>
+     960:	8f45                	or	a4,a4,s1
+     962:	c398                	sw	a4,0(a5)
+     964:	854a                	mv	a0,s2
+     966:	3565                	jal	80e <ETH_LinkUpCfg>
+     968:	b759                	j	8ee <ETH_PHYLink+0x82>
+     96a:	01f9f993          	andi	s3,s3,31
+     96e:	4705                	li	a4,1
+     970:	fee995e3          	bne	s3,a4,95a <ETH_PHYLink+0xee>
+     974:	4398                	lw	a4,0(a5)
+     976:	76fd                	lui	a3,0xfffff
+     978:	7ff68693          	addi	a3,a3,2047 # fffff7ff <_eusrstack+0xdffef7ff>
+     97c:	8f75                	and	a4,a4,a3
+     97e:	b7d5                	j	962 <ETH_PHYLink+0xf6>
+     980:	6509                	lui	a0,0x2
+     982:	19c50513          	addi	a0,a0,412 # 219c <strlen+0x3e>
+     986:	778010ef          	jal	20fe <puts>
+     98a:	400247b7          	lui	a5,0x40024
+     98e:	80078793          	addi	a5,a5,-2048 # 40023800 <_eusrstack+0x20013800>
+     992:	4398                	lw	a4,0(a5)
+     994:	9b6d                	andi	a4,a4,-5
+     996:	c398                	sw	a4,0(a5)
+     998:	4705                	li	a4,1
+     99a:	82e18023          	sb	a4,-2016(gp) # 20000210 <phyLinkReset>
+     99e:	8401a703          	lw	a4,-1984(gp) # 20000230 <LocalTime>
+     9a2:	80e1ae23          	sw	a4,-2020(gp) # 2000020c <phyLinkTime>
+     9a6:	82018c23          	sb	zero,-1992(gp) # 20000228 <LinkSta>
+     9aa:	b791                	j	8ee <ETH_PHYLink+0x82>
+     9ac:	400286b7          	lui	a3,0x40028
+     9b0:	429c                	lw	a5,0(a3)
+     9b2:	777d                	lui	a4,0xfffff
+     9b4:	7ff70713          	addi	a4,a4,2047 # fffff7ff <_eusrstack+0xdffef7ff>
+     9b8:	8ff9                	and	a5,a5,a4
+     9ba:	c29c                	sw	a5,0(a3)
+     9bc:	b765                	j	964 <ETH_PHYLink+0xf8>
+     9be:	6509                	lui	a0,0x2
+     9c0:	19c50513          	addi	a0,a0,412 # 219c <strlen+0x3e>
+     9c4:	73a010ef          	jal	20fe <puts>
+     9c8:	400247b7          	lui	a5,0x40024
+     9cc:	80078793          	addi	a5,a5,-2048 # 40023800 <_eusrstack+0x20013800>
+     9d0:	4398                	lw	a4,0(a5)
+     9d2:	9b6d                	andi	a4,a4,-5
+     9d4:	c398                	sw	a4,0(a5)
+     9d6:	4705                	li	a4,1
+     9d8:	82e18023          	sb	a4,-2016(gp) # 20000210 <phyLinkReset>
+     9dc:	8401a683          	lw	a3,-1984(gp) # 20000230 <LocalTime>
+     9e0:	80d1ae23          	sw	a3,-2020(gp) # 2000020c <phyLinkTime>
+     9e4:	82018c23          	sb	zero,-1992(gp) # 20000228 <LinkSta>
+     9e8:	83c1a783          	lw	a5,-1988(gp) # 2000022c <ChipId>
+     9ec:	02000693          	li	a3,32
+     9f0:	0f07f793          	andi	a5,a5,240
+     9f4:	eed79de3          	bne	a5,a3,8ee <ETH_PHYLink+0x82>
+     9f8:	8101c783          	lbu	a5,-2032(gp) # 20000200 <phyNegoStat>
+     9fc:	0017f613          	andi	a2,a5,1
+     a00:	ee0607e3          	beqz	a2,8ee <ETH_PHYLink+0x82>
+     a04:	80c1a583          	lw	a1,-2036(gp) # 200001fc <phyNegoLinkTime>
+     a08:	8401a703          	lw	a4,-1984(gp) # 20000230 <LocalTime>
+     a0c:	8f0d                	sub	a4,a4,a1
+     a0e:	06300593          	li	a1,99
+     a12:	ece5eee3          	bltu	a1,a4,8ee <ETH_PHYLink+0x82>
+     a16:	8001a623          	sw	zero,-2036(gp) # 200001fc <phyNegoLinkTime>
+     a1a:	40029737          	lui	a4,0x40029
+     a1e:	0027c793          	xori	a5,a5,2
+     a22:	5318                	lw	a4,32(a4)
+     a24:	80f18823          	sb	a5,-2032(gp) # 20000200 <phyNegoStat>
+     a28:	b5d9                	j	8ee <ETH_PHYLink+0x82>

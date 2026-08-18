@@ -1,0 +1,99 @@
+source	tmp/wch-evt/evt/QingkeV2C_CH32V006_EVT/EXAM/TIM/SLTIM_DMA/User/main.c
+sha256	54721f24675cb5cf79a66247cbf736f5b6f4ce954f8f1364a0edfd1697f377b1
+range	65-100
+000065	    DMA_InitTypeDef DMA_InitStructure = {0};
+000066	    DMA_InitTypeDef DMA_InitStructure1 = {0};
+000067	    DMA_InitTypeDef DMA_InitStructure2 = {0};
+000068	    NVIC_InitTypeDef NVIC_InitStructure = {0};
+000069
+000070	    RCC_HBPeriphClockCmd(RCC_HBPeriph_DMA1, ENABLE);
+000071
+000072	    DMA_DeInit(DMA1_Channel1);//DMA_CH1
+000073
+000074	   if((DBGMCU_GetCHIPID()&(~0x000000F0))==0x00700800)
+000075	    {
+000076	    DMA_DeInit(DMA1_Channel2);
+000077	    DMA_DeInit(DMA1_Channel3);
+000078	    }
+000079
+000080	    DMA_InitStructure.DMA_PeripheralBaseAddr = (u32)&(TIM1->ATRLR);
+000081	    DMA_InitStructure.DMA_MemoryBaseAddr = (u32) dbuf;
+000082	    DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralSRC;
+000083	    DMA_InitStructure.DMA_BufferSize = 1000;
+000084	    DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
+000085	    DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
+000086	    DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Word;
+000087	    DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_Word;
+000088	    DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;
+000089	    DMA_InitStructure.DMA_Priority = DMA_Priority_High;
+000090	    DMA_InitStructure.DMA_M2M = DMA_M2M_Disable;
+000091
+000092	    if((DBGMCU_GetCHIPID()&(~0x000000F0))==0x00700800)
+000093	    {
+000094	    DMA_InitStructure1.DMA_PeripheralBaseAddr = (u32)&(TIM1->ATRLR);
+000095	    DMA_InitStructure1.DMA_MemoryBaseAddr = (u32) dbuf1;
+000096	    DMA_InitStructure1.DMA_DIR = DMA_DIR_PeripheralSRC;
+000097	    DMA_InitStructure1.DMA_BufferSize = 1000;
+000098	    DMA_InitStructure1.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
+000099	    DMA_InitStructure1.DMA_MemoryInc = DMA_MemoryInc_Enable;
+000100	    DMA_InitStructure1.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Word;
+range	112-170
+000112	    DMA_InitStructure2.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Word;
+000113	    DMA_InitStructure2.DMA_MemoryDataSize = DMA_MemoryDataSize_Word;
+000114	    DMA_InitStructure2.DMA_Mode = DMA_Mode_Normal;
+000115	    DMA_InitStructure2.DMA_Priority = DMA_Priority_VeryHigh;
+000116	    DMA_InitStructure2.DMA_M2M = DMA_M2M_Disable;
+000117	    }
+000118
+000119	    DMA_Init(DMA1_Channel1, &DMA_InitStructure);
+000120	    if((DBGMCU_GetCHIPID()&(~0x000000F0))==0x00700800)
+000121	    {
+000122	    DMA_Init(DMA1_Channel2, &DMA_InitStructure1);
+000123	    DMA_Init(DMA1_Channel3, &DMA_InitStructure2);
+000124	    }
+000125
+000126	    NVIC_InitStructure.NVIC_IRQChannel=DMA1_Channel1_IRQn;
+000127	    NVIC_InitStructure.NVIC_IRQChannelCmd=ENABLE;
+000128	    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority=1;
+000129	    NVIC_InitStructure.NVIC_IRQChannelSubPriority=1;
+000130	    NVIC_Init(&NVIC_InitStructure);
+000131
+000132	    if((DBGMCU_GetCHIPID()&(~0x000000F0))==0x00700800)
+000133	    {
+000134	    NVIC_InitStructure.NVIC_IRQChannel=DMA1_Channel2_IRQn;
+000135	    NVIC_InitStructure.NVIC_IRQChannelCmd=ENABLE;
+000136	    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority=1;
+000137	    NVIC_InitStructure.NVIC_IRQChannelSubPriority=1;
+000138	    NVIC_Init(&NVIC_InitStructure);
+000139
+000140	    NVIC_InitStructure.NVIC_IRQChannel=DMA1_Channel3_IRQn;
+000141	    NVIC_InitStructure.NVIC_IRQChannelCmd=ENABLE;
+000142	    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority=1;
+000143	    NVIC_InitStructure.NVIC_IRQChannelSubPriority=0;
+000144	    NVIC_Init(&NVIC_InitStructure);
+000145	    }
+000146
+000147	    DMA_ClearFlag(DMA1_FLAG_TC1);
+000148
+000149	    if((DBGMCU_GetCHIPID()&(~0x000000F0))==0x00700800)
+000150	    {
+000151	    DMA_ClearFlag(DMA1_FLAG_TC2);
+000152	    DMA_ClearFlag(DMA1_FLAG_TC3);
+000153	    }
+000154
+000155
+000156	    DMA_ITConfig(DMA1_Channel1, DMA_IT_TC, ENABLE);
+000157	    if((DBGMCU_GetCHIPID()&(~0x000000F0))==0x00700800)
+000158	    {
+000159	    DMA_ITConfig(DMA1_Channel2, DMA_IT_TC, ENABLE);
+000160	    DMA_ITConfig(DMA1_Channel3, DMA_IT_TC, ENABLE);
+000161	    }
+000162
+000163	    DMA_Cmd(DMA1_Channel1, ENABLE);
+000164	    if((DBGMCU_GetCHIPID()&(~0x000000F0))==0x00700800)
+000165	    {
+000166	    DMA_Cmd(DMA1_Channel2, ENABLE);
+000167	    DMA_Cmd(DMA1_Channel3, ENABLE);
+000168	    }
+000169
+000170	}

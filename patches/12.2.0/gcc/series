@@ -1,0 +1,9 @@
+0001-riscv-configure-WCH-12.2-multilib-set.patch
+0002-Backport-safe-ctype-include-ordering-for-recent-libc.patch
+0003-RISC-V-test-unversioned-WCH-XW-march-strings.patch
+0004-RISC-V-recognize-RV32-Zbs-single-bit-constant-moves.patch
+0005-RISC-V-implement-WCH-hardware-saved-fast-interrupts.patch
+0006-RISC-V-generate-multiply-instructions-for-Zmmul.patch
+0007-RISC-V-recognize-the-RV32-sign-bit-in-Zbs-masks.patch
+0008-RISC-V-truncate-RV32-integer-building-intermediates.patch
+0009-gcc-implement-WCH-highcode-section-splitting.patch

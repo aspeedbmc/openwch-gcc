@@ -1,0 +1,98 @@
+From 9a4312bf71f64a8cdcd371b2c846663fcbbef74f Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 6 <phase6@openwch.local>
+Date: Mon, 17 Aug 2026 02:50:38 +0900
+Subject: [PATCH 3/5] riscv: accept the WCH QingKe 'xw' -march spelling
+
+The stock parser rejects every -march string WCH's own EVT projects use:
+riscv_parse_arch_string () stops after the 'c' extension, so rv32imacxw,
+rv32imafcxw, rv32gcxw and rv32ecxw all die with "unsupported ISA substring
+'xw'", while the official WCH 8.2.0 build accepts them.  Consume an optional
+bare 'x' and then an optional 'w' as two independent steps after the
+compressed-extension step, matching that build.
+
+Spec source, all first-hand measurements of the official binary
+ref/gcc/darwin-arm64/8.2.0/bin/riscv-none-embed-gcc,
+  sha256 9d693fae19e3c9aa52e57683612235571e7c91ce7f1d0025b053df728f4fa14f:
+
+- Archived per-case matrix, tmp/toolchain_8.2.0/evidence/s1/probes/raw/
+  01-march-gcc (32 rows = 14 -c invocations + the same 14 with
+  -print-multi-directory + 4 negative cases).  Accepted: m02 rv32imacxw,
+  m07 rv32gcxw, m08 rv32imafdcxw, m10 rv32ecxw.  Rejected, with the residual
+  substring naming exactly how far the parser got: m03 rv32imac_xw -> '_xw',
+  m04 rv32imacxw1p0 -> '1p0', m05 rv32imacxw2p0 -> '2p0', neg-xq
+  rv32imac_xq -> '_xq', neg-xw9p9 rv32imac_xw9p9 -> '_xw9p9', neg-qq
+  rv32imacqq -> 'qq'.  The underscore forms are not consumed, and no version
+  suffix is accepted.
+- tmp/toolchain_8.2.0/evidence/s1/optsweep/optsweep.md section 4.3, which
+  places the insertion point from those residuals: rv32imacxq reports 'q'
+  (the 'x' was eaten) and rv32imacxwz reports 'z' (the 'xw' was eaten), so
+  both characters are consumed immediately after the compressed-extension
+  step and the parser is not matching the two-character string "xw" as a
+  unit.  Those two cases do not by themselves decide whether the 'w' step is
+  nested inside the 'x' step or sits beside it: the two readings behave
+  identically on every input that contains an 'x', which is all this matrix
+  holds.  The next item is what decides it.
+- The deciding axis is a 'w' with no preceding 'x', measured in
+  tmp/toolchain_8.2.0/evidence/s4/defect-fidelity/out/official/raw/
+  18-march-w-axis (16 invocations, derived table waxis.tsv).  w01 rv32imacw
+  and w02 rv32iw are accepted (-S, rc=0), and w01's assembly is byte-identical
+  to the rv32imacxw and rv32imacx baselines w05 and w06, so the 'w' step does
+  not depend on an 'x' having been consumed: the two steps are parallel, not
+  nested.  w03 rv32imacwx is rejected, so the 'w' step runs after the 'x' step
+  rather than before it, and w04 rv32imacww is rejected, so it runs once.  The
+  assembler is stricter than the compiler on the bare form -- w01c and w02c
+  fail with "Fatal error: -march=rv32imacw: unsupported ISA subset `w'", which
+  is the rejection the comment in the hunk records.
+- 21 further live cases recorded in tmp/toolchain_8.2.0/evidence/s3/d1/
+  spec-probe/official-placement.txt, which fix the remaining position and
+  multiplicity questions: rv32imaxw, rv32ixw, rv32gxw and rv32exw are all
+  accepted, so the step is not conditional on 'c' having been consumed;
+  rv32imacxx reports 'x' and rv32imacxww reports 'w', so each step runs once
+  rather than in a loop; rv64imacxw and rv64gcxw are accepted too, so rv32
+  and rv64 share the one code path.
+
+No subset registration and no code-generation effect: the hunk touches
+neither *flags nor any subset list, so -march=rv32imacxw leaves target_flags
+exactly as -march=rv32imac leaves them.  Measured on the official binary
+(tmp/toolchain_8.2.0/evidence/s1/optsweep/optsweep.md section 4.4 and
+tmp/toolchain_8.2.0/evidence/s3/d1/spec-probe/official-extra.txt): -O2 -S
+output is bytewise identical between rv32imac and rv32imacxw, and between
+rv32imafc and rv32imafcxw; the XW code-size win appears only in the .o, i.e.
+it belongs to the assembler.  Multilib selection needs no change either --
+gcc/config/riscv/t-elf-multilib already lists march=rv32imacxw,
+march=rv32imafcxw and march=rv32ecxw, and those entries match on the driver's
+option text, which now survives parsing: rv32imacxw -> rv32imacxw/ilp32,
+rv32ecxw -> rv32ecxw/ilp32e, rv32imafcxw -> rv32imafcxw/ilp32f, rv32gcxw and
+rv32imafdcxw -> "." (7 values recorded in official-extra.txt).  The string
+reaches the assembler untouched, as -march=rv32imacxw on the as command line
+(tmp/toolchain_8.2.0/evidence/s1/probes/raw/03-attributes/driver-v.stderr).
+---
+ gcc/common/config/riscv/riscv-common.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/gcc/common/config/riscv/riscv-common.c b/gcc/common/config/riscv/riscv-common.c
+index 8a78aebc3..d239e2037 100644
+--- a/gcc/common/config/riscv/riscv-common.c
++++ b/gcc/common/config/riscv/riscv-common.c
+@@ -114,6 +114,18 @@ riscv_parse_arch_string (const char *isa, int *flags, location_t loc)
+   if (*p == 'c')
+     *flags |= MASK_RVC, p++;
+ 
++  /* Accept the WCH QingKe vendor spelling, which appends an optional bare
++     'x' and then an optional 'w' as two independent steps (rv32imacxw,
++     rv32imacx and rv32imacw all pass; the assembler still rejects the bare
++     'w' form).  The string selects a multilib and is handed to the
++     assembler unchanged; no subset is registered and no target flag is set
++     here, so it has no effect on code generation.  */
++  if (*p == 'x')
++    p++;
++
++  if (*p == 'w')
++    p++;
++
+   if (*p)
+     {
+       error_at (loc, "-march=%s: unsupported ISA substring %qs", isa, p);
+-- 
+2.55.0
+

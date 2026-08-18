@@ -1,0 +1,134 @@
+From ab1101dd82237f419c74db4700cc8a018b9bed25 Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 3 <phase3@openwch.local>
+Date: Thu, 13 Aug 2026 22:33:48 +0900
+Subject: [PATCH 6/9] RISC-V: use mret for WCH fast simple returns
+
+WCH fast interrupt handlers normally leave through the interrupt epilogue,
+which already emits mret.  Shrink wrapping can instead create
+simple_return exits; those were lowered as ordinary ret instructions.
+
+The official specification source is the phase-3d frozen EVT assembly
+surface: 61 pre-patch objects / 65 simple-return exits, plus the object
+unlocked by RC02, the implicit-declaration repair round, with two exits.
+Every differing exit was official mret versus upstream ret, with no other
+assembly difference.  The directed official probe covers framed and one-
+and two-exit shrink-wrap shapes; naked, ordinary, and misspelled
+attributes are negative controls.
+
+Emit mret for simple returns in an exact WCH-Interrupt-fast function.
+Preserve the negative-control behavior and cover all observed exit shapes.
+
+Behavior evidence:
+  tmp/phase3d-evidence/t3-rc04/prepatch-shape-audit.md
+  tmp/phase3d-evidence/t3-rc04/prepatch-pairs.tsv
+  tmp/phase3d-evidence/t3-rc04/prepatch-summary.json
+  tmp/phase3d-evidence/t3-rc04/cluster-run/summary.json
+
+gcc/ChangeLog:
+
+	* config/riscv/riscv.cc (riscv_output_return): Return mret in a WCH
+	fast interrupt.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/riscv/wch-fast-interrupt-shrink-wrap.c: New test.
+---
+ gcc/config/riscv/riscv.cc                     |  3 +
+ .../riscv/wch-fast-interrupt-shrink-wrap.c    | 71 +++++++++++++++++++
+ 2 files changed, 74 insertions(+)
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-shrink-wrap.c
+
+diff --git a/gcc/config/riscv/riscv.cc b/gcc/config/riscv/riscv.cc
+index 29735b021..ed7af3682 100644
+--- a/gcc/config/riscv/riscv.cc
++++ b/gcc/config/riscv/riscv.cc
+@@ -4820,6 +4820,9 @@ riscv_output_return ()
+   if (cfun->machine->naked_p)
+     return "";
+ 
++  if (cfun->machine->wch_fast_interrupt_p)
++    return "mret";
++
+   return "ret";
+ }
+ 
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-shrink-wrap.c b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-shrink-wrap.c
+new file mode 100644
+index 000000000..1f4d3a640
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-shrink-wrap.c
+@@ -0,0 +1,71 @@
++/* Verify that shrink-wrapped exits of WCH fast interrupts use mret.  */
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv32imac -mabi=ilp32 -fshrink-wrap -fno-tree-tail-merge -fno-crossjumping" } */
++/* { dg-skip-if "" { *-*-* } { "-flto" } { "" } } */
++
++extern void slow (void);
++extern volatile int flag0, flag1, payload, sink;
++
++static inline __attribute__ ((always_inline)) void
++framed_path (int tag)
++{
++  register int keep asm ("s0") = payload + tag;
++  asm volatile ("" : "+r" (keep));
++  slow ();
++  sink = keep;
++}
++
++void __attribute__ ((interrupt ("WCH-Interrupt-fast")))
++fast_one_early (void)
++{
++  if (!flag0)
++    {
++      asm volatile ("# fast one early");
++      return;
++    }
++  framed_path (1);
++}
++
++void __attribute__ ((interrupt ("WCH-Interrupt-fast")))
++fast_two_early (void)
++{
++  if (!flag0)
++    {
++      asm volatile ("# fast two early zero");
++      return;
++    }
++  if (!flag1)
++    {
++      sink = 2;
++      asm volatile ("# fast two early one");
++      return;
++    }
++  framed_path (2);
++}
++
++void
++ordinary_one_early (void)
++{
++  if (!flag0)
++    {
++      asm volatile ("# ordinary early");
++      return;
++    }
++  framed_path (3);
++}
++
++void __attribute__ ((interrupt ("WCH-Interrupt-Fast")))
++typo_one_early (void)
++{ /* { dg-warning {argument to 'interrupt' attribute is not '"user"', '"supervisor"', or '"machine"'} } */
++  if (!flag0)
++    {
++      asm volatile ("# typo early");
++      return;
++    }
++  framed_path (4);
++}
++
++/* The fast handlers have five physical return paths, all using mret.  */
++/* { dg-final { scan-assembler-times {\mmret\M} 5 } } */
++/* Ordinary and misspelled handlers retain one simple ret each.  */
++/* { dg-final { scan-assembler-times {\mret\M} 2 } } */
+-- 
+2.55.0
+

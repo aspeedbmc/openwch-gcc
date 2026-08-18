@@ -1,0 +1,377 @@
+From 49bf9728df0e340b850cfe440533b8176f2e6d6f Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 4 <phase4@openwch.local>
+Date: Thu, 13 Aug 2026 07:22:37 +0900
+Subject: [PATCH 6/9] RISC-V: generate multiply instructions for Zmmul
+
+Model Zmmul as an independent subextension so it enables every integer multiplication pattern without enabling division. Reject a redundant M+Zmmul architecture with the WCH diagnostic, and define the corresponding multiplication feature macros.
+
+Behavior specification: tmp/phase4-evidence/s3-zmmul-official/; tmp/phase4-evidence/s3-gcc-zmmul-final/official.s; tmp/phase4-evidence/s3-zmmul-implementation/official-rv32.s; tmp/phase4-evidence/s3-zmmul-implementation/official-rv64.s; tmp/phase4-evidence/s3-zmmul-implementation/official-conflict.stderr.
+
+gcc/ChangeLog:
+
+	* common/config/riscv/riscv-common.cc (riscv_ext_version_table):
+	Add zmmul.
+	(riscv_ext_flag_table): Likewise.
+	* config/riscv/riscv-c.cc (riscv_cpu_cpp_builtins): Define
+	__riscv_mul for Zmmul.
+	* config/riscv/riscv-opts.h (MASK_ZMMUL, TARGET_ZMMUL): New macros.
+	* config/riscv/riscv.opt (riscv_zmmul_subext): New variable.
+	* config/riscv/riscv.cc (riscv_rtx_costs): Use the hardware
+	multiply cost for Zmmul.
+	(riscv_option_override): Reject M combined with Zmmul.
+	* config/riscv/riscv.md (mulsi3, muldi3, mulv<mode>4, umulv<mode>4)
+	(*mulsi3_extended, *mulsi3_extended2, <u>mulditi3)
+	(<su>muldi3_highpart, usmulditi3, usmuldi3_highpart, <u>mulsidi3)
+	(<su>mulsi3_highpart, usmulsidi3, usmulsi3_highpart): Enable for
+	Zmmul.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/riscv/wch-zmmul.c: New test.
+	* gcc.target/riscv/wch-zmmul-conflict.c: New test.
+	* gcc.target/riscv/wch-zmmul-predef.c: New test.
+	* gcc.target/riscv/wch-zmmul-rv64.c: New test.
+---
+ gcc/common/config/riscv/riscv-common.cc       |  3 ++
+ gcc/config/riscv/riscv-c.cc                   |  2 +-
+ gcc/config/riscv/riscv-opts.h                 |  4 ++
+ gcc/config/riscv/riscv.cc                     | 10 ++++-
+ gcc/config/riscv/riscv.md                     | 28 ++++++-------
+ gcc/config/riscv/riscv.opt                    |  3 ++
+ .../gcc.target/riscv/wch-zmmul-conflict.c     |  6 +++
+ .../gcc.target/riscv/wch-zmmul-predef.c       | 20 ++++++++++
+ .../gcc.target/riscv/wch-zmmul-rv64.c         | 17 ++++++++
+ gcc/testsuite/gcc.target/riscv/wch-zmmul.c    | 39 +++++++++++++++++++
+ 10 files changed, 116 insertions(+), 16 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-zmmul-conflict.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-zmmul-predef.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-zmmul-rv64.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-zmmul.c
+
+diff --git a/gcc/common/config/riscv/riscv-common.cc b/gcc/common/config/riscv/riscv-common.cc
+index 1501242e2..e00df17a8 100644
+--- a/gcc/common/config/riscv/riscv-common.cc
++++ b/gcc/common/config/riscv/riscv-common.cc
+@@ -153,6 +153,7 @@ static const struct riscv_ext_version riscv_ext_version_table[] =
+   {"zbb", ISA_SPEC_CLASS_NONE, 1, 0},
+   {"zbc", ISA_SPEC_CLASS_NONE, 1, 0},
+   {"zbs", ISA_SPEC_CLASS_NONE, 1, 0},
++  {"zmmul", ISA_SPEC_CLASS_NONE, 1, 0},
+ 
+   {"zbkb",  ISA_SPEC_CLASS_NONE, 1, 0},
+   {"zbkc",  ISA_SPEC_CLASS_NONE, 1, 0},
+@@ -1099,6 +1100,8 @@ static const riscv_ext_flag_table_t riscv_ext_flag_table[] =
+   {"zbc",    &gcc_options::x_riscv_zb_subext, MASK_ZBC},
+   {"zbs",    &gcc_options::x_riscv_zb_subext, MASK_ZBS},
+ 
++  {"zmmul", &gcc_options::x_riscv_zmmul_subext, MASK_ZMMUL},
++
+   {"zbkb",   &gcc_options::x_riscv_zk_subext, MASK_ZBKB},
+   {"zbkc",   &gcc_options::x_riscv_zk_subext, MASK_ZBKC},
+   {"zbkx",   &gcc_options::x_riscv_zk_subext, MASK_ZBKX},
+diff --git a/gcc/config/riscv/riscv-c.cc b/gcc/config/riscv/riscv-c.cc
+index eb7ef0929..57a7ec85a 100644
+--- a/gcc/config/riscv/riscv-c.cc
++++ b/gcc/config/riscv/riscv-c.cc
+@@ -47,7 +47,7 @@ riscv_cpu_cpp_builtins (cpp_reader *pfile)
+   if (TARGET_ATOMIC)
+     builtin_define ("__riscv_atomic");
+ 
+-  if (TARGET_MUL)
++  if (TARGET_MUL || TARGET_ZMMUL)
+     builtin_define ("__riscv_mul");
+   if (TARGET_DIV)
+     builtin_define ("__riscv_div");
+diff --git a/gcc/config/riscv/riscv-opts.h b/gcc/config/riscv/riscv-opts.h
+index 15bb5e768..de4fd69b5 100644
+--- a/gcc/config/riscv/riscv-opts.h
++++ b/gcc/config/riscv/riscv-opts.h
+@@ -83,6 +83,10 @@ enum stack_protector_guard {
+ #define TARGET_ZBC    ((riscv_zb_subext & MASK_ZBC) != 0)
+ #define TARGET_ZBS    ((riscv_zb_subext & MASK_ZBS) != 0)
+ 
++#define MASK_ZMMUL    (1 << 0)
++
++#define TARGET_ZMMUL  ((riscv_zmmul_subext & MASK_ZMMUL) != 0)
++
+ #define MASK_ZBKB     (1 << 0)
+ #define MASK_ZBKC     (1 << 1)
+ #define MASK_ZBKX     (1 << 2)
+diff --git a/gcc/config/riscv/riscv.cc b/gcc/config/riscv/riscv.cc
+index 8b5c9f9b2..8ba59eea8 100644
+--- a/gcc/config/riscv/riscv.cc
++++ b/gcc/config/riscv/riscv.cc
+@@ -2103,7 +2103,7 @@ riscv_rtx_costs (rtx x, machine_mode mode, int outer_code, int opno ATTRIBUTE_UN
+     case MULT:
+       if (float_mode_p)
+ 	*total = tune_param->fp_mul[mode == DFmode];
+-      else if (!TARGET_MUL)
++      else if (!(TARGET_MUL || TARGET_ZMMUL))
+ 	/* Estimate the cost of a library call.  */
+ 	*total = COSTS_N_INSNS (speed ? 32 : 6);
+       else if (GET_MODE_SIZE (mode) > UNITS_PER_WORD)
+@@ -5015,6 +5015,14 @@ riscv_option_override (void)
+   SUBTARGET_OVERRIDE_OPTIONS;
+ #endif
+ 
++  /* Zmmul is deliberately not an implied sub-extension of M here, even
++     though the assembler does record that relation in the object
++     attributes: the compiler rejects the combination outright, so an
++     implication would make every -march=rv32im fail.  The multiply
++     patterns therefore test TARGET_MUL || TARGET_ZMMUL instead.  */
++  if (TARGET_ZMMUL && TARGET_MUL)
++    error ("can not use both the %<ZMMUL%> and the %<M%> extension");
++
+   flag_pcc_struct_return = 0;
+ 
+   if (flag_pic)
+diff --git a/gcc/config/riscv/riscv.md b/gcc/config/riscv/riscv.md
+index c6399b138..8eaa760e3 100644
+--- a/gcc/config/riscv/riscv.md
++++ b/gcc/config/riscv/riscv.md
+@@ -756,7 +756,7 @@
+   [(set (match_operand:SI          0 "register_operand" "=r")
+ 	(mult:SI (match_operand:SI 1 "register_operand" " r")
+ 		 (match_operand:SI 2 "register_operand" " r")))]
+-  "TARGET_MUL"
++  "TARGET_MUL || TARGET_ZMMUL"
+   { return TARGET_64BIT ? "mulw\t%0,%1,%2" : "mul\t%0,%1,%2"; }
+   [(set_attr "type" "imul")
+    (set_attr "mode" "SI")])
+@@ -765,7 +765,7 @@
+   [(set (match_operand:DI          0 "register_operand" "=r")
+ 	(mult:DI (match_operand:DI 1 "register_operand" " r")
+ 		 (match_operand:DI 2 "register_operand" " r")))]
+-  "TARGET_MUL && TARGET_64BIT"
++  "(TARGET_MUL || TARGET_ZMMUL) && TARGET_64BIT"
+   "mul\t%0,%1,%2"
+   [(set_attr "type" "imul")
+    (set_attr "mode" "DI")])
+@@ -775,7 +775,7 @@
+ 	(mult:GPR (match_operand:GPR 1 "register_operand" " r")
+ 		  (match_operand:GPR 2 "register_operand" " r")))
+    (label_ref (match_operand 3 "" ""))]
+-  "TARGET_MUL"
++  "TARGET_MUL || TARGET_ZMMUL"
+ {
+   if (TARGET_64BIT && <MODE>mode == SImode)
+     {
+@@ -820,7 +820,7 @@
+ 	(mult:GPR (match_operand:GPR 1 "register_operand" " r")
+ 		  (match_operand:GPR 2 "register_operand" " r")))
+    (label_ref (match_operand 3 "" ""))]
+-  "TARGET_MUL"
++  "TARGET_MUL || TARGET_ZMMUL"
+ {
+   if (TARGET_64BIT && <MODE>mode == SImode)
+     {
+@@ -866,7 +866,7 @@
+ 	(sign_extend:DI
+ 	    (mult:SI (match_operand:SI 1 "register_operand" " r")
+ 		     (match_operand:SI 2 "register_operand" " r"))))]
+-  "TARGET_MUL && TARGET_64BIT"
++  "(TARGET_MUL || TARGET_ZMMUL) && TARGET_64BIT"
+   "mulw\t%0,%1,%2"
+   [(set_attr "type" "imul")
+    (set_attr "mode" "SI")])
+@@ -877,7 +877,7 @@
+ 	  (match_operator:SI 3 "subreg_lowpart_operator"
+ 	    [(mult:DI (match_operand:DI 1 "register_operand" " r")
+ 		      (match_operand:DI 2 "register_operand" " r"))])))]
+-  "TARGET_MUL && TARGET_64BIT"
++  "(TARGET_MUL || TARGET_ZMMUL) && TARGET_64BIT"
+   "mulw\t%0,%1,%2"
+   [(set_attr "type" "imul")
+    (set_attr "mode" "SI")])
+@@ -895,7 +895,7 @@
+   [(set (match_operand:TI                         0 "register_operand")
+ 	(mult:TI (any_extend:TI (match_operand:DI 1 "register_operand"))
+ 		 (any_extend:TI (match_operand:DI 2 "register_operand"))))]
+-  "TARGET_MUL && TARGET_64BIT"
++  "(TARGET_MUL || TARGET_ZMMUL) && TARGET_64BIT"
+ {
+   rtx low = gen_reg_rtx (DImode);
+   emit_insn (gen_muldi3 (low, operands[1], operands[2]));
+@@ -917,7 +917,7 @@
+ 		     (any_extend:TI
+ 		       (match_operand:DI 2 "register_operand" " r")))
+ 	    (const_int 64))))]
+-  "TARGET_MUL && TARGET_64BIT"
++  "(TARGET_MUL || TARGET_ZMMUL) && TARGET_64BIT"
+   "mulh<u>\t%0,%1,%2"
+   [(set_attr "type" "imul")
+    (set_attr "mode" "DI")])
+@@ -926,7 +926,7 @@
+   [(set (match_operand:TI                          0 "register_operand")
+ 	(mult:TI (zero_extend:TI (match_operand:DI 1 "register_operand"))
+ 		 (sign_extend:TI (match_operand:DI 2 "register_operand"))))]
+-  "TARGET_MUL && TARGET_64BIT"
++  "(TARGET_MUL || TARGET_ZMMUL) && TARGET_64BIT"
+ {
+   rtx low = gen_reg_rtx (DImode);
+   emit_insn (gen_muldi3 (low, operands[1], operands[2]));
+@@ -948,7 +948,7 @@
+ 		     (sign_extend:TI
+ 		       (match_operand:DI 2 "register_operand" " r")))
+ 	    (const_int 64))))]
+-  "TARGET_MUL && TARGET_64BIT"
++  "(TARGET_MUL || TARGET_ZMMUL) && TARGET_64BIT"
+   "mulhsu\t%0,%2,%1"
+   [(set_attr "type" "imul")
+    (set_attr "mode" "DI")])
+@@ -959,7 +959,7 @@
+ 		   (match_operand:SI 1 "register_operand" " r"))
+ 		 (any_extend:DI
+ 		   (match_operand:SI 2 "register_operand" " r"))))]
+-  "TARGET_MUL && !TARGET_64BIT"
++  "(TARGET_MUL || TARGET_ZMMUL) && !TARGET_64BIT"
+ {
+   rtx temp = gen_reg_rtx (SImode);
+   emit_insn (gen_mulsi3 (temp, operands[1], operands[2]));
+@@ -978,7 +978,7 @@
+ 		     (any_extend:DI
+ 		       (match_operand:SI 2 "register_operand" " r")))
+ 	    (const_int 32))))]
+-  "TARGET_MUL && !TARGET_64BIT"
++  "(TARGET_MUL || TARGET_ZMMUL) && !TARGET_64BIT"
+   "mulh<u>\t%0,%1,%2"
+   [(set_attr "type" "imul")
+    (set_attr "mode" "SI")])
+@@ -990,7 +990,7 @@
+ 		   (match_operand:SI 1 "register_operand" " r"))
+ 		 (sign_extend:DI
+ 		   (match_operand:SI 2 "register_operand" " r"))))]
+-  "TARGET_MUL && !TARGET_64BIT"
++  "(TARGET_MUL || TARGET_ZMMUL) && !TARGET_64BIT"
+ {
+   rtx temp = gen_reg_rtx (SImode);
+   emit_insn (gen_mulsi3 (temp, operands[1], operands[2]));
+@@ -1009,7 +1009,7 @@
+ 		     (sign_extend:DI
+ 		       (match_operand:SI 2 "register_operand" " r")))
+ 	    (const_int 32))))]
+-  "TARGET_MUL && !TARGET_64BIT"
++  "(TARGET_MUL || TARGET_ZMMUL) && !TARGET_64BIT"
+   "mulhsu\t%0,%2,%1"
+   [(set_attr "type" "imul")
+    (set_attr "mode" "SI")])
+diff --git a/gcc/config/riscv/riscv.opt b/gcc/config/riscv/riscv.opt
+index 492aad123..af897dc22 100644
+--- a/gcc/config/riscv/riscv.opt
++++ b/gcc/config/riscv/riscv.opt
+@@ -200,6 +200,9 @@ int riscv_zi_subext
+ TargetVariable
+ int riscv_zb_subext
+ 
++TargetVariable
++int riscv_zmmul_subext
++
+ TargetVariable
+ int riscv_zk_subext
+ 
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-zmmul-conflict.c b/gcc/testsuite/gcc.target/riscv/wch-zmmul-conflict.c
+new file mode 100644
+index 000000000..ec24b5a46
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-zmmul-conflict.c
+@@ -0,0 +1,6 @@
++/* { dg-do compile } */
++/* { dg-options "-march=rv32imac_zmmul -mabi=ilp32" } */
++
++/* { dg-error "can not use both the 'ZMMUL' and the 'M' extension" "" { target *-*-* } 0 } */
++
++int i;
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-zmmul-predef.c b/gcc/testsuite/gcc.target/riscv/wch-zmmul-predef.c
+new file mode 100644
+index 000000000..dc56b8b48
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-zmmul-predef.c
+@@ -0,0 +1,20 @@
++/* { dg-do compile } */
++/* { dg-options "-march=rv32i_zmmul -mabi=ilp32" } */
++
++#if !defined (__riscv_mul)
++#error "__riscv_mul"
++#endif
++
++#if !defined (__riscv_zmmul) || __riscv_zmmul != 1000000
++#error "__riscv_zmmul"
++#endif
++
++#if defined (__riscv_div)
++#error "__riscv_div"
++#endif
++
++#if defined (__riscv_muldiv)
++#error "__riscv_muldiv"
++#endif
++
++int i;
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-zmmul-rv64.c b/gcc/testsuite/gcc.target/riscv/wch-zmmul-rv64.c
+new file mode 100644
+index 000000000..3deb046f4
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-zmmul-rv64.c
+@@ -0,0 +1,17 @@
++/* { dg-do compile } */
++/* { dg-options "-march=rv64i_zmmul -mabi=lp64 -O2" } */
++
++long
++mul (long a, long b)
++{
++  return a * b;
++}
++
++int
++mulw (int a, int b)
++{
++  return a * b;
++}
++
++/* { dg-final { scan-assembler "mul\t" } } */
++/* { dg-final { scan-assembler "mulw\t" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-zmmul.c b/gcc/testsuite/gcc.target/riscv/wch-zmmul.c
+new file mode 100644
+index 000000000..92e9b98ce
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-zmmul.c
+@@ -0,0 +1,39 @@
++/* { dg-do compile } */
++/* { dg-options "-march=rv32i_zmmul -mabi=ilp32 -O2" } */
++
++int
++mul (int a, int b)
++{
++  return a * b;
++}
++
++int
++div (int a, int b)
++{
++  return a / b;
++}
++
++long long
++smul (int a, int b)
++{
++  return (long long) a * b;
++}
++
++unsigned long long
++umul (unsigned int a, unsigned int b)
++{
++  return (unsigned long long) a * b;
++}
++
++long long
++usmul (unsigned int a, int b)
++{
++  return (long long) a * b;
++}
++
++/* { dg-final { scan-assembler "mul\t" } } */
++/* { dg-final { scan-assembler "mulh\t" } } */
++/* { dg-final { scan-assembler "mulhu\t" } } */
++/* { dg-final { scan-assembler "mulhsu\t" } } */
++/* { dg-final { scan-assembler "__divsi3" } } */
++/* { dg-final { scan-assembler-not "div\t" } } */

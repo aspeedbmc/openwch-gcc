@@ -1,0 +1,863 @@
+# Tag-driven delivery.  Every release asset is produced by the same build and
+# byte-gate sequence as .github/workflows/toolchain-ci.yml: nothing is packaged
+# that has not first been proven byte-identical to the official WCH package in
+# the same run and the same working directory.
+#
+# The sequence is repeated inline rather than factored out.  A reusable
+# workflow (workflow_call) is deliberately not used: local act support for it
+# has never been dependable, and this pipeline has to stay verifiable with act.
+# A repository-local composite action would be the other permitted form, but it
+# is not exercised by act's parser either, so plain repetition is what can
+# actually be checked before the first real run.
+#
+# ---------------------------------------------------------------------------
+# Asset shape
+# ---------------------------------------------------------------------------
+#   name      openwch-toolchain-<version>-<platform>.tar.gz  (+ .sha256)
+#   root dir  openwch-toolchain-<version>-<platform>/
+#   contents  the complete installed toolchain: the compiler and binutils this
+#             repository builds from pristine upstream plus its patch series,
+#             with the official WCH target libraries, sysroot, specs and
+#             libgcc injected byte for byte by the build script.  That is the
+#             artifact the byte gate was run against, packaged verbatim -- not
+#             a re-assembled subset.
+#
+# ---------------------------------------------------------------------------
+# Reproducible packaging
+# ---------------------------------------------------------------------------
+# The embedded build time is SOURCE_DATE_EPOCH=1767225600, pinned by every
+# build script; the archive is made to agree with it rather than with the
+# runner's clock.  tar is given --sort=name (stable member order regardless of
+# readdir order), --mtime=@$SOURCE_DATE_EPOCH (no run timestamps), and
+# --owner=0 --group=0 --numeric-owner (no runner account names or ids), and
+# gzip is given -n so its header carries neither a timestamp nor the input file
+# name.  Without all five, two runs of an identical toolchain would produce
+# different archive bytes and the release asset could not be checked against a
+# rebuild.  These flags are GNU tar's; macOS ships bsdtar, so the darwin jobs
+# resolve GNU tar first.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# act executes a container job's `run:` steps with `sh -e` (dash), where
+# `set -o pipefail` is an illegal option and PIPESTATUS does not exist --
+# measured, not assumed.  Naming the shell makes act and GitHub agree and
+# keeps the pipefail-dependent steps below valid in both.
+defaults:
+  run:
+    shell: bash
+
+env:
+  BUILD_JOBS: "16"
+  EVT_GOLDEN_WORKERS: "16"
+  EVT_COMPARE_WORKERS: "16"
+  SOURCE_DATE_EPOCH: "1767225600"
+
+jobs:
+  release-linux-15-2-0:
+    name: release linux-amd64 GCC 15.2.0
+    runs-on: ubuntu-24.04
+    # Below the platform's 6 h hard limit on purpose: at exactly 360 the
+    # platform cuts the job silently, losing the very data that would
+    # explain the overrun.  15 minutes of headroom buys a diagnosable
+    # timeout that still flushes what the instrumentation has collected.
+    timeout-minutes: 345
+    permissions:
+      contents: write
+    container:
+      image: debian:bookworm@sha256:9344f8b8992482f80cba753f323adeaf17690076c095ccff6cc9536be98185dc
+    env:
+      OPENWCH_VERSION: "15.2.0"
+      OPENWCH_PLATFORM: linux-amd64
+      GATE_ARTIFACT_TOTAL: "274"
+      GATE_PROJECT_TOTAL: "9"
+      EVT_CONTAINER_IMAGE: "debian:bookworm@sha256:9344f8b8992482f80cba753f323adeaf17690076c095ccff6cc9536be98185dc"
+      TOOLCHAIN_TREE: tmp/ci-src/15.2.0/riscv-gnu-toolchain
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install container build dependencies
+        run: |
+          set -eu
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends \
+            bison flex texinfo gawk make gcc g++ libc6-dev m4 zlib1g-dev patch \
+            python3 perl git curl ca-certificates nodejs \
+            xz-utils bzip2 gzip tar diffutils findutils sed grep coreutils
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          echo "--- installed apt package set ---"
+          dpkg-query -W -f '${Package}\t${Version}\n' | sort
+
+      - name: Record environment facts
+        run: |
+          set -eu
+          printf 'P7_FACT\tnproc\t%s\n' "$(nproc)"
+          printf 'P7_FACT\tuname\t%s %s\n' "$(uname -s)" "$(uname -m)"
+          /usr/bin/gcc --version | sed -n 1p
+          make --version | sed -n 1p
+          tar --version | sed -n 1p
+          df -k . | tail -n 1
+
+      - name: Provision the official toolchain
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tprovision\t%s\n' "$(date +%s)"
+          scripts/ci/provision-official.sh "$OPENWCH_VERSION"
+          printf 'P7_DISK\tafter-provision\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
+          printf 'P7_STAGE\tend\tprovision\t%s\n' "$(date +%s)"
+
+      - name: Apply EVT project patches
+        run: sh ref/wch-evt/patches/apply.sh
+
+      - name: Prepare pristine sources and apply the patch series
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tprepare\t%s\n' "$(date +%s)"
+          scripts/ci/prepare-sources.sh "$OPENWCH_VERSION"
+          printf 'P7_STAGE\tend\tprepare\t%s\n' "$(date +%s)"
+
+      - name: Create the literal build path
+        run: scripts/ci/setup-literal-paths.sh "$OPENWCH_VERSION"
+
+      - name: Build the toolchain
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tbuild\t%s\n' "$(date +%s)"
+          target="${TOOLCHAIN_TREE:-$TOOLCHAIN_PROJECT}"
+          samples="$RUNNER_TEMP/build-samples.tsv"
+          : > "$samples"
+          (
+            while : ; do
+              now=$(date +%s)
+              kb=$( { du -sk "$target" 2>/dev/null || true; } | awk '{print $1}' || true)
+              if [ -r /sys/fs/cgroup/memory.peak ]; then
+                mem=$(cat /sys/fs/cgroup/memory.peak || echo 0); memmax=-1; memkind=cgroup-peak-bytes
+              else
+                # macOS has no cgroup.  The metric is vm_stat app memory
+                # (active + wired + compressed), chosen by measurement: a
+                # `ps -A -o rss=` sum reads 5.1x higher than app memory on the
+                # same machine at the same instant, because RSS counts shared
+                # text once per process.  "Pages free" is unusable in the other
+                # direction -- macOS keeps memory nearly full as cache, so free
+                # sits near zero and would imply the box is already exhausted.
+                # Known bias: this metric reads LOW (the compressor absorbs
+                # pages), so treat it as a floor.
+                mem=$( { vm_stat 2>/dev/null || true; } | awk '
+                  /page size of/ { for (i = 1; i <= NF; i++) if ($i ~ /^[0-9]+$/) { psz = $i; break } }
+                  /^Pages active:/ { gsub(/\./, "", $NF); a = $NF }
+                  /^Pages wired down:/ { gsub(/\./, "", $NF); w = $NF }
+                  /^Pages occupied by compressor:/ { gsub(/\./, "", $NF); c = $NF }
+                  END { print (a + w + c) * psz }' || echo 0)
+                memmax=-1
+                memkind=vm_stat-app-bytes
+              fi
+              printf 'P7_SAMPLE\tbuild\t%s\t%s\t%s\t%s\t%s\n' \
+                "$now" "${kb:-0}" "${mem:-0}" "${memmax:-0}" "$memkind"
+              printf '%s\t%s\t%s\t%s\t%s\n' \
+                "$now" "${kb:-0}" "${mem:-0}" "${memmax:-0}" "$memkind" >> "$samples"
+              sleep 30
+            done
+          ) &
+          sampler=$!
+          trap 'kill "$sampler" 2>/dev/null || true' EXIT
+          scripts/build-toolchain-15.2.0-linux.sh "$TOOLCHAIN_TREE"
+          kill "$sampler" 2>/dev/null || true
+          trap - EXIT
+          printf 'P7_DISK\tbuild-peak\t%s\tpeak du -sk of the source and build tree\n' \
+            "$(awk -F'\t' '{if ($2+0 > m) m = $2+0} END {print m+0}' "$samples")"
+          printf 'P7_MEM\tbuild-peak\t%s\t%s\n' \
+            "$(awk -F'\t' '{if ($3+0 > m) m = $3+0} END {print m+0}' "$samples")" \
+            "$(awk -F'\t' 'END {print $5}' "$samples")"
+          printf 'P7_MEM\tbuild-peak-largest-process\t%s\tps rss KiB; -1 means the cgroup path was used\n' \
+            "$(awk -F'\t' '{if ($4+0 > m) m = $4+0} END {print m+0}' "$samples")"
+          printf 'P7_STAGE\tend\tbuild\t%s\n' "$(date +%s)"
+
+      - name: Generate the golden manifest with the official toolchain
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tgate-golden\t%s\n' "$(date +%s)"
+          scripts/evt-golden.sh "$OPENWCH_VERSION"
+          printf 'P7_STAGE\tend\tgate-golden\t%s\n' "$(date +%s)"
+
+      - name: 'Assertion 1 and 2: manifest scale against absolute constants'
+        run: |
+          set -eu
+          manifest="analysis/golden/${OPENWCH_VERSION}-${OPENWCH_PLATFORM}.tsv"
+          gate_rows=$(awk -F '\t' '$1 !~ /^#/ && $1 != "slug" && $3 == "gate" { c++ } END { print c+0 }' "$manifest")
+          projects=$(awk -F '\t' '$1 !~ /^#/ && $1 != "slug" { print $1 }' "$manifest" | sort -u | wc -l | tr -d '[:space:]')
+          echo "manifest_gate_rows=$gate_rows expected=$GATE_ARTIFACT_TOTAL"
+          echo "manifest_projects=$projects expected=$GATE_PROJECT_TOTAL"
+          test "$gate_rows" = "$GATE_ARTIFACT_TOTAL"
+          test "$projects" = "$GATE_PROJECT_TOTAL"
+
+      - name: Compare our toolchain against the fresh manifest
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tgate-compare\t%s\n' "$(date +%s)"
+          set -o pipefail
+          status=0
+          scripts/evt-compare.sh "$OPENWCH_VERSION" "$TOOLCHAIN_TREE/output" \
+            | tee "$RUNNER_TEMP/evt-compare.log" || status=$?
+          echo "$status" > "$RUNNER_TEMP/evt-compare.status"
+          echo "evt_compare_status=$status"
+          printf 'P7_DISK\tafter-gate\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
+          printf 'P7_MEM\tgate-peak\t%s\t%s\n' \
+            "$(cat /sys/fs/cgroup/memory.peak 2>/dev/null || ps -A -o rss= | awk '{s+=$1} END {print s+0}')" \
+            "$([ -r /sys/fs/cgroup/memory.peak ] && echo cgroup-peak-bytes || echo ps-rss-kb)"
+          printf 'P7_STAGE\tend\tgate-compare\t%s\n' "$(date +%s)"
+
+      - name: 'Assertion 3: comparison summary'
+        run: |
+          set -eu
+          summary=$(awk -F '\t' '$1 == "SUMMARY" { print }' "$RUNNER_TEMP/evt-compare.log")
+          test -n "$summary"
+          echo "$summary"
+          printf '%s\n' "$summary" | awk -F '\t' -v want="gate_pass=$GATE_ARTIFACT_TOTAL" '
+            {
+              pass = 0; fail = 0
+              for (i = 2; i <= NF; i++) {
+                if ($i == want) pass = 1
+                if ($i == "gate_fail=0") fail = 1
+              }
+              exit (pass && fail) ? 0 : 1
+            }'
+          test "$(cat "$RUNNER_TEMP/evt-compare.status")" = "0"
+
+      - name: Package the gated toolchain
+        run: |
+          set -eu
+          name="openwch-toolchain-${OPENWCH_VERSION}-${OPENWCH_PLATFORM}"
+          stage="$RUNNER_TEMP/package"
+          rm -rf "$stage"
+          mkdir -p "$stage"
+          cp -R "$TOOLCHAIN_TREE/output" "$stage/$name"
+          mkdir -p "$RUNNER_TEMP/assets"
+          tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" \
+              --owner=0 --group=0 --numeric-owner --format=gnu \
+              -C "$stage" -cf - "$name" \
+            | gzip -n > "$RUNNER_TEMP/assets/$name.tar.gz"
+          ( cd "$RUNNER_TEMP/assets" && sha256sum "$name.tar.gz" > "$name.tar.gz.sha256" )
+          cat "$RUNNER_TEMP/assets/$name.tar.gz.sha256"
+
+      - name: Publish the release assets
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          files: |
+            ${{ runner.temp }}/assets/*.tar.gz
+            ${{ runner.temp }}/assets/*.tar.gz.sha256
+          fail_on_unmatched_files: true
+
+      - name: Upload the assets as a workflow artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: assets-linux-amd64-15.2.0
+          path: ${{ runner.temp }}/assets
+          if-no-files-found: warn
+
+  release-darwin-15-2-0:
+    name: release darwin-arm64 GCC 15.2.0
+    runs-on: macos-15
+    # Below the platform's 6 h hard limit on purpose: at exactly 360 the
+    # platform cuts the job silently, losing the very data that would
+    # explain the overrun.  15 minutes of headroom buys a diagnosable
+    # timeout that still flushes what the instrumentation has collected.
+    timeout-minutes: 345
+    permissions:
+      contents: write
+    env:
+      OPENWCH_VERSION: "15.2.0"
+      OPENWCH_PLATFORM: darwin-arm64
+      GATE_ARTIFACT_TOTAL: "274"
+      GATE_PROJECT_TOTAL: "9"
+      TOOLCHAIN_TREE: tmp/ci-src/15.2.0/riscv-gnu-toolchain
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Record environment facts and resolve GNU tar
+        run: |
+          set -eu
+          printf 'P7_FACT\tnproc\t%s\n' "$(sysctl -n hw.ncpu)"
+          printf 'P7_FACT\tuname\t%s %s\n' "$(uname -s)" "$(uname -m)"
+          /usr/bin/clang --version | sed -n 1p
+          command -v gtar >/dev/null 2>&1 || brew install gnu-tar
+          gtar --version | sed -n 1p
+          df -k . | tail -n 1
+
+      - name: Ensure Homebrew zstd is present
+        run: |
+          set -eu
+          if [ ! -e /opt/homebrew/include/zstd.h ] || [ ! -e /opt/homebrew/lib/libzstd.dylib ]; then
+            brew install zstd
+          fi
+
+      - name: Provision the official toolchain
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tprovision\t%s\n' "$(date +%s)"
+          scripts/ci/provision-official.sh "$OPENWCH_VERSION"
+          printf 'P7_DISK\tafter-provision\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
+          printf 'P7_STAGE\tend\tprovision\t%s\n' "$(date +%s)"
+
+      - name: Apply EVT project patches
+        run: sh ref/wch-evt/patches/apply.sh
+
+      - name: Prepare pristine sources and apply the patch series
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tprepare\t%s\n' "$(date +%s)"
+          scripts/ci/prepare-sources.sh "$OPENWCH_VERSION"
+          printf 'P7_STAGE\tend\tprepare\t%s\n' "$(date +%s)"
+
+      - name: Create the literal build path
+        run: scripts/ci/setup-literal-paths.sh "$OPENWCH_VERSION"
+
+      - name: Build the toolchain
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tbuild\t%s\n' "$(date +%s)"
+          target="${TOOLCHAIN_TREE:-$TOOLCHAIN_PROJECT}"
+          samples="$RUNNER_TEMP/build-samples.tsv"
+          : > "$samples"
+          (
+            while : ; do
+              now=$(date +%s)
+              kb=$( { du -sk "$target" 2>/dev/null || true; } | awk '{print $1}' || true)
+              if [ -r /sys/fs/cgroup/memory.peak ]; then
+                mem=$(cat /sys/fs/cgroup/memory.peak || echo 0); memmax=-1; memkind=cgroup-peak-bytes
+              else
+                # macOS has no cgroup.  The metric is vm_stat app memory
+                # (active + wired + compressed), chosen by measurement: a
+                # `ps -A -o rss=` sum reads 5.1x higher than app memory on the
+                # same machine at the same instant, because RSS counts shared
+                # text once per process.  "Pages free" is unusable in the other
+                # direction -- macOS keeps memory nearly full as cache, so free
+                # sits near zero and would imply the box is already exhausted.
+                # Known bias: this metric reads LOW (the compressor absorbs
+                # pages), so treat it as a floor.
+                mem=$( { vm_stat 2>/dev/null || true; } | awk '
+                  /page size of/ { for (i = 1; i <= NF; i++) if ($i ~ /^[0-9]+$/) { psz = $i; break } }
+                  /^Pages active:/ { gsub(/\./, "", $NF); a = $NF }
+                  /^Pages wired down:/ { gsub(/\./, "", $NF); w = $NF }
+                  /^Pages occupied by compressor:/ { gsub(/\./, "", $NF); c = $NF }
+                  END { print (a + w + c) * psz }' || echo 0)
+                memmax=-1
+                memkind=vm_stat-app-bytes
+              fi
+              printf 'P7_SAMPLE\tbuild\t%s\t%s\t%s\t%s\t%s\n' \
+                "$now" "${kb:-0}" "${mem:-0}" "${memmax:-0}" "$memkind"
+              printf '%s\t%s\t%s\t%s\t%s\n' \
+                "$now" "${kb:-0}" "${mem:-0}" "${memmax:-0}" "$memkind" >> "$samples"
+              sleep 30
+            done
+          ) &
+          sampler=$!
+          trap 'kill "$sampler" 2>/dev/null || true' EXIT
+          scripts/build-toolchain-15.2.0.sh "$TOOLCHAIN_TREE"
+          kill "$sampler" 2>/dev/null || true
+          trap - EXIT
+          printf 'P7_DISK\tbuild-peak\t%s\tpeak du -sk of the source and build tree\n' \
+            "$(awk -F'\t' '{if ($2+0 > m) m = $2+0} END {print m+0}' "$samples")"
+          printf 'P7_MEM\tbuild-peak\t%s\t%s\n' \
+            "$(awk -F'\t' '{if ($3+0 > m) m = $3+0} END {print m+0}' "$samples")" \
+            "$(awk -F'\t' 'END {print $5}' "$samples")"
+          printf 'P7_MEM\tbuild-peak-largest-process\t%s\tps rss KiB; -1 means the cgroup path was used\n' \
+            "$(awk -F'\t' '{if ($4+0 > m) m = $4+0} END {print m+0}' "$samples")"
+          printf 'P7_STAGE\tend\tbuild\t%s\n' "$(date +%s)"
+
+      - name: Generate the golden manifest with the official toolchain
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tgate-golden\t%s\n' "$(date +%s)"
+          scripts/evt-golden.sh "$OPENWCH_VERSION"
+          printf 'P7_STAGE\tend\tgate-golden\t%s\n' "$(date +%s)"
+
+      - name: 'Assertion 1 and 2: manifest scale against absolute constants'
+        run: |
+          set -eu
+          manifest="analysis/golden/${OPENWCH_VERSION}-${OPENWCH_PLATFORM}.tsv"
+          gate_rows=$(awk -F '\t' '$1 !~ /^#/ && $1 != "slug" && $3 == "gate" { c++ } END { print c+0 }' "$manifest")
+          projects=$(awk -F '\t' '$1 !~ /^#/ && $1 != "slug" { print $1 }' "$manifest" | sort -u | wc -l | tr -d '[:space:]')
+          echo "manifest_gate_rows=$gate_rows expected=$GATE_ARTIFACT_TOTAL"
+          echo "manifest_projects=$projects expected=$GATE_PROJECT_TOTAL"
+          test "$gate_rows" = "$GATE_ARTIFACT_TOTAL"
+          test "$projects" = "$GATE_PROJECT_TOTAL"
+
+      - name: Compare our toolchain against the fresh manifest
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tgate-compare\t%s\n' "$(date +%s)"
+          set -o pipefail
+          status=0
+          scripts/evt-compare.sh "$OPENWCH_VERSION" "$TOOLCHAIN_TREE/output" \
+            | tee "$RUNNER_TEMP/evt-compare.log" || status=$?
+          echo "$status" > "$RUNNER_TEMP/evt-compare.status"
+          echo "evt_compare_status=$status"
+          printf 'P7_DISK\tafter-gate\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
+          printf 'P7_MEM\tgate-peak\t%s\t%s\n' \
+            "$(cat /sys/fs/cgroup/memory.peak 2>/dev/null || ps -A -o rss= | awk '{s+=$1} END {print s+0}')" \
+            "$([ -r /sys/fs/cgroup/memory.peak ] && echo cgroup-peak-bytes || echo ps-rss-kb)"
+          printf 'P7_STAGE\tend\tgate-compare\t%s\n' "$(date +%s)"
+
+      - name: 'Assertion 3: comparison summary'
+        run: |
+          set -eu
+          summary=$(awk -F '\t' '$1 == "SUMMARY" { print }' "$RUNNER_TEMP/evt-compare.log")
+          test -n "$summary"
+          echo "$summary"
+          printf '%s\n' "$summary" | awk -F '\t' -v want="gate_pass=$GATE_ARTIFACT_TOTAL" '
+            {
+              pass = 0; fail = 0
+              for (i = 2; i <= NF; i++) {
+                if ($i == want) pass = 1
+                if ($i == "gate_fail=0") fail = 1
+              }
+              exit (pass && fail) ? 0 : 1
+            }'
+          test "$(cat "$RUNNER_TEMP/evt-compare.status")" = "0"
+
+      - name: Package the gated toolchain
+        run: |
+          set -eu
+          name="openwch-toolchain-${OPENWCH_VERSION}-${OPENWCH_PLATFORM}"
+          stage="$RUNNER_TEMP/package"
+          rm -rf "$stage"
+          mkdir -p "$stage"
+          cp -R "$TOOLCHAIN_TREE/output" "$stage/$name"
+          mkdir -p "$RUNNER_TEMP/assets"
+          gtar --sort=name --mtime="@$SOURCE_DATE_EPOCH" \
+               --owner=0 --group=0 --numeric-owner --format=gnu \
+               -C "$stage" -cf - "$name" \
+            | gzip -n > "$RUNNER_TEMP/assets/$name.tar.gz"
+          ( cd "$RUNNER_TEMP/assets" && shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256" )
+          cat "$RUNNER_TEMP/assets/$name.tar.gz.sha256"
+
+      - name: Publish the release assets
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          files: |
+            ${{ runner.temp }}/assets/*.tar.gz
+            ${{ runner.temp }}/assets/*.tar.gz.sha256
+          fail_on_unmatched_files: true
+
+      - name: Upload the assets as a workflow artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: assets-darwin-arm64-15.2.0
+          path: ${{ runner.temp }}/assets
+          if-no-files-found: warn
+
+  release-darwin-12-2-0:
+    name: release darwin-arm64 GCC 12.2.0
+    runs-on: macos-15
+    # Below the platform's 6 h hard limit on purpose: at exactly 360 the
+    # platform cuts the job silently, losing the very data that would
+    # explain the overrun.  15 minutes of headroom buys a diagnosable
+    # timeout that still flushes what the instrumentation has collected.
+    timeout-minutes: 345
+    permissions:
+      contents: write
+    env:
+      OPENWCH_VERSION: "12.2.0"
+      OPENWCH_PLATFORM: darwin-arm64
+      GATE_ARTIFACT_TOTAL: "274"
+      GATE_PROJECT_TOTAL: "9"
+      TOOLCHAIN_PROJECT: tmp/ci-src/12.2.0/riscv-none-elf-gcc-xpack.git
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Record environment facts and resolve GNU tar
+        run: |
+          set -eu
+          printf 'P7_FACT\tnproc\t%s\n' "$(sysctl -n hw.ncpu)"
+          printf 'P7_FACT\tuname\t%s %s\n' "$(uname -s)" "$(uname -m)"
+          /usr/bin/clang --version | sed -n 1p
+          command -v gtar >/dev/null 2>&1 || brew install gnu-tar
+          gtar --version | sed -n 1p
+          df -k . | tail -n 1
+
+      - name: Provision the official toolchain
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tprovision\t%s\n' "$(date +%s)"
+          scripts/ci/provision-official.sh "$OPENWCH_VERSION"
+          printf 'P7_DISK\tafter-provision\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
+          printf 'P7_STAGE\tend\tprovision\t%s\n' "$(date +%s)"
+
+      - name: Apply EVT project patches
+        run: sh ref/wch-evt/patches/apply.sh
+
+      - name: Prepare pristine sources and apply the patch series
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tprepare\t%s\n' "$(date +%s)"
+          scripts/ci/prepare-sources.sh "$OPENWCH_VERSION"
+          printf 'P7_STAGE\tend\tprepare\t%s\n' "$(date +%s)"
+
+      - name: Create the literal build path
+        run: scripts/ci/setup-literal-paths.sh "$OPENWCH_VERSION"
+
+      - name: Build the toolchain
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tbuild\t%s\n' "$(date +%s)"
+          target="${TOOLCHAIN_TREE:-$TOOLCHAIN_PROJECT}"
+          samples="$RUNNER_TEMP/build-samples.tsv"
+          : > "$samples"
+          (
+            while : ; do
+              now=$(date +%s)
+              kb=$( { du -sk "$target" 2>/dev/null || true; } | awk '{print $1}' || true)
+              if [ -r /sys/fs/cgroup/memory.peak ]; then
+                mem=$(cat /sys/fs/cgroup/memory.peak || echo 0); memmax=-1; memkind=cgroup-peak-bytes
+              else
+                # macOS has no cgroup.  The metric is vm_stat app memory
+                # (active + wired + compressed), chosen by measurement: a
+                # `ps -A -o rss=` sum reads 5.1x higher than app memory on the
+                # same machine at the same instant, because RSS counts shared
+                # text once per process.  "Pages free" is unusable in the other
+                # direction -- macOS keeps memory nearly full as cache, so free
+                # sits near zero and would imply the box is already exhausted.
+                # Known bias: this metric reads LOW (the compressor absorbs
+                # pages), so treat it as a floor.
+                mem=$( { vm_stat 2>/dev/null || true; } | awk '
+                  /page size of/ { for (i = 1; i <= NF; i++) if ($i ~ /^[0-9]+$/) { psz = $i; break } }
+                  /^Pages active:/ { gsub(/\./, "", $NF); a = $NF }
+                  /^Pages wired down:/ { gsub(/\./, "", $NF); w = $NF }
+                  /^Pages occupied by compressor:/ { gsub(/\./, "", $NF); c = $NF }
+                  END { print (a + w + c) * psz }' || echo 0)
+                memmax=-1
+                memkind=vm_stat-app-bytes
+              fi
+              printf 'P7_SAMPLE\tbuild\t%s\t%s\t%s\t%s\t%s\n' \
+                "$now" "${kb:-0}" "${mem:-0}" "${memmax:-0}" "$memkind"
+              printf '%s\t%s\t%s\t%s\t%s\n' \
+                "$now" "${kb:-0}" "${mem:-0}" "${memmax:-0}" "$memkind" >> "$samples"
+              sleep 30
+            done
+          ) &
+          sampler=$!
+          trap 'kill "$sampler" 2>/dev/null || true' EXIT
+          CLEAN_HOST_DEPS=1 scripts/build-toolchain-12.2.0.sh "$TOOLCHAIN_PROJECT"
+          kill "$sampler" 2>/dev/null || true
+          trap - EXIT
+          printf 'P7_DISK\tbuild-peak\t%s\tpeak du -sk of the source and build tree\n' \
+            "$(awk -F'\t' '{if ($2+0 > m) m = $2+0} END {print m+0}' "$samples")"
+          printf 'P7_MEM\tbuild-peak\t%s\t%s\n' \
+            "$(awk -F'\t' '{if ($3+0 > m) m = $3+0} END {print m+0}' "$samples")" \
+            "$(awk -F'\t' 'END {print $5}' "$samples")"
+          printf 'P7_MEM\tbuild-peak-largest-process\t%s\tps rss KiB; -1 means the cgroup path was used\n' \
+            "$(awk -F'\t' '{if ($4+0 > m) m = $4+0} END {print m+0}' "$samples")"
+          printf 'P7_STAGE\tend\tbuild\t%s\n' "$(date +%s)"
+
+      - name: Generate the golden manifest with the official toolchain
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tgate-golden\t%s\n' "$(date +%s)"
+          scripts/evt-golden.sh "$OPENWCH_VERSION"
+          printf 'P7_STAGE\tend\tgate-golden\t%s\n' "$(date +%s)"
+
+      - name: 'Assertion 1 and 2: manifest scale against absolute constants'
+        run: |
+          set -eu
+          manifest="analysis/golden/${OPENWCH_VERSION}-${OPENWCH_PLATFORM}.tsv"
+          gate_rows=$(awk -F '\t' '$1 !~ /^#/ && $1 != "slug" && $3 == "gate" { c++ } END { print c+0 }' "$manifest")
+          projects=$(awk -F '\t' '$1 !~ /^#/ && $1 != "slug" { print $1 }' "$manifest" | sort -u | wc -l | tr -d '[:space:]')
+          echo "manifest_gate_rows=$gate_rows expected=$GATE_ARTIFACT_TOTAL"
+          echo "manifest_projects=$projects expected=$GATE_PROJECT_TOTAL"
+          test "$gate_rows" = "$GATE_ARTIFACT_TOTAL"
+          test "$projects" = "$GATE_PROJECT_TOTAL"
+
+      - name: Compare our toolchain against the fresh manifest
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tgate-compare\t%s\n' "$(date +%s)"
+          set -o pipefail
+          status=0
+          scripts/evt-compare.sh "$OPENWCH_VERSION" \
+            "$TOOLCHAIN_PROJECT/build/darwin-arm64/application" \
+            | tee "$RUNNER_TEMP/evt-compare.log" || status=$?
+          echo "$status" > "$RUNNER_TEMP/evt-compare.status"
+          echo "evt_compare_status=$status"
+          printf 'P7_DISK\tafter-gate\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
+          printf 'P7_MEM\tgate-peak\t%s\t%s\n' \
+            "$(cat /sys/fs/cgroup/memory.peak 2>/dev/null || ps -A -o rss= | awk '{s+=$1} END {print s+0}')" \
+            "$([ -r /sys/fs/cgroup/memory.peak ] && echo cgroup-peak-bytes || echo ps-rss-kb)"
+          printf 'P7_STAGE\tend\tgate-compare\t%s\n' "$(date +%s)"
+
+      - name: 'Assertion 3: comparison summary'
+        run: |
+          set -eu
+          summary=$(awk -F '\t' '$1 == "SUMMARY" { print }' "$RUNNER_TEMP/evt-compare.log")
+          test -n "$summary"
+          echo "$summary"
+          printf '%s\n' "$summary" | awk -F '\t' -v want="gate_pass=$GATE_ARTIFACT_TOTAL" '
+            {
+              pass = 0; fail = 0
+              for (i = 2; i <= NF; i++) {
+                if ($i == want) pass = 1
+                if ($i == "gate_fail=0") fail = 1
+              }
+              exit (pass && fail) ? 0 : 1
+            }'
+          test "$(cat "$RUNNER_TEMP/evt-compare.status")" = "0"
+
+      - name: Package the gated toolchain
+        run: |
+          set -eu
+          name="openwch-toolchain-${OPENWCH_VERSION}-${OPENWCH_PLATFORM}"
+          stage="$RUNNER_TEMP/package"
+          rm -rf "$stage"
+          mkdir -p "$stage"
+          cp -R "$TOOLCHAIN_PROJECT/build/darwin-arm64/application" "$stage/$name"
+          mkdir -p "$RUNNER_TEMP/assets"
+          gtar --sort=name --mtime="@$SOURCE_DATE_EPOCH" \
+               --owner=0 --group=0 --numeric-owner --format=gnu \
+               -C "$stage" -cf - "$name" \
+            | gzip -n > "$RUNNER_TEMP/assets/$name.tar.gz"
+          ( cd "$RUNNER_TEMP/assets" && shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256" )
+          cat "$RUNNER_TEMP/assets/$name.tar.gz.sha256"
+
+      - name: Publish the release assets
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          files: |
+            ${{ runner.temp }}/assets/*.tar.gz
+            ${{ runner.temp }}/assets/*.tar.gz.sha256
+          fail_on_unmatched_files: true
+
+      - name: Upload the assets as a workflow artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: assets-darwin-arm64-12.2.0
+          path: ${{ runner.temp }}/assets
+          if-no-files-found: warn
+
+  release-darwin-8-2-0:
+    name: release darwin-arm64 GCC 8.2.0
+    # arm64, for the same reason as in toolchain-ci.yml: the gate harness maps
+    # only Darwin/arm64 on macOS, and build-toolchain-8.2.0.sh re-executes
+    # itself through arch -x86_64 so the compiler is still an x86_64 host build.
+    runs-on: macos-15
+    # Below the platform's 6 h hard limit on purpose: at exactly 360 the
+    # platform cuts the job silently, losing the very data that would
+    # explain the overrun.  15 minutes of headroom buys a diagnosable
+    # timeout that still flushes what the instrumentation has collected.
+    timeout-minutes: 345
+    permissions:
+      contents: write
+    env:
+      OPENWCH_VERSION: "8.2.0"
+      OPENWCH_PLATFORM: darwin-arm64
+      GATE_ARTIFACT_TOTAL: "242"
+      GATE_PROJECT_TOTAL: "8"
+      TOOLCHAIN_PROJECT: tmp/toolchain_8.2.0/work
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Record environment facts and resolve GNU tar
+        run: |
+          set -eu
+          printf 'P7_FACT\tnproc\t%s\n' "$(sysctl -n hw.ncpu)"
+          printf 'P7_FACT\tuname\t%s %s\n' "$(uname -s)" "$(uname -m)"
+          /usr/bin/clang --version | sed -n 1p
+          command -v gtar >/dev/null 2>&1 || brew install gnu-tar
+          gtar --version | sed -n 1p
+          df -k . | tail -n 1
+
+      # Load-bearing, not a contingency: this leg genuinely runs through
+      # Rosetta, because build-toolchain-8.2.0.sh:27-30 re-executes itself with
+      # arch -x86_64 to match the official --build/--host=x86_64-apple-darwin17
+      # configure literal.  Rosetta 2 IS preinstalled on the arm64 macOS images
+      # -- the evidence is the image's own packer template running
+      # install-rosetta.sh and the image self-test asserting `pgrep oahd`.  The
+      # image Readmes never mention Rosetta at all, so reading them alone would
+      # wrongly suggest it is absent.  The step therefore probes and installs
+      # only on failure instead of relying on the runner default either way.
+      - name: Ensure Rosetta 2 can execute x86_64 binaries
+        run: |
+          set -eu
+          if arch -x86_64 /usr/bin/true 2>/dev/null; then
+            echo "rosetta=present"
+          else
+            echo "rosetta=absent action=install"
+            sudo /usr/sbin/softwareupdate --install-rosetta --agree-to-license
+            arch -x86_64 /usr/bin/true
+          fi
+
+      - name: Provision the official toolchain
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tprovision\t%s\n' "$(date +%s)"
+          scripts/ci/provision-official.sh "$OPENWCH_VERSION"
+          printf 'P7_DISK\tafter-provision\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
+          printf 'P7_STAGE\tend\tprovision\t%s\n' "$(date +%s)"
+
+      - name: Apply EVT project patches
+        run: sh ref/wch-evt/patches/apply.sh
+
+      - name: Prepare pristine sources and apply the patch series
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tprepare\t%s\n' "$(date +%s)"
+          scripts/ci/prepare-sources.sh "$OPENWCH_VERSION"
+          printf 'P7_STAGE\tend\tprepare\t%s\n' "$(date +%s)"
+
+      - name: Create the literal build path
+        run: scripts/ci/setup-literal-paths.sh "$OPENWCH_VERSION"
+
+      - name: Build the toolchain
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tbuild\t%s\n' "$(date +%s)"
+          target="${TOOLCHAIN_TREE:-$TOOLCHAIN_PROJECT}"
+          samples="$RUNNER_TEMP/build-samples.tsv"
+          : > "$samples"
+          (
+            while : ; do
+              now=$(date +%s)
+              kb=$( { du -sk "$target" 2>/dev/null || true; } | awk '{print $1}' || true)
+              if [ -r /sys/fs/cgroup/memory.peak ]; then
+                mem=$(cat /sys/fs/cgroup/memory.peak || echo 0); memmax=-1; memkind=cgroup-peak-bytes
+              else
+                # macOS has no cgroup.  The metric is vm_stat app memory
+                # (active + wired + compressed), chosen by measurement: a
+                # `ps -A -o rss=` sum reads 5.1x higher than app memory on the
+                # same machine at the same instant, because RSS counts shared
+                # text once per process.  "Pages free" is unusable in the other
+                # direction -- macOS keeps memory nearly full as cache, so free
+                # sits near zero and would imply the box is already exhausted.
+                # Known bias: this metric reads LOW (the compressor absorbs
+                # pages), so treat it as a floor.
+                mem=$( { vm_stat 2>/dev/null || true; } | awk '
+                  /page size of/ { for (i = 1; i <= NF; i++) if ($i ~ /^[0-9]+$/) { psz = $i; break } }
+                  /^Pages active:/ { gsub(/\./, "", $NF); a = $NF }
+                  /^Pages wired down:/ { gsub(/\./, "", $NF); w = $NF }
+                  /^Pages occupied by compressor:/ { gsub(/\./, "", $NF); c = $NF }
+                  END { print (a + w + c) * psz }' || echo 0)
+                memmax=-1
+                memkind=vm_stat-app-bytes
+              fi
+              printf 'P7_SAMPLE\tbuild\t%s\t%s\t%s\t%s\t%s\n' \
+                "$now" "${kb:-0}" "${mem:-0}" "${memmax:-0}" "$memkind"
+              printf '%s\t%s\t%s\t%s\t%s\n' \
+                "$now" "${kb:-0}" "${mem:-0}" "${memmax:-0}" "$memkind" >> "$samples"
+              sleep 30
+            done
+          ) &
+          sampler=$!
+          trap 'kill "$sampler" 2>/dev/null || true' EXIT
+          CLEAN_HOST_DEPS=1 scripts/build-toolchain-8.2.0.sh
+          kill "$sampler" 2>/dev/null || true
+          trap - EXIT
+          printf 'P7_DISK\tbuild-peak\t%s\tpeak du -sk of the source and build tree\n' \
+            "$(awk -F'\t' '{if ($2+0 > m) m = $2+0} END {print m+0}' "$samples")"
+          printf 'P7_MEM\tbuild-peak\t%s\t%s\n' \
+            "$(awk -F'\t' '{if ($3+0 > m) m = $3+0} END {print m+0}' "$samples")" \
+            "$(awk -F'\t' 'END {print $5}' "$samples")"
+          printf 'P7_MEM\tbuild-peak-largest-process\t%s\tps rss KiB; -1 means the cgroup path was used\n' \
+            "$(awk -F'\t' '{if ($4+0 > m) m = $4+0} END {print m+0}' "$samples")"
+          printf 'P7_STAGE\tend\tbuild\t%s\n' "$(date +%s)"
+
+      - name: Generate the golden manifest with the official toolchain
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tgate-golden\t%s\n' "$(date +%s)"
+          scripts/evt-golden.sh "$OPENWCH_VERSION"
+          printf 'P7_STAGE\tend\tgate-golden\t%s\n' "$(date +%s)"
+
+      - name: 'Assertion 1 and 2: manifest scale against absolute constants'
+        run: |
+          set -eu
+          manifest="analysis/golden/${OPENWCH_VERSION}-${OPENWCH_PLATFORM}.tsv"
+          gate_rows=$(awk -F '\t' '$1 !~ /^#/ && $1 != "slug" && $3 == "gate" { c++ } END { print c+0 }' "$manifest")
+          projects=$(awk -F '\t' '$1 !~ /^#/ && $1 != "slug" { print $1 }' "$manifest" | sort -u | wc -l | tr -d '[:space:]')
+          echo "manifest_gate_rows=$gate_rows expected=$GATE_ARTIFACT_TOTAL"
+          echo "manifest_projects=$projects expected=$GATE_PROJECT_TOTAL"
+          test "$gate_rows" = "$GATE_ARTIFACT_TOTAL"
+          test "$projects" = "$GATE_PROJECT_TOTAL"
+
+      - name: Compare our toolchain against the fresh manifest
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tgate-compare\t%s\n' "$(date +%s)"
+          set -o pipefail
+          status=0
+          scripts/evt-compare.sh "$OPENWCH_VERSION" \
+            "$TOOLCHAIN_PROJECT/darwin-x64/install/riscv-none-embed-gcc" \
+            | tee "$RUNNER_TEMP/evt-compare.log" || status=$?
+          echo "$status" > "$RUNNER_TEMP/evt-compare.status"
+          echo "evt_compare_status=$status"
+          printf 'P7_DISK\tafter-gate\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
+          printf 'P7_MEM\tgate-peak\t%s\t%s\n' \
+            "$(cat /sys/fs/cgroup/memory.peak 2>/dev/null || ps -A -o rss= | awk '{s+=$1} END {print s+0}')" \
+            "$([ -r /sys/fs/cgroup/memory.peak ] && echo cgroup-peak-bytes || echo ps-rss-kb)"
+          printf 'P7_STAGE\tend\tgate-compare\t%s\n' "$(date +%s)"
+
+      - name: 'Assertion 3: comparison summary'
+        run: |
+          set -eu
+          summary=$(awk -F '\t' '$1 == "SUMMARY" { print }' "$RUNNER_TEMP/evt-compare.log")
+          test -n "$summary"
+          echo "$summary"
+          printf '%s\n' "$summary" | awk -F '\t' -v want="gate_pass=$GATE_ARTIFACT_TOTAL" '
+            {
+              pass = 0; fail = 0
+              for (i = 2; i <= NF; i++) {
+                if ($i == want) pass = 1
+                if ($i == "gate_fail=0") fail = 1
+              }
+              exit (pass && fail) ? 0 : 1
+            }'
+          test "$(cat "$RUNNER_TEMP/evt-compare.status")" = "0"
+
+      - name: Package the gated toolchain
+        run: |
+          set -eu
+          name="openwch-toolchain-${OPENWCH_VERSION}-${OPENWCH_PLATFORM}"
+          stage="$RUNNER_TEMP/package"
+          rm -rf "$stage"
+          mkdir -p "$stage"
+          cp -R "$TOOLCHAIN_PROJECT/darwin-x64/install/riscv-none-embed-gcc" "$stage/$name"
+          mkdir -p "$RUNNER_TEMP/assets"
+          gtar --sort=name --mtime="@$SOURCE_DATE_EPOCH" \
+               --owner=0 --group=0 --numeric-owner --format=gnu \
+               -C "$stage" -cf - "$name" \
+            | gzip -n > "$RUNNER_TEMP/assets/$name.tar.gz"
+          ( cd "$RUNNER_TEMP/assets" && shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256" )
+          cat "$RUNNER_TEMP/assets/$name.tar.gz.sha256"
+
+      - name: Publish the release assets
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          files: |
+            ${{ runner.temp }}/assets/*.tar.gz
+            ${{ runner.temp }}/assets/*.tar.gz.sha256
+          fail_on_unmatched_files: true
+
+      - name: Upload the assets as a workflow artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: assets-darwin-arm64-8.2.0
+          path: ${{ runner.temp }}/assets
+          if-no-files-found: warn

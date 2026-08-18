@@ -1,0 +1,1001 @@
+# Rebuild every toolchain version from pristine upstream sources plus this
+# repository's patch series, then prove byte equality against the official WCH
+# package in the same run and the same working directory.
+#
+# ---------------------------------------------------------------------------
+# Scope boundary: the full EVT tree is deliberately NOT run here.
+# ---------------------------------------------------------------------------
+# The closing gate for a version is the full EVT tree (1298 projects built
+# twice, once with the official toolchain and once with ours).  It does not fit
+# a hosted runner on either axis:
+#   * disk -- every candidate runner ships 14 GB of SSD, total, including the
+#     operating system and preinstalled software (ubuntu-24.04, macos-15 and
+#     macos-15-intel are all 14 GB).  One darwin leg already spends ~1.4 GB on
+#     the MounRiver archive plus the extracted official tree, the upstream
+#     checkouts and a complete GCC build tree.
+#   * time -- a job is killed at 6 hours on every hosted runner, and
+#     timeout-minutes cannot raise that ceiling.  macOS concurrency is capped at
+#     5 jobs on Free/Pro/Team plans, so the work cannot be spread sideways
+#     either.
+# The full tree therefore stays a local, operator-driven run; the nine-project
+# quick regression set below is the push/pull-request gate.  The generator for
+# the full local leg is still unversioned (P2-19) and is tracked outside this
+# workflow.
+#
+# ---------------------------------------------------------------------------
+# Why the manifest is regenerated instead of read from analysis/golden/
+# ---------------------------------------------------------------------------
+# The committed manifests embed the absolute working directory they were made
+# in, and building with -g writes that directory into DW_AT_comp_dir.  A
+# manifest made elsewhere can never match here.  Every job therefore runs
+# evt-golden.sh against the official package first and evt-compare.sh against
+# our build second, in one run and one directory.  The committed manifest is
+# printed as a raw drift diagnostic only and is never a pass/fail signal.
+#
+# ---------------------------------------------------------------------------
+# Why the scale of that fresh manifest is asserted against absolute constants
+# ---------------------------------------------------------------------------
+# evt-compare.sh derives its expected gate total from the manifest it is about
+# to check (evt-compare.sh:182).  With a manifest generated in the same run,
+# verifier and verified share a source: if a project were excluded here, the
+# manifest would shrink and the comparison would report "all passed" over the
+# smaller denominator.  Each job therefore asserts the artifact and project
+# counts against constants that do not come from that manifest, before the
+# comparison runs.
+
+name: Toolchain byte gate
+
+on:
+  push:
+    paths:
+      - "patches/**"
+      - "scripts/**"
+      - ".github/workflows/**"
+      - "ref/wch-evt/**"
+  pull_request:
+    paths:
+      - "patches/**"
+      - "scripts/**"
+      - ".github/workflows/**"
+      - "ref/wch-evt/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# act executes a container job's `run:` steps with `sh -e` (dash), where
+# `set -o pipefail` is an illegal option and PIPESTATUS does not exist --
+# measured, not assumed.  Naming the shell makes act and GitHub agree and
+# keeps the pipefail-dependent steps below valid in both.
+defaults:
+  run:
+    shell: bash
+
+# The concurrency contract, stated here so it is visible in the workflow and
+# not only in the harness defaults: 16 project-level workers, each project
+# building with make -j2 (hard-coded at evt-golden.sh:189 and
+# evt-compare.sh:143), and BUILD_JOBS=16 for the toolchain build itself.  These
+# are pinned even where they match the defaults, and they are NOT lowered to
+# match a smaller runner: a 3-4 core runner oversubscribes, and each job logs
+# its actual core count so the oversubscription is on the record.
+env:
+  BUILD_JOBS: "16"
+  EVT_GOLDEN_WORKERS: "16"
+  EVT_COMPARE_WORKERS: "16"
+
+jobs:
+  linux-15-2-0:
+    name: linux-amd64 GCC 15.2.0
+    runs-on: ubuntu-24.04
+    # Below the platform's 6 h hard limit on purpose: at exactly 360 the
+    # platform cuts the job silently, losing the very data that would
+    # explain the overrun.  15 minutes of headroom buys a diagnosable
+    # timeout that still flushes what the instrumentation has collected.
+    timeout-minutes: 345
+    # Pinned by digest.  This string is the multi-architecture OCI index digest
+    # for debian:bookworm; on an x64 runner it resolves to the amd64 manifest
+    # sha256:41a613df4beca480a97c22b1f6837f7502cb95206e2cc2daf1ea3cb28f8755ab.
+    # A local act run must pass --container-architecture linux/amd64 or an
+    # Apple Silicon host resolves the arm64 variant instead and
+    # build-toolchain-15.2.0-linux.sh:31 refuses to run.
+    container:
+      image: debian:bookworm@sha256:9344f8b8992482f80cba753f323adeaf17690076c095ccff6cc9536be98185dc
+    env:
+      OPENWCH_VERSION: "15.2.0"
+      OPENWCH_PLATFORM: linux-amd64
+      GATE_ARTIFACT_TOTAL: "274"
+      GATE_PROJECT_TOTAL: "9"
+      # evt-golden.sh:45-47 refuses to run on linux without this, and it does so
+      # only at gate time -- hours after the build starts.  It is recorded in
+      # the manifest header as provenance and pulls nothing.
+      EVT_CONTAINER_IMAGE: "debian:bookworm@sha256:9344f8b8992482f80cba753f323adeaf17690076c095ccff6cc9536be98185dc"
+      TOOLCHAIN_TREE: tmp/ci-src/15.2.0/riscv-gnu-toolchain
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      # The package list starts from the commands
+      # build-toolchain-15.2.0-linux.sh:37-44 requires, plus m4 (GMP's build
+      # needs it), the archive tools contrib/download_prerequisites unpacks
+      # with, and curl for the fetch itself.  Two entries do not come from that
+      # command table and were found by probing the base image: `patch`, which
+      # ref/wch-evt/patches/apply.sh shells out to and which bookworm does not
+      # ship, and zlib1g-dev, which the binutils configure line's
+      # --with-system-zlib needs and which a command table structurally cannot
+      # reveal because it is a library, not a command.  (GCC itself is
+      # configured --without-system-zlib and needs no zstd on this platform;
+      # both were read out of the official binary's embedded configure argv.)
+      # nodejs is included because the
+      # base image has none: every JavaScript action (cache, upload-artifact)
+      # exits 127 inside this container under act.  A real runner mounts its
+      # own node, so the package is redundant there and costs about 27 s; one
+      # apt line that works in both places beats two code paths.
+      #
+      # The digest above pins the base image, but this apt layer on top of it
+      # is mutable, so the resolved package set is printed into the log.  The
+      # phase-5 package list cannot be restored for comparison: it lives under
+      # tmp/toolchain_15.2.0-linux/, a path this phase is not permitted to read.
+      - name: Install container build dependencies
+        run: |
+          set -eu
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends \
+            bison flex texinfo gawk make gcc g++ libc6-dev m4 zlib1g-dev patch \
+            python3 perl git curl ca-certificates nodejs \
+            xz-utils bzip2 gzip tar diffutils findutils sed grep coreutils
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          echo "--- installed apt package set ---"
+          dpkg-query -W -f '${Package}\t${Version}\n' | sort
+
+      - name: Record environment facts
+        run: |
+          set -eu
+          printf 'P7_FACT\tnproc\t%s\n' "$(nproc)"
+          printf 'P7_FACT\tuname\t%s %s\n' "$(uname -s)" "$(uname -m)"
+          # Capacity provenance: the memory ceiling this job actually runs under
+          # and the machine's own total, so a peak reading has a denominator.
+          printf 'P7_FACT\tcgroup_memory_max\t%s\n' \
+            "$(cat /sys/fs/cgroup/memory.max 2>/dev/null || cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null || echo unavailable)"
+          printf 'P7_FACT\tmeminfo_total_kb\t%s\n' \
+            "$(awk '/^MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null || echo unavailable)"
+          /usr/bin/gcc --version | sed -n 1p
+          make --version | sed -n 1p
+          python3 --version
+          git --version
+          bison --version | sed -n 1p
+          flex --version | sed -n 1p
+          makeinfo --version | sed -n 1p
+          df -k . | tail -n 1
+
+      - name: Cache the official WCH package archive
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: tmp/ci-cache/official
+          key: official-linux-amd64-15.2.0-${{ hashFiles('ref/wch-evt/tools/fetch_wch_toolchain.py') }}
+
+      - name: Provision the official toolchain
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tprovision\t%s\n' "$(date +%s)"
+          scripts/ci/provision-official.sh "$OPENWCH_VERSION"
+          printf 'P7_DISK\tafter-provision\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
+          printf 'P7_STAGE\tend\tprovision\t%s\n' "$(date +%s)"
+
+      # ref/wch-evt/ is committed in its unpatched state by design; the nine
+      # modified files in a developer tree are this script's applied state.  A
+      # CI checkout is unpatched, so the step is mandatory here.  It is
+      # idempotent.
+      - name: Apply EVT project patches
+        run: sh ref/wch-evt/patches/apply.sh
+
+      - name: Prepare pristine sources and apply the patch series
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tprepare\t%s\n' "$(date +%s)"
+          scripts/ci/prepare-sources.sh "$OPENWCH_VERSION"
+          printf 'P7_DISK\tafter-sources\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
+          printf 'P7_STAGE\tend\tprepare\t%s\n' "$(date +%s)"
+
+      - name: Create the literal build path
+        run: scripts/ci/setup-literal-paths.sh "$OPENWCH_VERSION"
+
+      - name: Build the toolchain
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tbuild\t%s\n' "$(date +%s)"
+          # Streaming instrumentation.  Every sample is printed as it is taken, so
+          # a job killed at the platform ceiling still shows how far it got and
+          # what the peak was up to that point; a summary written only at the end
+          # would be lost in exactly the run that most needs diagnosing.
+          # One block covers both platforms: cgroup v2 memory.peak inside the
+          # linux container (measured readable), ps RSS on macOS where no cgroup
+          # exists -- and macOS is where the 7 GB ceiling actually bites.
+          target="${TOOLCHAIN_TREE:-$TOOLCHAIN_PROJECT}"
+          samples="$RUNNER_TEMP/build-samples.tsv"
+          : > "$samples"
+          (
+            while : ; do
+              now=$(date +%s)
+              kb=$( { du -sk "$target" 2>/dev/null || true; } | awk '{print $1}' || true)
+              if [ -r /sys/fs/cgroup/memory.peak ]; then
+                mem=$(cat /sys/fs/cgroup/memory.peak || echo 0); memmax=-1; memkind=cgroup-peak-bytes
+              else
+                # macOS has no cgroup.  The metric is vm_stat app memory
+                # (active + wired + compressed), chosen by measurement: a
+                # `ps -A -o rss=` sum reads 5.1x higher than app memory on the
+                # same machine at the same instant, because RSS counts shared
+                # text once per process.  "Pages free" is unusable in the other
+                # direction -- macOS keeps memory nearly full as cache, so free
+                # sits near zero and would imply the box is already exhausted.
+                # Known bias: this metric reads LOW (the compressor absorbs
+                # pages), so treat it as a floor.
+                mem=$( { vm_stat 2>/dev/null || true; } | awk '
+                  /page size of/ { for (i = 1; i <= NF; i++) if ($i ~ /^[0-9]+$/) { psz = $i; break } }
+                  /^Pages active:/ { gsub(/\./, "", $NF); a = $NF }
+                  /^Pages wired down:/ { gsub(/\./, "", $NF); w = $NF }
+                  /^Pages occupied by compressor:/ { gsub(/\./, "", $NF); c = $NF }
+                  END { print (a + w + c) * psz }' || echo 0)
+                memmax=-1
+                memkind=vm_stat-app-bytes
+              fi
+              printf 'P7_SAMPLE\tbuild\t%s\t%s\t%s\t%s\t%s\n' \
+                "$now" "${kb:-0}" "${mem:-0}" "${memmax:-0}" "$memkind"
+              printf '%s\t%s\t%s\t%s\t%s\n' \
+                "$now" "${kb:-0}" "${mem:-0}" "${memmax:-0}" "$memkind" >> "$samples"
+              sleep 30
+            done
+          ) &
+          sampler=$!
+          trap 'kill "$sampler" 2>/dev/null || true' EXIT
+          # The build script already announces its own phases on stdout as
+          # `stage=<name>` (binutils-configure, binutils-build, gcc-configure,
+          # gcc-all-gcc, ...).  Stamping those lines is what makes a single run
+          # yield a phase breakdown; without it the whole build is one opaque
+          # number and the serial fraction cannot even be approximated.
+          # errexit is lifted around the pipeline on purpose: the peak-memory
+          # reading has to be taken whether the build passed or failed, and a
+          # failed capacity run is exactly when the number matters most.
+          set -o pipefail
+          set +e
+          scripts/build-toolchain-15.2.0-linux.sh "$TOOLCHAIN_TREE" 2>&1 \
+            | while IFS= read -r line; do
+                printf '%s\n' "$line"
+                case "$line" in
+                  stage=*) printf 'P7_SUBSTAGE\t%s\t%s\n' "${line#stage=}" "$(date +%s)" ;;
+                esac
+              done
+          build_rc=${PIPESTATUS[0]}
+          set -e
+          printf 'P7_SUBSTAGE\tbuild-finished\t%s\n' "$(date +%s)"
+          kill "$sampler" 2>/dev/null || true
+          trap - EXIT
+          printf 'P7_MEM\tbuild-peak-bytes\t%s\tcgroup peak after the toolchain build\n' \
+            "$(cat /sys/fs/cgroup/memory.peak 2>/dev/null || cat /sys/fs/cgroup/memory/memory.max_usage_in_bytes 2>/dev/null || echo unavailable)"
+          test "$build_rc" = 0
+          printf 'P7_DISK\tbuild-peak\t%s\tpeak du -sk of the source and build tree\n' \
+            "$(sort -n "$RUNNER_TEMP/build-disk-samples.txt" | tail -n 1)"
+          printf 'P7_DISK\tafter-build\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
+          printf 'P7_STAGE\tend\tbuild\t%s\n' "$(date +%s)"
+
+      - name: Generate the golden manifest with the official toolchain
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tgate-golden\t%s\n' "$(date +%s)"
+          scripts/evt-golden.sh "$OPENWCH_VERSION"
+          printf 'P7_STAGE\tend\tgate-golden\t%s\n' "$(date +%s)"
+
+      - name: 'Assertion 1 and 2: manifest scale against absolute constants'
+        run: |
+          set -eu
+          manifest="analysis/golden/${OPENWCH_VERSION}-${OPENWCH_PLATFORM}.tsv"
+          gate_rows=$(awk -F '\t' '$1 !~ /^#/ && $1 != "slug" && $3 == "gate" { c++ } END { print c+0 }' "$manifest")
+          projects=$(awk -F '\t' '$1 !~ /^#/ && $1 != "slug" { print $1 }' "$manifest" | sort -u | wc -l | tr -d '[:space:]')
+          echo "manifest_gate_rows=$gate_rows expected=$GATE_ARTIFACT_TOTAL"
+          echo "manifest_projects=$projects expected=$GATE_PROJECT_TOTAL"
+          test "$gate_rows" = "$GATE_ARTIFACT_TOTAL"
+          test "$projects" = "$GATE_PROJECT_TOTAL"
+
+      - name: Record raw manifest drift (diagnostic only, never a gate)
+        run: |
+          set -eu
+          manifest="analysis/golden/${OPENWCH_VERSION}-${OPENWCH_PLATFORM}.tsv"
+          echo "raw_drift_lines=$(git diff --numstat -- "$manifest" | awk '{print $1"+"$2}')"
+          git diff -- "$manifest" | head -n 200 || true
+
+      - name: Compare our toolchain against the fresh manifest
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tgate-compare\t%s\n' "$(date +%s)"
+          set -o pipefail
+          status=0
+          scripts/evt-compare.sh "$OPENWCH_VERSION" "$TOOLCHAIN_TREE/output" \
+            | tee "$RUNNER_TEMP/evt-compare.log" || status=$?
+          echo "$status" > "$RUNNER_TEMP/evt-compare.status"
+          echo "evt_compare_status=$status"
+          printf 'P7_DISK\tafter-gate\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
+          printf 'P7_MEM\tgate-peak\t%s\t%s\n' \
+            "$(cat /sys/fs/cgroup/memory.peak 2>/dev/null || ps -A -o rss= | awk '{s+=$1} END {print s+0}')" \
+            "$([ -r /sys/fs/cgroup/memory.peak ] && echo 'cgroup-peak-bytes, cumulative high-water mark' || echo 'ps-rss-kb, sum over all processes')"
+          printf 'P7_STAGE\tend\tgate-compare\t%s\n' "$(date +%s)"
+
+      # The SUMMARY row is tab separated (evt-compare.sh:349-350); matching it
+      # with spaces never fires.  Both the explicit field check and the script's
+      # own exit status must agree, so neither is a single point of trust.
+      - name: 'Assertion 3: comparison summary'
+        run: |
+          set -eu
+          summary=$(awk -F '\t' '$1 == "SUMMARY" { print }' "$RUNNER_TEMP/evt-compare.log")
+          test -n "$summary"
+          echo "$summary"
+          printf '%s\n' "$summary" | awk -F '\t' -v want="gate_pass=$GATE_ARTIFACT_TOTAL" '
+            {
+              pass = 0; fail = 0
+              for (i = 2; i <= NF; i++) {
+                if ($i == want) pass = 1
+                if ($i == "gate_fail=0") fail = 1
+              }
+              exit (pass && fail) ? 0 : 1
+            }'
+          test "$(cat "$RUNNER_TEMP/evt-compare.status")" = "0"
+
+      # Which two compilers the gate actually compared.  A green run whose
+      # provenance is not recorded cannot be audited afterwards.
+      - name: Record both toolchain identities
+        if: always()
+        run: |
+          set -eu
+          official="ref/gcc/${OPENWCH_PLATFORM}/${OPENWCH_VERSION}/bin/riscv32-wch-elf-gcc"
+          ours="$TOOLCHAIN_TREE/output/bin/riscv32-wch-elf-gcc"
+          for label in official ours; do
+            eval "compiler=\$$label"
+            if [ -x "$compiler" ]; then
+              printf 'P7_TOOLCHAIN\t%s\tpath\t%s\n' "$label" "$compiler"
+              printf 'P7_TOOLCHAIN\t%s\tversion\t%s\n' "$label" "$("$compiler" --version | sed -n 1p)"
+              printf 'P7_TOOLCHAIN\t%s\tdumpmachine\t%s\n' "$label" "$("$compiler" -dumpmachine)"
+            else
+              printf 'P7_TOOLCHAIN\t%s\tmissing\t%s\n' "$label" "$compiler"
+            fi
+          done
+
+      - name: Upload gate evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: gate-linux-amd64-15.2.0
+          path: |
+            analysis/golden/15.2.0-linux-amd64.tsv
+            ${{ runner.temp }}/evt-compare.log
+          if-no-files-found: warn
+
+  darwin-15-2-0:
+    name: darwin-arm64 GCC 15.2.0
+    runs-on: macos-15
+    # Below the platform's 6 h hard limit on purpose: at exactly 360 the
+    # platform cuts the job silently, losing the very data that would
+    # explain the overrun.  15 minutes of headroom buys a diagnosable
+    # timeout that still flushes what the instrumentation has collected.
+    timeout-minutes: 345
+    env:
+      OPENWCH_VERSION: "15.2.0"
+      OPENWCH_PLATFORM: darwin-arm64
+      GATE_ARTIFACT_TOTAL: "274"
+      GATE_PROJECT_TOTAL: "9"
+      TOOLCHAIN_TREE: tmp/ci-src/15.2.0/riscv-gnu-toolchain
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Record environment facts
+        run: |
+          set -eu
+          printf 'P7_FACT\tnproc\t%s\n' "$(sysctl -n hw.ncpu)"
+          printf 'P7_FACT\tuname\t%s %s\n' "$(uname -s)" "$(uname -m)"
+          /usr/bin/clang --version | sed -n 1p
+          make --version | sed -n 1p
+          python3 --version
+          git --version
+          df -k . | tail -n 1
+
+      # build-toolchain-15.2.0.sh:105-106 requires Homebrew zstd headers and a
+      # linkable library, and it rewrites the install name
+      # /opt/homebrew/opt/zstd/lib/libzstd.1.dylib that Homebrew always uses.
+      # The version does not matter: the dylib that ships in the built package
+      # is copied from the official package and digest-checked
+      # (build-toolchain-15.2.0.sh:205-207), so Homebrew's copy only has to
+      # exist at configure and link time.
+      - name: Ensure Homebrew zstd is present
+        run: |
+          set -eu
+          if [ ! -e /opt/homebrew/include/zstd.h ] || [ ! -e /opt/homebrew/lib/libzstd.dylib ]; then
+            brew install zstd
+          fi
+          ls -l /opt/homebrew/lib/libzstd.dylib
+
+      - name: Cache the official MounRiver macOS package
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: tmp/ci-cache/official
+          key: official-mrs-macos-arm64-v2.5.0-189fdb95e898ec3f5ce4028166dd06c829f503227b6f8ae1a13bace9ec04937e
+
+      - name: Provision the official toolchain
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tprovision\t%s\n' "$(date +%s)"
+          scripts/ci/provision-official.sh "$OPENWCH_VERSION"
+          printf 'P7_DISK\tafter-provision\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
+          printf 'P7_STAGE\tend\tprovision\t%s\n' "$(date +%s)"
+
+      - name: Apply EVT project patches
+        run: sh ref/wch-evt/patches/apply.sh
+
+      - name: Prepare pristine sources and apply the patch series
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tprepare\t%s\n' "$(date +%s)"
+          scripts/ci/prepare-sources.sh "$OPENWCH_VERSION"
+          printf 'P7_DISK\tafter-sources\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
+          printf 'P7_STAGE\tend\tprepare\t%s\n' "$(date +%s)"
+
+      - name: Create the literal build path
+        run: scripts/ci/setup-literal-paths.sh "$OPENWCH_VERSION"
+
+      - name: Build the toolchain
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tbuild\t%s\n' "$(date +%s)"
+          # Streaming instrumentation.  Every sample is printed as it is taken, so
+          # a job killed at the platform ceiling still shows how far it got and
+          # what the peak was up to that point; a summary written only at the end
+          # would be lost in exactly the run that most needs diagnosing.
+          # One block covers both platforms: cgroup v2 memory.peak inside the
+          # linux container (measured readable), ps RSS on macOS where no cgroup
+          # exists -- and macOS is where the 7 GB ceiling actually bites.
+          target="${TOOLCHAIN_TREE:-$TOOLCHAIN_PROJECT}"
+          samples="$RUNNER_TEMP/build-samples.tsv"
+          : > "$samples"
+          (
+            while : ; do
+              now=$(date +%s)
+              kb=$( { du -sk "$target" 2>/dev/null || true; } | awk '{print $1}' || true)
+              if [ -r /sys/fs/cgroup/memory.peak ]; then
+                mem=$(cat /sys/fs/cgroup/memory.peak || echo 0); memmax=-1; memkind=cgroup-peak-bytes
+              else
+                # macOS has no cgroup.  The metric is vm_stat app memory
+                # (active + wired + compressed), chosen by measurement: a
+                # `ps -A -o rss=` sum reads 5.1x higher than app memory on the
+                # same machine at the same instant, because RSS counts shared
+                # text once per process.  "Pages free" is unusable in the other
+                # direction -- macOS keeps memory nearly full as cache, so free
+                # sits near zero and would imply the box is already exhausted.
+                # Known bias: this metric reads LOW (the compressor absorbs
+                # pages), so treat it as a floor.
+                mem=$( { vm_stat 2>/dev/null || true; } | awk '
+                  /page size of/ { for (i = 1; i <= NF; i++) if ($i ~ /^[0-9]+$/) { psz = $i; break } }
+                  /^Pages active:/ { gsub(/\./, "", $NF); a = $NF }
+                  /^Pages wired down:/ { gsub(/\./, "", $NF); w = $NF }
+                  /^Pages occupied by compressor:/ { gsub(/\./, "", $NF); c = $NF }
+                  END { print (a + w + c) * psz }' || echo 0)
+                memmax=-1
+                memkind=vm_stat-app-bytes
+              fi
+              printf 'P7_SAMPLE\tbuild\t%s\t%s\t%s\t%s\t%s\n' \
+                "$now" "${kb:-0}" "${mem:-0}" "${memmax:-0}" "$memkind"
+              printf '%s\t%s\t%s\t%s\t%s\n' \
+                "$now" "${kb:-0}" "${mem:-0}" "${memmax:-0}" "$memkind" >> "$samples"
+              sleep 30
+            done
+          ) &
+          sampler=$!
+          trap 'kill "$sampler" 2>/dev/null || true' EXIT
+          /usr/bin/time -l scripts/build-toolchain-15.2.0.sh "$TOOLCHAIN_TREE" 2> >(tee "$RUNNER_TEMP/time-l.txt" >&2)
+          kill "$sampler" 2>/dev/null || true
+          trap - EXIT
+          printf 'P7_DISK\tbuild-peak\t%s\tpeak du -sk of the source and build tree\n' \
+            "$(awk -F'\t' '{if ($2+0 > m) m = $2+0} END {print m+0}' "$samples")"
+          printf 'P7_MEM\tbuild-peak\t%s\t%s\n' \
+            "$(awk -F'\t' '{if ($3+0 > m) m = $3+0} END {print m+0}' "$samples")" \
+            "$(awk -F'\t' 'END {print $5}' "$samples")"
+          printf 'P7_MEM\tbuild-peak-largest-process\t%s\tlargest single process max RSS; -1 when unmeasured\n' \
+            "$( [ -f "$RUNNER_TEMP/time-l.txt" ] && awk '/maximum resident set size/ {print $1; exit}' "$RUNNER_TEMP/time-l.txt" || awk -F'\t' '{if ($4+0 > m) m = $4+0} END {print m+0}' "$samples")"
+          printf 'P7_DISK\tafter-build\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
+          printf 'P7_STAGE\tend\tbuild\t%s\n' "$(date +%s)"
+
+      - name: Generate the golden manifest with the official toolchain
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tgate-golden\t%s\n' "$(date +%s)"
+          scripts/evt-golden.sh "$OPENWCH_VERSION"
+          printf 'P7_STAGE\tend\tgate-golden\t%s\n' "$(date +%s)"
+
+      - name: 'Assertion 1 and 2: manifest scale against absolute constants'
+        run: |
+          set -eu
+          manifest="analysis/golden/${OPENWCH_VERSION}-${OPENWCH_PLATFORM}.tsv"
+          gate_rows=$(awk -F '\t' '$1 !~ /^#/ && $1 != "slug" && $3 == "gate" { c++ } END { print c+0 }' "$manifest")
+          projects=$(awk -F '\t' '$1 !~ /^#/ && $1 != "slug" { print $1 }' "$manifest" | sort -u | wc -l | tr -d '[:space:]')
+          echo "manifest_gate_rows=$gate_rows expected=$GATE_ARTIFACT_TOTAL"
+          echo "manifest_projects=$projects expected=$GATE_PROJECT_TOTAL"
+          test "$gate_rows" = "$GATE_ARTIFACT_TOTAL"
+          test "$projects" = "$GATE_PROJECT_TOTAL"
+
+      - name: Record raw manifest drift (diagnostic only, never a gate)
+        run: |
+          set -eu
+          manifest="analysis/golden/${OPENWCH_VERSION}-${OPENWCH_PLATFORM}.tsv"
+          echo "raw_drift_lines=$(git diff --numstat -- "$manifest" | awk '{print $1"+"$2}')"
+          git diff -- "$manifest" | head -n 200 || true
+
+      - name: Compare our toolchain against the fresh manifest
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tgate-compare\t%s\n' "$(date +%s)"
+          set -o pipefail
+          status=0
+          scripts/evt-compare.sh "$OPENWCH_VERSION" "$TOOLCHAIN_TREE/output" \
+            | tee "$RUNNER_TEMP/evt-compare.log" || status=$?
+          echo "$status" > "$RUNNER_TEMP/evt-compare.status"
+          echo "evt_compare_status=$status"
+          printf 'P7_DISK\tafter-gate\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
+          printf 'P7_MEM\tgate-peak\t%s\t%s\n' \
+            "$(cat /sys/fs/cgroup/memory.peak 2>/dev/null || ps -A -o rss= | awk '{s+=$1} END {print s+0}')" \
+            "$([ -r /sys/fs/cgroup/memory.peak ] && echo 'cgroup-peak-bytes, cumulative high-water mark' || echo 'ps-rss-kb, sum over all processes')"
+          printf 'P7_STAGE\tend\tgate-compare\t%s\n' "$(date +%s)"
+
+      - name: 'Assertion 3: comparison summary'
+        run: |
+          set -eu
+          summary=$(awk -F '\t' '$1 == "SUMMARY" { print }' "$RUNNER_TEMP/evt-compare.log")
+          test -n "$summary"
+          echo "$summary"
+          printf '%s\n' "$summary" | awk -F '\t' -v want="gate_pass=$GATE_ARTIFACT_TOTAL" '
+            {
+              pass = 0; fail = 0
+              for (i = 2; i <= NF; i++) {
+                if ($i == want) pass = 1
+                if ($i == "gate_fail=0") fail = 1
+              }
+              exit (pass && fail) ? 0 : 1
+            }'
+          test "$(cat "$RUNNER_TEMP/evt-compare.status")" = "0"
+
+      - name: Upload gate evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: gate-darwin-arm64-15.2.0
+          path: |
+            analysis/golden/15.2.0-darwin-arm64.tsv
+            ${{ runner.temp }}/evt-compare.log
+          if-no-files-found: warn
+
+  darwin-12-2-0:
+    name: darwin-arm64 GCC 12.2.0
+    runs-on: macos-15
+    # Below the platform's 6 h hard limit on purpose: at exactly 360 the
+    # platform cuts the job silently, losing the very data that would
+    # explain the overrun.  15 minutes of headroom buys a diagnosable
+    # timeout that still flushes what the instrumentation has collected.
+    timeout-minutes: 345
+    env:
+      OPENWCH_VERSION: "12.2.0"
+      OPENWCH_PLATFORM: darwin-arm64
+      GATE_ARTIFACT_TOTAL: "274"
+      GATE_PROJECT_TOTAL: "9"
+      TOOLCHAIN_PROJECT: tmp/ci-src/12.2.0/riscv-none-elf-gcc-xpack.git
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Record environment facts
+        run: |
+          set -eu
+          printf 'P7_FACT\tnproc\t%s\n' "$(sysctl -n hw.ncpu)"
+          printf 'P7_FACT\tuname\t%s %s\n' "$(uname -s)" "$(uname -m)"
+          /usr/bin/clang --version | sed -n 1p
+          make --version | sed -n 1p
+          python3 --version
+          git --version
+          df -k . | tail -n 1
+
+      - name: Cache the official MounRiver macOS package
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: tmp/ci-cache/official
+          key: official-mrs-macos-arm64-v2.5.0-189fdb95e898ec3f5ce4028166dd06c829f503227b6f8ae1a13bace9ec04937e
+
+      - name: Provision the official toolchain
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tprovision\t%s\n' "$(date +%s)"
+          scripts/ci/provision-official.sh "$OPENWCH_VERSION"
+          printf 'P7_DISK\tafter-provision\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
+          printf 'P7_STAGE\tend\tprovision\t%s\n' "$(date +%s)"
+
+      - name: Apply EVT project patches
+        run: sh ref/wch-evt/patches/apply.sh
+
+      # 12.2.0 pins its own host dependency set (gmp/mpfr/mpc/isl-0.24/zlib/
+      # zstd) with its own SHA-256 gate and must not use GCC's in-tree
+      # contrib/download_prerequisites.
+      - name: Prepare pristine sources and apply the patch series
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tprepare\t%s\n' "$(date +%s)"
+          scripts/ci/prepare-sources.sh "$OPENWCH_VERSION"
+          printf 'P7_DISK\tafter-sources\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
+          printf 'P7_STAGE\tend\tprepare\t%s\n' "$(date +%s)"
+
+      - name: Create the literal build path
+        run: scripts/ci/setup-literal-paths.sh "$OPENWCH_VERSION"
+
+      - name: Build the toolchain
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tbuild\t%s\n' "$(date +%s)"
+          # Streaming instrumentation.  Every sample is printed as it is taken, so
+          # a job killed at the platform ceiling still shows how far it got and
+          # what the peak was up to that point; a summary written only at the end
+          # would be lost in exactly the run that most needs diagnosing.
+          # One block covers both platforms: cgroup v2 memory.peak inside the
+          # linux container (measured readable), ps RSS on macOS where no cgroup
+          # exists -- and macOS is where the 7 GB ceiling actually bites.
+          target="${TOOLCHAIN_TREE:-$TOOLCHAIN_PROJECT}"
+          samples="$RUNNER_TEMP/build-samples.tsv"
+          : > "$samples"
+          (
+            while : ; do
+              now=$(date +%s)
+              kb=$( { du -sk "$target" 2>/dev/null || true; } | awk '{print $1}' || true)
+              if [ -r /sys/fs/cgroup/memory.peak ]; then
+                mem=$(cat /sys/fs/cgroup/memory.peak || echo 0); memmax=-1; memkind=cgroup-peak-bytes
+              else
+                # macOS has no cgroup.  The metric is vm_stat app memory
+                # (active + wired + compressed), chosen by measurement: a
+                # `ps -A -o rss=` sum reads 5.1x higher than app memory on the
+                # same machine at the same instant, because RSS counts shared
+                # text once per process.  "Pages free" is unusable in the other
+                # direction -- macOS keeps memory nearly full as cache, so free
+                # sits near zero and would imply the box is already exhausted.
+                # Known bias: this metric reads LOW (the compressor absorbs
+                # pages), so treat it as a floor.
+                mem=$( { vm_stat 2>/dev/null || true; } | awk '
+                  /page size of/ { for (i = 1; i <= NF; i++) if ($i ~ /^[0-9]+$/) { psz = $i; break } }
+                  /^Pages active:/ { gsub(/\./, "", $NF); a = $NF }
+                  /^Pages wired down:/ { gsub(/\./, "", $NF); w = $NF }
+                  /^Pages occupied by compressor:/ { gsub(/\./, "", $NF); c = $NF }
+                  END { print (a + w + c) * psz }' || echo 0)
+                memmax=-1
+                memkind=vm_stat-app-bytes
+              fi
+              printf 'P7_SAMPLE\tbuild\t%s\t%s\t%s\t%s\t%s\n' \
+                "$now" "${kb:-0}" "${mem:-0}" "${memmax:-0}" "$memkind"
+              printf '%s\t%s\t%s\t%s\t%s\n' \
+                "$now" "${kb:-0}" "${mem:-0}" "${memmax:-0}" "$memkind" >> "$samples"
+              sleep 30
+            done
+          ) &
+          sampler=$!
+          trap 'kill "$sampler" 2>/dev/null || true' EXIT
+          /usr/bin/time -l env CLEAN_HOST_DEPS=1 scripts/build-toolchain-12.2.0.sh "$TOOLCHAIN_PROJECT" 2> >(tee "$RUNNER_TEMP/time-l.txt" >&2)
+          kill "$sampler" 2>/dev/null || true
+          trap - EXIT
+          printf 'P7_DISK\tbuild-peak\t%s\tpeak du -sk of the source and build tree\n' \
+            "$(awk -F'\t' '{if ($2+0 > m) m = $2+0} END {print m+0}' "$samples")"
+          printf 'P7_MEM\tbuild-peak\t%s\t%s\n' \
+            "$(awk -F'\t' '{if ($3+0 > m) m = $3+0} END {print m+0}' "$samples")" \
+            "$(awk -F'\t' 'END {print $5}' "$samples")"
+          printf 'P7_MEM\tbuild-peak-largest-process\t%s\tlargest single process max RSS; -1 when unmeasured\n' \
+            "$( [ -f "$RUNNER_TEMP/time-l.txt" ] && awk '/maximum resident set size/ {print $1; exit}' "$RUNNER_TEMP/time-l.txt" || awk -F'\t' '{if ($4+0 > m) m = $4+0} END {print m+0}' "$samples")"
+          printf 'P7_DISK\tafter-build\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
+          printf 'P7_STAGE\tend\tbuild\t%s\n' "$(date +%s)"
+
+      - name: Generate the golden manifest with the official toolchain
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tgate-golden\t%s\n' "$(date +%s)"
+          scripts/evt-golden.sh "$OPENWCH_VERSION"
+          printf 'P7_STAGE\tend\tgate-golden\t%s\n' "$(date +%s)"
+
+      - name: 'Assertion 1 and 2: manifest scale against absolute constants'
+        run: |
+          set -eu
+          manifest="analysis/golden/${OPENWCH_VERSION}-${OPENWCH_PLATFORM}.tsv"
+          gate_rows=$(awk -F '\t' '$1 !~ /^#/ && $1 != "slug" && $3 == "gate" { c++ } END { print c+0 }' "$manifest")
+          projects=$(awk -F '\t' '$1 !~ /^#/ && $1 != "slug" { print $1 }' "$manifest" | sort -u | wc -l | tr -d '[:space:]')
+          echo "manifest_gate_rows=$gate_rows expected=$GATE_ARTIFACT_TOTAL"
+          echo "manifest_projects=$projects expected=$GATE_PROJECT_TOTAL"
+          test "$gate_rows" = "$GATE_ARTIFACT_TOTAL"
+          test "$projects" = "$GATE_PROJECT_TOTAL"
+
+      - name: Record raw manifest drift (diagnostic only, never a gate)
+        run: |
+          set -eu
+          manifest="analysis/golden/${OPENWCH_VERSION}-${OPENWCH_PLATFORM}.tsv"
+          echo "raw_drift_lines=$(git diff --numstat -- "$manifest" | awk '{print $1"+"$2}')"
+          git diff -- "$manifest" | head -n 200 || true
+
+      - name: Compare our toolchain against the fresh manifest
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tgate-compare\t%s\n' "$(date +%s)"
+          set -o pipefail
+          status=0
+          scripts/evt-compare.sh "$OPENWCH_VERSION" \
+            "$TOOLCHAIN_PROJECT/build/darwin-arm64/application" \
+            | tee "$RUNNER_TEMP/evt-compare.log" || status=$?
+          echo "$status" > "$RUNNER_TEMP/evt-compare.status"
+          echo "evt_compare_status=$status"
+          printf 'P7_DISK\tafter-gate\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
+          printf 'P7_MEM\tgate-peak\t%s\t%s\n' \
+            "$(cat /sys/fs/cgroup/memory.peak 2>/dev/null || ps -A -o rss= | awk '{s+=$1} END {print s+0}')" \
+            "$([ -r /sys/fs/cgroup/memory.peak ] && echo 'cgroup-peak-bytes, cumulative high-water mark' || echo 'ps-rss-kb, sum over all processes')"
+          printf 'P7_STAGE\tend\tgate-compare\t%s\n' "$(date +%s)"
+
+      - name: 'Assertion 3: comparison summary'
+        run: |
+          set -eu
+          summary=$(awk -F '\t' '$1 == "SUMMARY" { print }' "$RUNNER_TEMP/evt-compare.log")
+          test -n "$summary"
+          echo "$summary"
+          printf '%s\n' "$summary" | awk -F '\t' -v want="gate_pass=$GATE_ARTIFACT_TOTAL" '
+            {
+              pass = 0; fail = 0
+              for (i = 2; i <= NF; i++) {
+                if ($i == want) pass = 1
+                if ($i == "gate_fail=0") fail = 1
+              }
+              exit (pass && fail) ? 0 : 1
+            }'
+          test "$(cat "$RUNNER_TEMP/evt-compare.status")" = "0"
+
+      - name: Upload gate evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: gate-darwin-arm64-12.2.0
+          path: |
+            analysis/golden/12.2.0-darwin-arm64.tsv
+            ${{ runner.temp }}/evt-compare.log
+          if-no-files-found: warn
+
+  darwin-8-2-0:
+    name: darwin-arm64 GCC 8.2.0
+    # ---------------------------------------------------------------------
+    # Runner choice, and why it is not the Intel image
+    # ---------------------------------------------------------------------
+    # The official 8.2.0 host executables are Mach-O x86_64, which makes a
+    # native Intel runner look like the more faithful host, and
+    # macos-15-intel exists as a standard hosted label (4 CPU / 14 GB RAM /
+    # 14 GB SSD, free on public repositories, available until August 2027 as
+    # the final x86_64 image on Actions).
+    #
+    # It cannot be used, because the gate harness is arm64-only on macOS:
+    # evt-golden.sh:32-36 and evt-compare.sh:32-38 map Darwin/arm64 and Linux
+    # x86_64 to a platform and die on anything else, so on an Intel runner both
+    # scripts refuse to start with "unsupported host platform: Darwin/x86_64".
+    # The platform string also names the manifest file, so accepting Intel
+    # would fork the gate baseline rather than extend it.
+    #
+    # An arm64 runner reproduces the configuration that reached zero difference
+    # locally: build-toolchain-8.2.0.sh:27-30 re-executes itself through
+    # arch -x86_64, so the compiler is still built as an x86_64 host under
+    # Rosetta 2, exactly as it was on the developer machine.  Rosetta 2 is
+    # preinstalled on the arm64 macOS images -- the evidence is the image's own
+    # packer template running install-rosetta.sh and the image self-test
+    # asserting the oahd daemon, NOT the image Readme, which does not mention
+    # Rosetta at all and would suggest the opposite.  The probe below therefore
+    # checks rather than assumes, and installs only if the check fails.
+    runs-on: macos-15
+    # Below the platform's 6 h hard limit on purpose: at exactly 360 the
+    # platform cuts the job silently, losing the very data that would
+    # explain the overrun.  15 minutes of headroom buys a diagnosable
+    # timeout that still flushes what the instrumentation has collected.
+    timeout-minutes: 345
+    env:
+      OPENWCH_VERSION: "8.2.0"
+      OPENWCH_PLATFORM: darwin-arm64
+      # 242 artifacts over 8 projects: one of the nine quick-set projects is an
+      # established exclusion for 8.2.0, not a defect.  evt-golden.sh:263
+      # requires the project table to hold exactly nine rows, so the table must
+      # not be trimmed to match.
+      GATE_ARTIFACT_TOTAL: "242"
+      GATE_PROJECT_TOTAL: "8"
+      TOOLCHAIN_PROJECT: tmp/toolchain_8.2.0/work
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Record environment facts
+        run: |
+          set -eu
+          printf 'P7_FACT\tnproc\t%s\n' "$(sysctl -n hw.ncpu)"
+          printf 'P7_FACT\tuname\t%s %s\n' "$(uname -s)" "$(uname -m)"
+          /usr/bin/clang --version | sed -n 1p
+          make --version | sed -n 1p
+          python3 --version
+          git --version
+          df -k . | tail -n 1
+
+      # Load-bearing, not a contingency: this leg genuinely runs through
+      # Rosetta, because build-toolchain-8.2.0.sh:27-30 re-executes itself with
+      # arch -x86_64 to match the official --build/--host=x86_64-apple-darwin17
+      # configure literal.  Rosetta 2 IS preinstalled on the arm64 macOS images
+      # -- the evidence is the image's own packer template running
+      # install-rosetta.sh and the image self-test asserting `pgrep oahd`.  The
+      # image Readmes never mention Rosetta at all, so reading them alone would
+      # wrongly suggest it is absent.  The step therefore probes and installs
+      # only on failure instead of relying on the runner default either way.
+      - name: Ensure Rosetta 2 can execute x86_64 binaries
+        run: |
+          set -eu
+          if arch -x86_64 /usr/bin/true 2>/dev/null; then
+            echo "rosetta=present"
+          else
+            echo "rosetta=absent action=install"
+            sudo /usr/sbin/softwareupdate --install-rosetta --agree-to-license
+            arch -x86_64 /usr/bin/true
+          fi
+
+      - name: Cache the official MounRiver macOS package
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: tmp/ci-cache/official
+          key: official-mrs-macos-arm64-v2.5.0-189fdb95e898ec3f5ce4028166dd06c829f503227b6f8ae1a13bace9ec04937e
+
+      - name: Provision the official toolchain
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tprovision\t%s\n' "$(date +%s)"
+          scripts/ci/provision-official.sh "$OPENWCH_VERSION"
+          printf 'P7_DISK\tafter-provision\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
+          printf 'P7_STAGE\tend\tprovision\t%s\n' "$(date +%s)"
+
+      - name: Apply EVT project patches
+        run: sh ref/wch-evt/patches/apply.sh
+
+      # 8.2.0 pins gmp/mpfr/mpc/isl-0.18/zlib with its own SHA-256 gate.  Its
+      # xPack GCC tree also carries a contrib/download_prerequisites, and that
+      # file lists gmp-6.1.0, mpfr-3.1.4, mpc-1.0.3 -- three of four versions
+      # differ from what the build script actually uses.  Using it would build a
+      # different compiler while the gate still looked green.
+      - name: Prepare pristine sources and apply the patch series
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tprepare\t%s\n' "$(date +%s)"
+          scripts/ci/prepare-sources.sh "$OPENWCH_VERSION"
+          printf 'P7_DISK\tafter-sources\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
+          printf 'P7_STAGE\tend\tprepare\t%s\n' "$(date +%s)"
+
+      - name: Create the literal build path
+        run: scripts/ci/setup-literal-paths.sh "$OPENWCH_VERSION"
+
+      - name: Build the toolchain
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tbuild\t%s\n' "$(date +%s)"
+          # Streaming instrumentation.  Every sample is printed as it is taken, so
+          # a job killed at the platform ceiling still shows how far it got and
+          # what the peak was up to that point; a summary written only at the end
+          # would be lost in exactly the run that most needs diagnosing.
+          # One block covers both platforms: cgroup v2 memory.peak inside the
+          # linux container (measured readable), ps RSS on macOS where no cgroup
+          # exists -- and macOS is where the 7 GB ceiling actually bites.
+          target="${TOOLCHAIN_TREE:-$TOOLCHAIN_PROJECT}"
+          samples="$RUNNER_TEMP/build-samples.tsv"
+          : > "$samples"
+          (
+            while : ; do
+              now=$(date +%s)
+              kb=$( { du -sk "$target" 2>/dev/null || true; } | awk '{print $1}' || true)
+              if [ -r /sys/fs/cgroup/memory.peak ]; then
+                mem=$(cat /sys/fs/cgroup/memory.peak || echo 0); memmax=-1; memkind=cgroup-peak-bytes
+              else
+                # macOS has no cgroup.  The metric is vm_stat app memory
+                # (active + wired + compressed), chosen by measurement: a
+                # `ps -A -o rss=` sum reads 5.1x higher than app memory on the
+                # same machine at the same instant, because RSS counts shared
+                # text once per process.  "Pages free" is unusable in the other
+                # direction -- macOS keeps memory nearly full as cache, so free
+                # sits near zero and would imply the box is already exhausted.
+                # Known bias: this metric reads LOW (the compressor absorbs
+                # pages), so treat it as a floor.
+                mem=$( { vm_stat 2>/dev/null || true; } | awk '
+                  /page size of/ { for (i = 1; i <= NF; i++) if ($i ~ /^[0-9]+$/) { psz = $i; break } }
+                  /^Pages active:/ { gsub(/\./, "", $NF); a = $NF }
+                  /^Pages wired down:/ { gsub(/\./, "", $NF); w = $NF }
+                  /^Pages occupied by compressor:/ { gsub(/\./, "", $NF); c = $NF }
+                  END { print (a + w + c) * psz }' || echo 0)
+                memmax=-1
+                memkind=vm_stat-app-bytes
+              fi
+              printf 'P7_SAMPLE\tbuild\t%s\t%s\t%s\t%s\t%s\n' \
+                "$now" "${kb:-0}" "${mem:-0}" "${memmax:-0}" "$memkind"
+              printf '%s\t%s\t%s\t%s\t%s\n' \
+                "$now" "${kb:-0}" "${mem:-0}" "${memmax:-0}" "$memkind" >> "$samples"
+              sleep 30
+            done
+          ) &
+          sampler=$!
+          trap 'kill "$sampler" 2>/dev/null || true' EXIT
+          /usr/bin/time -l env CLEAN_HOST_DEPS=1 scripts/build-toolchain-8.2.0.sh 2> >(tee "$RUNNER_TEMP/time-l.txt" >&2)
+          kill "$sampler" 2>/dev/null || true
+          trap - EXIT
+          printf 'P7_DISK\tbuild-peak\t%s\tpeak du -sk of the source and build tree\n' \
+            "$(awk -F'\t' '{if ($2+0 > m) m = $2+0} END {print m+0}' "$samples")"
+          printf 'P7_MEM\tbuild-peak\t%s\t%s\n' \
+            "$(awk -F'\t' '{if ($3+0 > m) m = $3+0} END {print m+0}' "$samples")" \
+            "$(awk -F'\t' 'END {print $5}' "$samples")"
+          printf 'P7_MEM\tbuild-peak-largest-process\t%s\tlargest single process max RSS; -1 when unmeasured\n' \
+            "$( [ -f "$RUNNER_TEMP/time-l.txt" ] && awk '/maximum resident set size/ {print $1; exit}' "$RUNNER_TEMP/time-l.txt" || awk -F'\t' '{if ($4+0 > m) m = $4+0} END {print m+0}' "$samples")"
+          printf 'P7_DISK\tafter-build\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
+          printf 'P7_STAGE\tend\tbuild\t%s\n' "$(date +%s)"
+
+      - name: Generate the golden manifest with the official toolchain
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tgate-golden\t%s\n' "$(date +%s)"
+          scripts/evt-golden.sh "$OPENWCH_VERSION"
+          printf 'P7_STAGE\tend\tgate-golden\t%s\n' "$(date +%s)"
+
+      - name: 'Assertion 1 and 2: manifest scale against absolute constants'
+        run: |
+          set -eu
+          manifest="analysis/golden/${OPENWCH_VERSION}-${OPENWCH_PLATFORM}.tsv"
+          gate_rows=$(awk -F '\t' '$1 !~ /^#/ && $1 != "slug" && $3 == "gate" { c++ } END { print c+0 }' "$manifest")
+          projects=$(awk -F '\t' '$1 !~ /^#/ && $1 != "slug" { print $1 }' "$manifest" | sort -u | wc -l | tr -d '[:space:]')
+          echo "manifest_gate_rows=$gate_rows expected=$GATE_ARTIFACT_TOTAL"
+          echo "manifest_projects=$projects expected=$GATE_PROJECT_TOTAL"
+          test "$gate_rows" = "$GATE_ARTIFACT_TOTAL"
+          test "$projects" = "$GATE_PROJECT_TOTAL"
+
+      - name: Record raw manifest drift (diagnostic only, never a gate)
+        run: |
+          set -eu
+          manifest="analysis/golden/${OPENWCH_VERSION}-${OPENWCH_PLATFORM}.tsv"
+          echo "raw_drift_lines=$(git diff --numstat -- "$manifest" | awk '{print $1"+"$2}')"
+          git diff -- "$manifest" | head -n 200 || true
+
+      - name: Compare our toolchain against the fresh manifest
+        run: |
+          set -eu
+          printf 'P7_STAGE\tbegin\tgate-compare\t%s\n' "$(date +%s)"
+          set -o pipefail
+          status=0
+          scripts/evt-compare.sh "$OPENWCH_VERSION" \
+            "$TOOLCHAIN_PROJECT/darwin-x64/install/riscv-none-embed-gcc" \
+            | tee "$RUNNER_TEMP/evt-compare.log" || status=$?
+          echo "$status" > "$RUNNER_TEMP/evt-compare.status"
+          echo "evt_compare_status=$status"
+          printf 'P7_DISK\tafter-gate\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
+          printf 'P7_MEM\tgate-peak\t%s\t%s\n' \
+            "$(cat /sys/fs/cgroup/memory.peak 2>/dev/null || ps -A -o rss= | awk '{s+=$1} END {print s+0}')" \
+            "$([ -r /sys/fs/cgroup/memory.peak ] && echo 'cgroup-peak-bytes, cumulative high-water mark' || echo 'ps-rss-kb, sum over all processes')"
+          printf 'P7_STAGE\tend\tgate-compare\t%s\n' "$(date +%s)"
+
+      - name: 'Assertion 3: comparison summary'
+        run: |
+          set -eu
+          summary=$(awk -F '\t' '$1 == "SUMMARY" { print }' "$RUNNER_TEMP/evt-compare.log")
+          test -n "$summary"
+          echo "$summary"
+          printf '%s\n' "$summary" | awk -F '\t' -v want="gate_pass=$GATE_ARTIFACT_TOTAL" '
+            {
+              pass = 0; fail = 0
+              for (i = 2; i <= NF; i++) {
+                if ($i == want) pass = 1
+                if ($i == "gate_fail=0") fail = 1
+              }
+              exit (pass && fail) ? 0 : 1
+            }'
+          test "$(cat "$RUNNER_TEMP/evt-compare.status")" = "0"
+
+      - name: Upload gate evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: gate-darwin-arm64-8.2.0
+          path: |
+            analysis/golden/8.2.0-darwin-arm64.tsv
+            ${{ runner.temp }}/evt-compare.log
+          if-no-files-found: warn

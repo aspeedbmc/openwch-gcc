@@ -1,0 +1,16 @@
+schema_version	group_id	package_or_family	selector_expression	full_chipid_bits	physical_sites	classification	revision_sensitive	rationale	representative_path
+1	SEL-WCHNET	five WCHNET archives	lhu 0x1FFFF706 &0xF0 ==0x30/0x80	23:20	8 archive-member occurrences; 2 object hashes	MODEL-SELECT	no	SDK names high half DEVID and model tables map values to V203/V208/V303 families	wchnet-binary/*-GetChipID.txt
+1	SEL-V317-CAN	V317 package	CHIPID>>4 &0xF in 4..7	7:4	1 source	REVISION-SELECT	yes	published model patterns keep model digits fixed and wildcard this nibble	ch32v30x_can.c
+1	SEL-V317-TIM	V317 package	CHIPID[7:4] in 4..8	7:4	1 source	REVISION-SELECT	yes	same model can select alternate timer setup	ch32v30x_tim.c
+1	SEL-V317-ETH	V317 package	ChipId &0xF0 thresholds/equalities	7:4	20 source files; 4 semantic modes	REVISION-SELECT	yes	recovery/tuning varies within a published model pattern	EXAM/ETH/NetLib/eth_driver_*.c
+1	SEL-H417-CAN	H417 package	ChipId &0xF0 ==0	7:4	1 source	REVISION-SELECT	yes	revision-zero alternate CAN sequence	ch32h417_can.c
+1	SEL-H417-GPIO-REV	H417 package	CHIPID &0xF0 ==0	7:4	1 source	REVISION-SELECT	yes	revision-zero SWPMI operation	ch32h417_gpio.c:598-604
+1	SEL-H417-GPIO-MODEL	H417 package	CHIPID &~0xF0 then switch	all except 7:4	1 source	REVISION-INSENSITIVE-MODEL-SELECT	no	code explicitly removes revision nibble before model/package switch	ch32h417_gpio.c:605-607
+1	SEL-H417-ADC	H417 package	CHIPID &0xF0 ==0	7:4	6 source files	REVISION-SELECT	yes	revision-zero calibration delta	EXAM/ADC/DualADC_*/Common/hardware.c
+1	SEL-H417-EMMC	H417 package	ChipID &0xF0 ==0	7:4	3 source files	REVISION-SELECT	yes	revision-zero SWPMI operation	three sdmmc_emmc.c copies
+1	SEL-H417-PWR	H417 package	CHIPID[7:4] switch 0/1/2	7:4	1 source	REVISION-SELECT	yes	per-revision regulator configuration	PWR/Stop_Mode/Common/hardware.c
+1	SEL-H417-USBSS	H417 package	Chip=CHIPID[7:4]; Chip<3/>=3	7:4	5 assignments plus 3 driver copies	REVISION-SELECT	yes	link feature handling changes by revision	USBSS/UHSIF ch32h417_usbss_device.c
+1	SEL-V407-ETH	V407 package	CHIPID>>16 &0xF ==2/5	19:16	2 source files	MODEL/PACKAGE-SELECT	no	high-half DEVID package subcode selects LED/PHY pin mapping	V407 ETH eth_driver.c
+1	SEL-V407-GPIO	V407 package	CHIPID &~0xF0 then switch	all except 7:4	1 source	REVISION-INSENSITIVE-MODEL-SELECT	no	revision nibble removed	ch32v4x7_gpio.c
+1	SEL-V006-SLTIM	V006 package	CHIPID &~0xF0 ==0x00700800	all except 7:4	7 tests in 1 source	REVISION-INSENSITIVE-MODEL-SELECT	no	revision nibble removed	SLTIM_DMA/User/main.c
+1	SEL-X315-GPIO	X315 package	VCfg_Init() &~0xF0 then switch	all except 7:4	1 source	REVISION-INSENSITIVE-MODEL-SELECT	no	revision nibble removed	ch32x3x5_gpio.c

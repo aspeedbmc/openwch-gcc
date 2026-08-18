@@ -1,0 +1,12 @@
+schema_version	image_path	fingerprint	address	recursive_classification	recursive_parcel_start	recursive_parcel_length	linear_mixed_classification	linear_mixed_parcel_start	linear_mixed_parcel_length
+2	tmp/wch-evt/evt/QingkeV3C_CH587_EVT/EXAM/BLE/LIB/CH587BLE_ROMx.hex	0x07f805fb	0x0006b8d4	unclassified-populated-byte	not-applicable	not-applicable	inside-linear-mixed-long-parcel	0x0006b8d0	12
+2	tmp/wch-evt/evt/QingkeV3C_CH587_EVT/EXAM/BLE/LIB/CH587BLE_ROMx.hex	0x5f9b34fb	0x00066b68	unclassified-populated-byte	not-applicable	not-applicable	linear-mixed-parcel-start	0x00066b68	4
+2	tmp/wch-evt/evt/QingkeV3C_CH587_EVT/EXAM/BLE/LIB/CH587BLE_ROMx.hex	0x3b352f2b	0x000672de	unclassified-populated-byte	not-applicable	not-applicable	outside-complete-linear-mixed-frames	not-applicable	not-applicable
+2	tmp/wch-evt/evt/QingkeV4B_CH32V203_EVT/EXAM/BLE/LIB/wchble_rom.hex	0x5f9b34fb	0x0006e560	unclassified-populated-byte	not-applicable	not-applicable	linear-mixed-parcel-start	0x0006e560	4
+2	tmp/wch-evt/evt/QingkeV4B_CH32V203_EVT/EXAM/BLE/LIB/wchble_rom.hex	0x3b352f2b	0x0006e6ee	unclassified-populated-byte	not-applicable	not-applicable	linear-mixed-parcel-start	0x0006e6ee	4
+2	tmp/wch-evt/evt/QingkeV4B_CH32V203_EVT/EXAM/BLE/MESH/MESH_LIB/wchble_rom_mesh.hex	0x5f9b34fb	0x0006dc8c	unclassified-populated-byte	not-applicable	not-applicable	linear-mixed-parcel-start	0x0006dc8c	4
+2	tmp/wch-evt/evt/QingkeV4B_CH32V203_EVT/EXAM/BLE/MESH/MESH_LIB/wchble_rom_mesh.hex	0x3b352f2b	0x0006ddea	unclassified-populated-byte	not-applicable	not-applicable	linear-mixed-parcel-start	0x0006ddea	4
+2	tmp/wch-evt/evt/QingkeV4C_CH32V20x_EVT/EXAM/BLE/LIB/wchble_rom.hex	0x5f9b34fb	0x0006e560	unclassified-populated-byte	not-applicable	not-applicable	linear-mixed-parcel-start	0x0006e560	4
+2	tmp/wch-evt/evt/QingkeV4C_CH32V20x_EVT/EXAM/BLE/LIB/wchble_rom.hex	0x3b352f2b	0x0006e6ee	unclassified-populated-byte	not-applicable	not-applicable	linear-mixed-parcel-start	0x0006e6ee	4
+2	tmp/wch-evt/evt/QingkeV4C_CH32V20x_EVT/EXAM/BLE/MESH/MESH_LIB/wchble_rom_mesh.hex	0x5f9b34fb	0x0006dc8c	unclassified-populated-byte	not-applicable	not-applicable	linear-mixed-parcel-start	0x0006dc8c	4
+2	tmp/wch-evt/evt/QingkeV4C_CH32V20x_EVT/EXAM/BLE/MESH/MESH_LIB/wchble_rom_mesh.hex	0x3b352f2b	0x0006ddea	unclassified-populated-byte	not-applicable	not-applicable	linear-mixed-parcel-start	0x0006ddea	4

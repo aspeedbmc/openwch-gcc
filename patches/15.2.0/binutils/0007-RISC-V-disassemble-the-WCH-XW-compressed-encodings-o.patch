@@ -1,0 +1,363 @@
+From eb8e4dc9011fe80e2226faa6f396c71743689ae3 Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 3 <phase3@openwch.local>
+Date: Sun, 16 Aug 2026 02:13:08 +0900
+Subject: [PATCH 7/7] RISC-V: disassemble the WCH XW compressed encodings on
+ request
+
+objdump could assemble the XW compressed loads and stores but never showed
+them again: the disassembler skipped INSN_CLASS_XW unconditionally and
+printed .insn.  The official objdump prints them, but only when asked by
+name, through a -M option the upstream disassembler does not have:
+
+  $ objdump -d xw.o                 0: 2188   .insn   2, 0x2188
+  $ objdump -d -Mxw xw.o            0: 2188   lbu     a0,0(a1)
+  $ objdump -d -Mxw,no-aliases      0: 2188   c.lbu   a0,0(a1)
+
+The option is the only thing that decides.  An object whose Tag_RISCV_arch
+already contains xw2p2 still disassembles to .insn without it, and -Mmax
+does not enable it either -- it decodes these halfwords as the standard
+c.fld they collide with.  So the XW class is exempt from the architecture
+test rather than driven by it, in the same shape the assembler already
+uses for its own XW gates.
+
+Which of several matching encodings wins stays a question of table order,
+as for every other class, and the table needed correcting for it.  The XW
+rows were appended after the encodings they overlap, which is invisible
+while nothing decodes them and wrong as soon as something does: an
+exhaustive sweep of all 65,536 halfwords against the official objdump puts
+the damage at 8,192 words on an rv32imafdc_xw object, where
+-Mxw,no-aliases reached c.fld before the XW form, and 512 more on an
+rv32imac_zcb object, where it reached a Zcb load.  Move the four XW stack
+forms and the four mnemonics XW shares with Zcb ahead of the Zcd and Zcb
+rows, under three constraints: each mnemonic's rows stay contiguous, as the
+table requires; the XW row of a shared mnemonic stays first, which is the
+ordering the assembler's own XW gates rely on; and the Zcb rows that move
+along (0x8000-0x8FFF, op=00) stay disjoint from the Zcd ranges they pass
+(c.fld 0x2000-0x3FFF, c.fsd 0xA000-0xBFFF), so no new Zcb-versus-Zcd
+precedence is introduced.  The XW alias rows are already
+interleaved by mnemonic and are left alone -- they were reproducing the
+official choice exactly, including the cases where a Zcb alias
+legitimately wins.
+
+Register the option, exempt the class from the architecture test while
+gating it on the option, and add the operand printers for the four XW
+address modifiers, which existed only on the assembler side because
+nothing had ever printed one.  The help text is the official wording.
+
+Behavior source: direct WCH 15.2.0 objdump probes on an object holding all
+eight encodings, across -Mxw, -Mmax, -Mxw,max, -Mxw,no-aliases and an XW
+arch attribute with no option; the 65,536-halfword sweep over four
+architecture profiles and four disassembler modes, which agrees with the
+official objdump in all sixteen cells after the move and leaves the eight
+pre-existing cells unchanged; and the 8,704-case XW producer matrix, whose
+encodings the move leaves byte-identical.  The same option-not-attribute
+policy on the GDB side of the shared opcodes library is recorded in
+  analysis/toolchain/phase3e-gdb-sim-deep-diff.md
+
+The rows this moves carry no xlen requirement, so the move applies to
+elf64 objects on the same terms: -Mxw decodes the XW halfwords there too,
+which is what the official objdump does, measured in
+  tmp/phase9-evidence/15.2.0/spec.md
+---
+ .../gas/riscv/xw-compressed-dis-attribute.d   | 12 +++++
+ .../gas/riscv/xw-compressed-dis-no-aliases.d  | 18 +++++++
+ .../gas/riscv/xw-compressed-dis-off.d         | 12 +++++
+ .../gas/riscv/xw-compressed-dis-rv64.d        | 26 ++++++++++
+ gas/testsuite/gas/riscv/xw-compressed-dis.d   | 18 +++++++
+ opcodes/riscv-dis.c                           | 52 +++++++++++++++++--
+ opcodes/riscv-opc.c                           | 31 ++++++-----
+ 7 files changed, 151 insertions(+), 18 deletions(-)
+ create mode 100644 gas/testsuite/gas/riscv/xw-compressed-dis-attribute.d
+ create mode 100644 gas/testsuite/gas/riscv/xw-compressed-dis-no-aliases.d
+ create mode 100644 gas/testsuite/gas/riscv/xw-compressed-dis-off.d
+ create mode 100644 gas/testsuite/gas/riscv/xw-compressed-dis-rv64.d
+ create mode 100644 gas/testsuite/gas/riscv/xw-compressed-dis.d
+
+diff --git a/gas/testsuite/gas/riscv/xw-compressed-dis-attribute.d b/gas/testsuite/gas/riscv/xw-compressed-dis-attribute.d
+new file mode 100644
+index 00000000..0e62e37f
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-compressed-dis-attribute.d
+@@ -0,0 +1,12 @@
++#as: --w_priv_spec -march=rv32imac_xw -mabi=ilp32
++#source: xw-compressed.s
++#objdump: -d
++
++.*:[ 	]+file format .*
++
++Disassembly of section .text:
++
++0+000 <.text>:
++[ 	]+0:[ 	]+2188[ 	]+\.insn[ 	]+2, 0x2188
++[ 	]+2:[ 	]+218a[ 	]+\.insn[ 	]+2, 0x218a
++#pass
+diff --git a/gas/testsuite/gas/riscv/xw-compressed-dis-no-aliases.d b/gas/testsuite/gas/riscv/xw-compressed-dis-no-aliases.d
+new file mode 100644
+index 00000000..0b59e75c
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-compressed-dis-no-aliases.d
+@@ -0,0 +1,18 @@
++#as: -march=rv32imac_xw -mabi=ilp32
++#source: xw-compressed.s
++#objdump: -d -Mxw,no-aliases
++
++.*:[ 	]+file format .*
++
++Disassembly of section .text:
++
++0+000 <.text>:
++[ 	]+0:[ 	]+2188[ 	]+c\.lbu[ 	]+a0,0\(a1\)
++[ 	]+2:[ 	]+218a[ 	]+c\.lhu[ 	]+a0,0\(a1\)
++[ 	]+4:[ 	]+a188[ 	]+c\.sb[ 	]+a0,0\(a1\)
++[ 	]+6:[ 	]+a18a[ 	]+c\.sh[ 	]+a0,0\(a1\)
++[ 	]+8:[ 	]+8008[ 	]+c\.lbusp[ 	]+a0,0\(sp\)
++[ 	]+a:[ 	]+8028[ 	]+c\.lhusp[ 	]+a0,0\(sp\)
++[ 	]+c:[ 	]+8048[ 	]+c\.sbsp[ 	]+a0,0\(sp\)
++[ 	]+e:[ 	]+8068[ 	]+c\.shsp[ 	]+a0,0\(sp\)
++#pass
+diff --git a/gas/testsuite/gas/riscv/xw-compressed-dis-off.d b/gas/testsuite/gas/riscv/xw-compressed-dis-off.d
+new file mode 100644
+index 00000000..5ab69122
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-compressed-dis-off.d
+@@ -0,0 +1,12 @@
++#as: -march=rv32imac_xw -mabi=ilp32
++#source: xw-compressed.s
++#objdump: -d
++
++.*:[ 	]+file format .*
++
++Disassembly of section .text:
++
++0+000 <.text>:
++[ 	]+0:[ 	]+2188[ 	]+\.insn[ 	]+2, 0x2188
++[ 	]+2:[ 	]+218a[ 	]+\.insn[ 	]+2, 0x218a
++#pass
+diff --git a/gas/testsuite/gas/riscv/xw-compressed-dis-rv64.d b/gas/testsuite/gas/riscv/xw-compressed-dis-rv64.d
+new file mode 100644
+index 00000000..efac5385
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-compressed-dis-rv64.d
+@@ -0,0 +1,26 @@
++#as: -march=rv64imac_xw -mabi=lp64
++#source: xw-compressed.s
++#objdump: -d -Mxw
++
++.*:[ 	]+file format .*
++
++Disassembly of section .text:
++
++0+000 <.text>:
++[ 	]+0:[ 	]+2188[ 	]+lbu[ 	]+a0,0\(a1\)
++[ 	]+2:[ 	]+218a[ 	]+lhu[ 	]+a0,0\(a1\)
++[ 	]+4:[ 	]+a188[ 	]+sb[ 	]+a0,0\(a1\)
++[ 	]+6:[ 	]+a18a[ 	]+sh[ 	]+a0,0\(a1\)
++[ 	]+8:[ 	]+8008[ 	]+lbu[ 	]+a0,0\(sp\)
++[ 	]+a:[ 	]+8028[ 	]+lhu[ 	]+a0,0\(sp\)
++[ 	]+c:[ 	]+8048[ 	]+sb[ 	]+a0,0\(sp\)
++[ 	]+e:[ 	]+8068[ 	]+sh[ 	]+a0,0\(sp\)
++[ 	]+10:[ 	]+2188[ 	]+lbu[ 	]+a0,0\(a1\)
++[ 	]+12:[ 	]+218a[ 	]+lhu[ 	]+a0,0\(a1\)
++[ 	]+14:[ 	]+a188[ 	]+sb[ 	]+a0,0\(a1\)
++[ 	]+16:[ 	]+a18a[ 	]+sh[ 	]+a0,0\(a1\)
++[ 	]+18:[ 	]+8008[ 	]+lbu[ 	]+a0,0\(sp\)
++[ 	]+1a:[ 	]+8028[ 	]+lhu[ 	]+a0,0\(sp\)
++[ 	]+1c:[ 	]+8048[ 	]+sb[ 	]+a0,0\(sp\)
++[ 	]+1e:[ 	]+8068[ 	]+sh[ 	]+a0,0\(sp\)
++#pass
+diff --git a/gas/testsuite/gas/riscv/xw-compressed-dis.d b/gas/testsuite/gas/riscv/xw-compressed-dis.d
+new file mode 100644
+index 00000000..7e8ef90a
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-compressed-dis.d
+@@ -0,0 +1,18 @@
++#as: -march=rv32imac_xw -mabi=ilp32
++#source: xw-compressed.s
++#objdump: -d -Mxw
++
++.*:[ 	]+file format .*
++
++Disassembly of section .text:
++
++0+000 <.text>:
++[ 	]+0:[ 	]+2188[ 	]+lbu[ 	]+a0,0\(a1\)
++[ 	]+2:[ 	]+218a[ 	]+lhu[ 	]+a0,0\(a1\)
++[ 	]+4:[ 	]+a188[ 	]+sb[ 	]+a0,0\(a1\)
++[ 	]+6:[ 	]+a18a[ 	]+sh[ 	]+a0,0\(a1\)
++[ 	]+8:[ 	]+8008[ 	]+lbu[ 	]+a0,0\(sp\)
++[ 	]+a:[ 	]+8028[ 	]+lhu[ 	]+a0,0\(sp\)
++[ 	]+c:[ 	]+8048[ 	]+sb[ 	]+a0,0\(sp\)
++[ 	]+e:[ 	]+8068[ 	]+sh[ 	]+a0,0\(sp\)
++#pass
+diff --git a/opcodes/riscv-dis.c b/opcodes/riscv-dis.c
+index f9e4d388..56cf7d1a 100644
+--- a/opcodes/riscv-dis.c
++++ b/opcodes/riscv-dis.c
+@@ -72,6 +72,11 @@ struct riscv_private_data
+   /* If set, disassemble without checking architecture string, just like what
+      we did at the beginning.  */
+   bool all_ext;
++  /* If set, decode the WCH XW compressed encodings.  These are keyed on this
++     option alone: an XW architecture attribute does not enable them and
++     all_ext does not either, since the encodings they occupy already belong
++     to the standard compressed double-float instructions.  */
++  bool xw;
+ };
+ 
+ /* Set default RISC-V disassembler options.  */
+@@ -84,6 +89,7 @@ set_default_riscv_dis_options (struct disassemble_info *info)
+   pd->riscv_fpr_names = riscv_fpr_names_abi;
+   pd->no_aliases = false;
+   pd->all_ext = false;
++  pd->xw = false;
+ }
+ 
+ /* Parse RISC-V disassembler option (without arguments).  */
+@@ -102,6 +108,8 @@ parse_riscv_dis_option_without_args (const char *option,
+     }
+   else if (strcmp (option, "max") == 0)
+     pd->all_ext = true;
++  else if (strcmp (option, "xw") == 0)
++    pd->xw = true;
+   else
+     return false;
+   return true;
+@@ -772,6 +780,29 @@ print_insn_args (const char *oparg, insn_t l, bfd_vma pc, disassemble_info *info
+ 	case 'X': /* Vendor-specific operands.  */
+ 	  switch (*++oparg)
+ 	    {
++	    case 'w': /* Vendor-specific (WCH) XW operands.  */
++	      switch (*++oparg)
++		{
++		case 'b':
++		  print (info->stream, dis_style_immediate, "%d",
++			 (int) EXTRACT_XW_REG_BYTE_UIMM (l));
++		  break;
++		case 'h':
++		  print (info->stream, dis_style_immediate, "%d",
++			 (int) EXTRACT_XW_REG_HALF_UIMM (l));
++		  break;
++		case 'B':
++		  print (info->stream, dis_style_immediate, "%d",
++			 (int) EXTRACT_XW_SP_BYTE_UIMM (l));
++		  break;
++		case 'H':
++		  print (info->stream, dis_style_immediate, "%d",
++			 (int) EXTRACT_XW_SP_HALF_UIMM (l));
++		  break;
++		default:
++		  goto undefined_modifier;
++		}
++	      break;
+ 	    case 't': /* Vendor-specific (T-head) operands.  */
+ 	      {
+ 		size_t n;
+@@ -1016,8 +1047,13 @@ riscv_disassemble_insn (bfd_vma memaddr,
+ 
+       for (; op->name; op++)
+ 	{
+-	  /* The WCH disassembler prints XW compressed encodings as .insn.  */
+-	  if (op->insn_class == INSN_CLASS_XW)
++	  /* The XW compressed encodings are shown only when they were asked
++	     for by name.  Without the option they print as .insn, which is
++	     also what an XW architecture attribute alone produces, so the
++	     ordinary architecture test below cannot decide them.  Which of
++	     several matching encodings wins is left to the table order, as
++	     for every other class.  */
++	  if (op->insn_class == INSN_CLASS_XW && !pd->xw)
+ 	    continue;
+ 	  /* Ignore macro insns.  */
+ 	  if (op->pinfo == INSN_MACRO)
+@@ -1032,8 +1068,11 @@ riscv_disassemble_insn (bfd_vma memaddr,
+ 	  if ((op->xlen_requirement != 0)
+ 	      && (op->xlen_requirement != pd->xlen))
+ 	    continue;
+-	  /* Is this instruction supported by the current architecture?  */
+-	  if (!pd->all_ext
++	  /* Is this instruction supported by the current architecture?  The
++	     XW class is exempt: -Mxw enables it against any architecture and
++	     -Mmax does not enable it against any.  */
++	  if (op->insn_class != INSN_CLASS_XW
++	      && !pd->all_ext
+ 	      && !riscv_multi_subset_supports (&pd->riscv_rps_dis,
+ 					       op->insn_class))
+ 	    continue;
+@@ -1491,6 +1530,7 @@ riscv_init_disasm_info (struct disassemble_info *info)
+   pd->riscv_fpr_names = NULL;
+   pd->no_aliases = false;
+   pd->all_ext = false;
++  pd->xw = false;
+ 
+   info->private_data = pd;
+   riscv_dis_parse_subset (info, pd->default_arch);
+@@ -1643,6 +1683,10 @@ static struct
+   { "no-aliases",
+     N_("Disassemble only into canonical instructions."),
+     RISCV_OPTION_ARG_NONE },
++  { "xw",
++    N_("Enable WCH compressed instruction extension, such as\n"
++       "\t\tlbu lhu sb sh lbusp lhusp sbsp shsp"),
++    RISCV_OPTION_ARG_NONE },
+   { "priv-spec=",
+     N_("Print the CSR according to the chosen privilege spec."),
+     RISCV_OPTION_ARG_PRIV_SPEC }
+diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
+index b4d81935..dd521c7f 100644
+--- a/opcodes/riscv-opc.c
++++ b/opcodes/riscv-opc.c
+@@ -1229,6 +1229,23 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"c.sdsp",    64, INSN_CLASS_ZCA,   "CV,CN(Cc)", MATCH_C_SDSP, MASK_C_SDSP, match_opcode, INSN_DREF|INSN_8_BYTE },
+ {"c.sd",      32, INSN_CLASS_ZCLSD, "Ct,Cl(Cs)", MATCH_C_SD, MASK_C_SD, match_crs2s_even, INSN_DREF|INSN_8_BYTE },
+ {"c.sd",      64, INSN_CLASS_ZCA,   "Ct,Cl(Cs)", MATCH_C_SD, MASK_C_SD, match_opcode, INSN_DREF|INSN_8_BYTE },
++/* Vendor-specific (WCH) XW compressed load/store instructions, and the
++   standard Zcb encodings they share a mnemonic with.  WCH resolves an
++   overlap in favour of XW, so the whole group precedes the Zcd and Zcb
++   encodings whose halfwords the XW forms reuse.  */
++{"c.lbusp",    0, INSN_CLASS_XW, "Ct,XwB(Cc)", MATCH_XW_C_LBUSP, MASK_XW_C_LBUSP, match_opcode, INSN_DREF|INSN_1_BYTE },
++{"c.lhusp",    0, INSN_CLASS_XW, "Ct,XwH(Cc)", MATCH_XW_C_LHUSP, MASK_XW_C_LHUSP, match_opcode, INSN_DREF|INSN_2_BYTE },
++{"c.sbsp",     0, INSN_CLASS_XW, "Ct,XwB(Cc)", MATCH_XW_C_SBSP, MASK_XW_C_SBSP, match_opcode, INSN_DREF|INSN_1_BYTE },
++{"c.shsp",     0, INSN_CLASS_XW, "Ct,XwH(Cc)", MATCH_XW_C_SHSP, MASK_XW_C_SHSP, match_opcode, INSN_DREF|INSN_2_BYTE },
++{"c.lbu",      0, INSN_CLASS_XW, "Ct,Xwb(Cs)", MATCH_XW_C_LBU, MASK_XW_C_LBU, match_opcode, INSN_DREF|INSN_1_BYTE },
++{"c.lbu",      0, INSN_CLASS_ZCB, "Ct,Wcb(Cs)", MATCH_C_LBU, MASK_C_LBU, match_opcode, INSN_DREF|INSN_1_BYTE },
++{"c.lhu",      0, INSN_CLASS_XW, "Ct,Xwh(Cs)", MATCH_XW_C_LHU, MASK_XW_C_LHU, match_opcode, INSN_DREF|INSN_2_BYTE },
++{"c.lhu",      0, INSN_CLASS_ZCB, "Ct,Wch(Cs)", MATCH_C_LHU, MASK_C_LHU, match_opcode, INSN_DREF|INSN_2_BYTE },
++{"c.sb",       0, INSN_CLASS_XW, "Ct,Xwb(Cs)", MATCH_XW_C_SB, MASK_XW_C_SB, match_opcode, INSN_DREF|INSN_1_BYTE },
++{"c.sb",       0, INSN_CLASS_ZCB, "Ct,Wcb(Cs)", MATCH_C_SB, MASK_C_SB, match_opcode, INSN_DREF|INSN_1_BYTE },
++{"c.sh",       0, INSN_CLASS_XW, "Ct,Xwh(Cs)", MATCH_XW_C_SH, MASK_XW_C_SH, match_opcode, INSN_DREF|INSN_2_BYTE },
++{"c.sh",       0, INSN_CLASS_ZCB, "Ct,Wch(Cs)", MATCH_C_SH, MASK_C_SH, match_opcode, INSN_DREF|INSN_2_BYTE },
++
+ {"c.fldsp",    0, INSN_CLASS_ZCD, "D,Cn(Cc)",  MATCH_C_FLDSP, MASK_C_FLDSP, match_opcode, INSN_DREF|INSN_8_BYTE },
+ {"c.fld",      0, INSN_CLASS_ZCD, "CD,Cl(Cs)", MATCH_C_FLD, MASK_C_FLD, match_opcode, INSN_DREF|INSN_8_BYTE },
+ {"c.fsdsp",    0, INSN_CLASS_ZCD, "CT,CN(Cc)", MATCH_C_FSDSP, MASK_C_FSDSP, match_opcode, INSN_DREF|INSN_8_BYTE },
+@@ -2298,15 +2315,7 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"vsm3me.vv",    0, INSN_CLASS_ZVKSH, "Vd,Vt,Vs", MATCH_VSM3ME_VV, MASK_VSM3ME_VV, match_opcode, 0},
+ 
+ /* ZCB instructions.  */
+-{"c.lbu",      0, INSN_CLASS_XW, "Ct,Xwb(Cs)", MATCH_XW_C_LBU, MASK_XW_C_LBU, match_opcode, INSN_DREF|INSN_1_BYTE },
+-{"c.lbu",      0, INSN_CLASS_ZCB, "Ct,Wcb(Cs)", MATCH_C_LBU, MASK_C_LBU, match_opcode, INSN_DREF|INSN_1_BYTE },
+-{"c.lhu",      0, INSN_CLASS_XW, "Ct,Xwh(Cs)", MATCH_XW_C_LHU, MASK_XW_C_LHU, match_opcode, INSN_DREF|INSN_2_BYTE },
+-{"c.lhu",      0, INSN_CLASS_ZCB, "Ct,Wch(Cs)", MATCH_C_LHU, MASK_C_LHU, match_opcode, INSN_DREF|INSN_2_BYTE },
+ {"c.lh",       0, INSN_CLASS_ZCB, "Ct,Wch(Cs)", MATCH_C_LH, MASK_C_LH, match_opcode, INSN_DREF|INSN_2_BYTE },
+-{"c.sb",       0, INSN_CLASS_XW, "Ct,Xwb(Cs)", MATCH_XW_C_SB, MASK_XW_C_SB, match_opcode, INSN_DREF|INSN_1_BYTE },
+-{"c.sb",       0, INSN_CLASS_ZCB, "Ct,Wcb(Cs)", MATCH_C_SB, MASK_C_SB, match_opcode, INSN_DREF|INSN_1_BYTE },
+-{"c.sh",       0, INSN_CLASS_XW, "Ct,Xwh(Cs)", MATCH_XW_C_SH, MASK_XW_C_SH, match_opcode, INSN_DREF|INSN_2_BYTE },
+-{"c.sh",       0, INSN_CLASS_ZCB, "Ct,Wch(Cs)", MATCH_C_SH, MASK_C_SH, match_opcode, INSN_DREF|INSN_2_BYTE },
+ {"c.not",      0, INSN_CLASS_ZCB, "Cs",  MATCH_C_NOT, MASK_C_NOT, match_opcode, 0 },
+ {"c.mul",      0, INSN_CLASS_ZCB_AND_ZMMUL,   "Cs,Ct",  MATCH_C_MUL, MASK_C_MUL, match_opcode, 0 },
+ {"c.sext.b",   0, INSN_CLASS_ZCB_AND_ZBB, "Cs",  MATCH_C_SEXT_B, MASK_C_SEXT_B, match_opcode, 0 },
+@@ -2316,12 +2325,6 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"c.zext.b",   0, INSN_CLASS_ZCB, "Cs",  MATCH_C_ZEXT_B, MASK_C_ZEXT_B, match_opcode, 0 },
+ {"c.sext.w",  64, INSN_CLASS_ZCB, "d",  MATCH_C_ADDIW, MASK_C_ADDIW|MASK_RVC_IMM, match_rd_nonzero, INSN_ALIAS },
+ 
+-/* Vendor-specific (WCH) XW compressed stack load/store instructions.  */
+-{"c.lbusp",    0, INSN_CLASS_XW, "Ct,XwB(Cc)", MATCH_XW_C_LBUSP, MASK_XW_C_LBUSP, match_opcode, INSN_DREF|INSN_1_BYTE },
+-{"c.lhusp",    0, INSN_CLASS_XW, "Ct,XwH(Cc)", MATCH_XW_C_LHUSP, MASK_XW_C_LHUSP, match_opcode, INSN_DREF|INSN_2_BYTE },
+-{"c.sbsp",     0, INSN_CLASS_XW, "Ct,XwB(Cc)", MATCH_XW_C_SBSP, MASK_XW_C_SBSP, match_opcode, INSN_DREF|INSN_1_BYTE },
+-{"c.shsp",     0, INSN_CLASS_XW, "Ct,XwH(Cc)", MATCH_XW_C_SHSP, MASK_XW_C_SHSP, match_opcode, INSN_DREF|INSN_2_BYTE },
+-
+ /* Zcmop instructions.  */
+ {"c.mop.1",     0,  INSN_CLASS_ZCMOP, "",  MATCH_C_MOP_1,  MASK_C_MOP_1, match_opcode, 0 },
+ {"c.mop.3",     0,  INSN_CLASS_ZCMOP, "",  MATCH_C_MOP_3,  MASK_C_MOP_3, match_opcode, 0 },
+-- 
+2.55.0
+

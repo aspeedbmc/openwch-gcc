@@ -1,0 +1,49 @@
+source	tmp/wch-evt/evt/QingkeV5F_CH32H417_EVT/EXAM/PWR/Stop_Mode/Common/hardware.c
+sha256	768c51ed315e087a69d9c80134cfbe2a035fae870e845da4a376d450e291b86f
+range	120-165
+000120	/*********************************************************************
+000121	 * @fn      PWR_STOPMode_LP_Cmd
+000122	 *
+000123	 * @brief   Reduce the VDDK voltage in stop mode with the voltage regulator
+000124	 *          in low-power mode.
+000125	 *
+000126	 * @return  none
+000127	 */
+000128	void PWR_STOPMode_LP_Cmd(FunctionalState NewState)
+000129	{
+000130	    uint32_t id = 0;
+000131	    id = (((*(uint32_t *)0x1FFFF704) & (0x000000F0)) >> 4);
+000132	    if(NewState != DISABLE)
+000133	    {
+000134	        switch(id)
+000135	        {
+000136	            case 0:
+000137	            {
+000138	                cfg &= ~((0x7 << 17));
+000139	                cfg |= ((0x1 << 17));
+000140	                break;
+000141	            }
+000142	            case 1:
+000143	            {
+000144	                cfg &= ~((0x7 << 17) | (0x7 << 4));
+000145	                cfg |= ((0x1 << 4));
+000146	                break;
+000147	            }
+000148	            case 2:
+000149	            {
+000150	                cfg &= ~((0x7 << 17) | (0x7 << 4));
+000151	                break;
+000152	            }
+000153	            default:
+000154	            {
+000155	                break;
+000156	            }
+000157	        }
+000158	        *(vu32*)SYS_CFGR0_BASE = cfg;
+000159	    }
+000160	    else
+000161	    {
+000162	        *(vu32*)SYS_CFGR0_BASE = tmp;
+000163	        Delay_Us(200);
+000164	    }
+000165	}

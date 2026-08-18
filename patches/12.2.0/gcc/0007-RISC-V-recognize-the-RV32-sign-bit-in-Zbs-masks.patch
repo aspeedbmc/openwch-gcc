@@ -1,0 +1,95 @@
+From 9e6a5bb34c6c55680ce882fdaabe494fe4d98417 Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 4 <phase4@openwch.local>
+Date: Thu, 13 Aug 2026 07:27:02 +0900
+Subject: [PATCH 7/9] RISC-V: recognize the RV32 sign bit in Zbs masks
+
+RV32 CONST_INT values are sign extended in HOST_WIDE_INT, so testing them without first applying the target word mask misses bit 31. Use the target-width single-bit predicate for bseti and bclri matching.
+
+Behavior specification: tmp/phase4-evidence/s3-zbs-sign-bit/probe.c; tmp/phase4-evidence/s3-zbs-sign-bit/official.s; tmp/phase4-evidence/s3-zbs-sign-bit/ours.s.
+
+gcc/ChangeLog:
+
+	* config/riscv/riscv.h (SINGLE_BIT_MASK_OPERAND): Mask the value to
+	the target word width before testing it.
+	* config/riscv/predicates.md (single_bit_mask_operand): Use
+	SINGLE_BIT_MASK_OPERAND.
+	(not_single_bit_mask_operand): Likewise.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/riscv/zbs-rv32-sign-bit.c: New test.
+---
+ gcc/config/riscv/predicates.md                  |  8 +++++---
+ gcc/config/riscv/riscv.h                        |  9 +++++++--
+ .../gcc.target/riscv/zbs-rv32-sign-bit.c        | 17 +++++++++++++++++
+ 3 files changed, 29 insertions(+), 5 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/riscv/zbs-rv32-sign-bit.c
+
+diff --git a/gcc/config/riscv/predicates.md b/gcc/config/riscv/predicates.md
+index 7686d56e5..898d30152 100644
+--- a/gcc/config/riscv/predicates.md
++++ b/gcc/config/riscv/predicates.md
+@@ -223,14 +223,16 @@
+   return riscv_gpr_save_operation_p (op);
+ })
+ 
+-;; Predicates for the ZBS extension.
++;; Predicates for the ZBS extension.  SINGLE_BIT_MASK_OPERAND masks its
++;; argument to the target word on RV32, so passing UINTVAL here and
++;; INTVAL in splittable_const_int_operand selects the same constants.
+ (define_predicate "single_bit_mask_operand"
+   (and (match_code "const_int")
+-       (match_test "pow2p_hwi (INTVAL (op))")))
++       (match_test "SINGLE_BIT_MASK_OPERAND (UINTVAL (op))")))
+ 
+ (define_predicate "not_single_bit_mask_operand"
+   (and (match_code "const_int")
+-       (match_test "pow2p_hwi (~INTVAL (op))")))
++       (match_test "SINGLE_BIT_MASK_OPERAND (~UINTVAL (op))")))
+ 
+ (define_predicate "const31_operand"
+   (and (match_code "const_int")
+diff --git a/gcc/config/riscv/riscv.h b/gcc/config/riscv/riscv.h
+index b3eb6abc2..118a93082 100644
+--- a/gcc/config/riscv/riscv.h
++++ b/gcc/config/riscv/riscv.h
+@@ -529,9 +529,14 @@ enum reg_class
+    || ((VALUE) | ((1UL<<31) - IMM_REACH)) + IMM_REACH == 0)
+ 
+ /* If this is a single bit mask, then we can load it with bseti.  Special
+-   handling of SImode 0x80000000 on RV64 is done in riscv_build_integer_1. */
++   handling of SImode 0x80000000 on RV64 is done in riscv_build_integer_1.
++   VALUE arrives sign extended in a HOST_WIDE_INT, so on RV32 it must be
++   masked to the target word first, otherwise bit 31 is never seen as a
++   single bit.  */
+ #define SINGLE_BIT_MASK_OPERAND(VALUE)					\
+-  (pow2p_hwi (VALUE))
++  (pow2p_hwi (TARGET_64BIT						\
++		? (VALUE)						\
++		: ((VALUE) & ((HOST_WIDE_INT_1U << 32) - 1))))
+ 
+ /* Stack layout; function entry, exit and calling.  */
+ 
+diff --git a/gcc/testsuite/gcc.target/riscv/zbs-rv32-sign-bit.c b/gcc/testsuite/gcc.target/riscv/zbs-rv32-sign-bit.c
+new file mode 100644
+index 000000000..b7679efa0
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/zbs-rv32-sign-bit.c
+@@ -0,0 +1,17 @@
++/* { dg-do compile } */
++/* { dg-options "-Os -march=rv32i_zbs -mabi=ilp32" } */
++
++unsigned int
++set_sign_bit (unsigned int x)
++{
++  return x | 0x80000000u;
++}
++
++unsigned int
++clear_sign_bit (unsigned int x)
++{
++  return x & 0x7fffffffu;
++}
++
++/* { dg-final { scan-assembler "bseti\ta0,a0,31" } } */
++/* { dg-final { scan-assembler "bclri\ta0,a0,31" } } */

@@ -1,0 +1,7 @@
+schema_version	source_api_or_load	address_or_expression	full_chipid_bits	semantic_field	selector_example	conclusion	source_anchor
+1	DBGMCU_GetCHIPID	u32 load @0x1FFFF704	31:0	CHIPID	entire word	combined model/package/revision identity word	V317 dbg source:103-127
+1	DBGMCU_GetREVID	u32 load &0x0000FFFF	15:0	REVID	vendor API names low half revision identifier	low half is revision identifier; do not assume every bit is a monotonic revision number	V317 dbg source:17-25
+1	runtime revision selector	CHIPID >>4 &0xF	7:4	REVID wildcard nibble	V317/H417 branches	same model can take different paths; published CHIPID lists mark this nibble x/X	V317 ChipID list:108-123
+1	DBGMCU_GetDEVID	u32 load >>16	31:16	DEVID	vendor API names high half device identifier	model/package identity half	V317 dbg source:29-37
+1	WCHNET GetChipID	lhu @0x1FFFF706	31:16	DEVID	little-endian halfword at base+2	reads DEVID, not REVID	06b binary GetChipID disassembly plus SDK field split
+1	WCHNET predicate	lhu @0x1FFFF706 &0x00F0	23:20	DEVID model-family nibble	equals 0x30 or 0x80	cross-chip model-family select, not same-chip revision select	WCHNET binary plus vendor CHIPID lists

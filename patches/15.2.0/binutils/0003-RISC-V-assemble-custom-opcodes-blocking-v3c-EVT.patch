@@ -1,0 +1,338 @@
+From 351a506048bd649211e5c0f51743e4628cd7792b Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 3 <phase3@openwch.local>
+Date: Thu, 13 Aug 2026 01:55:55 +0900
+Subject: [PATCH 3/7] RISC-V: assemble custom opcodes blocking v3c EVT
+
+The v3c-led build stops in CH58x_sys.c because pristine GAS rejects mcpy.
+Add the observed mcpy, wexti, mrslu, and mrsl encodings without an XW
+gate, including the WCH funct5 parser and disassembler precedence for
+overlapping vendor encodings.
+
+Behavior specification:
+  analysis/toolchain/wch-gcc-toolchain-survey.md sections 5.3 and 5.4
+  ref/wch-isa-research/isa/custom/qingke-custom-isa.md sections 2.1 and 2.2
+  ref/wch-isa-research/isa/custom/wch-custom-isa-reference.md sections 5.1 and 5.2
+---
+ gas/config/tc-riscv.c                         | 16 ++++++++++++++++
+ gas/testsuite/gas/riscv/mips-insns.d          |  4 ++--
+ gas/testsuite/gas/riscv/wch-custom32-bounds.d |  8 ++++++++
+ gas/testsuite/gas/riscv/wch-custom32-bounds.s |  8 ++++++++
+ gas/testsuite/gas/riscv/wch-custom32-fail.d   |  3 +++
+ gas/testsuite/gas/riscv/wch-custom32-fail.l   |  7 +++++++
+ gas/testsuite/gas/riscv/wch-custom32-fail.s   |  4 ++++
+ gas/testsuite/gas/riscv/wch-custom32.d        |  7 +++++++
+ gas/testsuite/gas/riscv/wch-custom32.s        |  4 ++++
+ gas/testsuite/gas/riscv/x-cv-mem.d            |  6 +++---
+ gas/testsuite/gas/riscv/x-thead-cmo.d         | 16 ++++++++--------
+ gas/testsuite/gas/riscv/x-thead-int.d         |  4 ++--
+ gas/testsuite/gas/riscv/x-thead-sync.d        | 10 +++++-----
+ include/opcode/riscv-opc.h                    | 13 +++++++++++++
+ include/opcode/riscv.h                        |  2 ++
+ opcodes/riscv-dis.c                           | 12 ++++++++++++
+ opcodes/riscv-opc.c                           |  4 ++++
+ 17 files changed, 108 insertions(+), 20 deletions(-)
+ create mode 100644 gas/testsuite/gas/riscv/wch-custom32-bounds.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-custom32-bounds.s
+ create mode 100644 gas/testsuite/gas/riscv/wch-custom32-fail.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-custom32-fail.l
+ create mode 100644 gas/testsuite/gas/riscv/wch-custom32-fail.s
+ create mode 100644 gas/testsuite/gas/riscv/wch-custom32.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-custom32.s
+
+diff --git a/gas/config/tc-riscv.c b/gas/config/tc-riscv.c
+index 9626a2a3..c2d38f43 100644
+--- a/gas/config/tc-riscv.c
++++ b/gas/config/tc-riscv.c
+@@ -1621,6 +1621,7 @@ validate_riscv_insn (const struct riscv_opcode *opc, int length)
+ 	  switch (*++oparg)
+ 	    {
+ 	    case '7': USE_BITS (OP_MASK_FUNCT7, OP_SH_FUNCT7); break;
++	    case '5': USE_BITS (OP_MASK_FUNCT5, OP_SH_FUNCT5); break;
+ 	    case '3': USE_BITS (OP_MASK_FUNCT3, OP_SH_FUNCT3); break;
+ 	    case '2': USE_BITS (OP_MASK_FUNCT2, OP_SH_FUNCT2); break;
+ 	    default:
+@@ -3781,6 +3782,21 @@ riscv_ip (char *str, struct riscv_cl_insn *ip, expressionS *imm_expr,
+ 		  asarg = expr_parse_end;
+ 		  continue;
+ 
++		case '5':
++		  if (my_getSmallExpression (imm_expr, imm_reloc, asarg, p)
++		      || imm_expr->X_op != O_constant
++		      || imm_expr->X_add_number < 0
++		      || imm_expr->X_add_number >= 32)
++		    {
++		      as_bad (_("bad value for funct5 field, "
++				"value must be 0...31"));
++		      break;
++		    }
++		  INSERT_OPERAND (FUNCT5, *ip, imm_expr->X_add_number);
++		  imm_expr->X_op = O_absent;
++		  asarg = expr_parse_end;
++		  continue;
++
+ 		case '3':
+ 		  if (my_getSmallExpression (imm_expr, imm_reloc, asarg, p)
+ 		      || imm_expr->X_op != O_constant
+diff --git a/gas/testsuite/gas/riscv/mips-insns.d b/gas/testsuite/gas/riscv/mips-insns.d
+index 999c4338..2e9b185d 100644
+--- a/gas/testsuite/gas/riscv/mips-insns.d
++++ b/gas/testsuite/gas/riscv/mips-insns.d
+@@ -7,8 +7,8 @@
+ Disassembly of section .text:
+ 
+ 0+000 <.text>:
+-[ 	]+[0-9a-f]+:[ 	]+0003000b[ 	]+mips.pref[ 	]+0x0,0x0\(t1\)
+-[ 	]+[0-9a-f]+:[ 	]+1ff38f8b[ 	]+mips.pref[ 	]+0x1f,0x1ff\(t2\)
++[ 	]+[0-9a-f]+:[ 	]+0003000b[ 	]+wexti[ 	]+zero,t1,zero,0
++[ 	]+[0-9a-f]+:[ 	]+1ff38f8b[ 	]+mrsl[ 	]+t6,t2,t6,3
+ [ 	]+[0-9a-f]+:[ 	]+6eb6350b[ 	]+mips.ccmov[ 	]+a0,a1,a2,a3
+ [ 	]+[0-9a-f]+:[ 	]+00301013[ 	]+mips.ehb
+ [ 	]+[0-9a-f]+:[ 	]+00101013[ 	]+mips.ihb
+diff --git a/gas/testsuite/gas/riscv/wch-custom32-bounds.d b/gas/testsuite/gas/riscv/wch-custom32-bounds.d
+new file mode 100644
+index 00000000..ec7a65b3
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-custom32-bounds.d
+@@ -0,0 +1,8 @@
++#as: -march=rv32i
++#objdump: -s -j .text
++
++.*:     file format .*
++
++Contents of section .text:
++ 0000 0f700000 0ff0fff9 0b000000 8b8ffff9 .*
++ 0010 0b000004 8b8ffffd 0b000006 8b8fffff .*
+diff --git a/gas/testsuite/gas/riscv/wch-custom32-bounds.s b/gas/testsuite/gas/riscv/wch-custom32-bounds.s
+new file mode 100644
+index 00000000..99315e05
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-custom32-bounds.s
+@@ -0,0 +1,8 @@
++	mcpy x0,x0,x0
++	mcpy x31,x31,x31
++	wexti x0,x0,x0,0
++	wexti x31,x31,x31,31
++	mrslu x0,x0,x0,0
++	mrslu x31,x31,x31,31
++	mrsl x0,x0,x0,0
++	mrsl x31,x31,x31,31
+diff --git a/gas/testsuite/gas/riscv/wch-custom32-fail.d b/gas/testsuite/gas/riscv/wch-custom32-fail.d
+new file mode 100644
+index 00000000..52f8b7c0
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-custom32-fail.d
+@@ -0,0 +1,3 @@
++#as: -march=rv32i
++#source: wch-custom32-fail.s
++#error_output: wch-custom32-fail.l
+diff --git a/gas/testsuite/gas/riscv/wch-custom32-fail.l b/gas/testsuite/gas/riscv/wch-custom32-fail.l
+new file mode 100644
+index 00000000..84b194da
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-custom32-fail.l
+@@ -0,0 +1,7 @@
++.*: Assembler messages:
++.*: Error: bad value for funct5 field, value must be 0...31
++.*: Error: illegal operands `wexti a0,a1,a2,-1'
++.*: Error: bad value for funct5 field, value must be 0...31
++.*: Error: illegal operands `wexti a0,a1,a2,32'
++.*: Error: bad value for funct5 field, value must be 0...31
++.*: Error: illegal operands `wexti a0,a1,a2,value'
+diff --git a/gas/testsuite/gas/riscv/wch-custom32-fail.s b/gas/testsuite/gas/riscv/wch-custom32-fail.s
+new file mode 100644
+index 00000000..8885f062
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-custom32-fail.s
+@@ -0,0 +1,4 @@
++	wexti a0,a1,a2,-1
++	wexti a0,a1,a2,32
++	wexti a0,a1,a2,value
++	.set value,3
+diff --git a/gas/testsuite/gas/riscv/wch-custom32.d b/gas/testsuite/gas/riscv/wch-custom32.d
+new file mode 100644
+index 00000000..83ad99b7
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-custom32.d
+@@ -0,0 +1,7 @@
++#as: -march=rv32i
++#objdump: -s -j .text
++
++.*:     file format .*
++
++Contents of section .text:
++ 0000 0f70b560 0b85c518 0b85c51c 0b85c51e .*
+diff --git a/gas/testsuite/gas/riscv/wch-custom32.s b/gas/testsuite/gas/riscv/wch-custom32.s
+new file mode 100644
+index 00000000..0459465c
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-custom32.s
+@@ -0,0 +1,4 @@
++	mcpy a0,a1,a2
++	wexti a0,a1,a2,3
++	mrslu a0,a1,a2,3
++	mrsl a0,a1,a2,3
+diff --git a/gas/testsuite/gas/riscv/x-cv-mem.d b/gas/testsuite/gas/riscv/x-cv-mem.d
+index 7ad9f252..4fb76874 100644
+--- a/gas/testsuite/gas/riscv/x-cv-mem.d
++++ b/gas/testsuite/gas/riscv/x-cv-mem.d
+@@ -7,9 +7,9 @@
+ Disassembly of section .text:
+ 
+ 0+000 <.text>:
+-[ 	]+[0-9a-f]+:[ 	]+8003828b[ 	]+cv.lb[ 	]+t0,\(t2\),-2048
+-[ 	]+[0-9a-f]+:[ 	]+00f30e8b[ 	]+cv.lb[ 	]+t4,\(t1\),15
+-[ 	]+[0-9a-f]+:[ 	]+7fff0e0b[ 	]+cv.lb[ 	]+t3,\(t5\),2047
++[ 	]+[0-9a-f]+:[ 	]+8003828b[ 	]+wexti[ 	]+t0,t2,zero,16
++[ 	]+[0-9a-f]+:[ 	]+00f30e8b[ 	]+wexti[ 	]+t4,t1,a5,0
++[ 	]+[0-9a-f]+:[ 	]+7fff0e0b[ 	]+mrsl[ 	]+t3,t5,t6,15
+ [ 	]+[0-9a-f]+:[ 	]+0863b2ab[ 	]+cv.lb[ 	]+t0,t1\(t2\)
+ [ 	]+[0-9a-f]+:[ 	]+09c33eab[ 	]+cv.lb[ 	]+t4,t3\(t1\)
+ [ 	]+[0-9a-f]+:[ 	]+085f3e2b[ 	]+cv.lb[ 	]+t3,t0\(t5\)
+diff --git a/gas/testsuite/gas/riscv/x-thead-cmo.d b/gas/testsuite/gas/riscv/x-thead-cmo.d
+index f482ddcb..9aaa6ddc 100644
+--- a/gas/testsuite/gas/riscv/x-thead-cmo.d
++++ b/gas/testsuite/gas/riscv/x-thead-cmo.d
+@@ -7,9 +7,9 @@
+ Disassembly of section .text:
+ 
+ 0+000 <target>:
+-[ 	]+[0-9a-f]+:[ 	]+0010000b[ 	]+th.dcache.call
+-[ 	]+[0-9a-f]+:[ 	]+0030000b[ 	]+th.dcache.ciall
+-[ 	]+[0-9a-f]+:[ 	]+0020000b[ 	]+th.dcache.iall
++[ 	]+[0-9a-f]+:[ 	]+0010000b[ 	]+wexti[ 	]+zero,zero,ra,0
++[ 	]+[0-9a-f]+:[ 	]+0030000b[ 	]+wexti[ 	]+zero,zero,gp,0
++[ 	]+[0-9a-f]+:[ 	]+0020000b[ 	]+wexti[ 	]+zero,zero,sp,0
+ [ 	]+[0-9a-f]+:[ 	]+0295000b[ 	]+th.dcache.cpa[ 	]+a0
+ [ 	]+[0-9a-f]+:[ 	]+02b5800b[ 	]+th.dcache.cipa[ 	]+a1
+ [ 	]+[0-9a-f]+:[ 	]+02a6000b[ 	]+th.dcache.ipa[ 	]+a2
+@@ -21,10 +21,10 @@ Disassembly of section .text:
+ [ 	]+[0-9a-f]+:[ 	]+0222800b[ 	]+th.dcache.isw[ 	]+t0
+ [ 	]+[0-9a-f]+:[ 	]+0283000b[ 	]+th.dcache.cpal1[ 	]+t1
+ [ 	]+[0-9a-f]+:[ 	]+0243800b[ 	]+th.dcache.cval1[ 	]+t2
+-[ 	]+[0-9a-f]+:[ 	]+0100000b[ 	]+th.icache.iall
+-[ 	]+[0-9a-f]+:[ 	]+0110000b[ 	]+th.icache.ialls
++[ 	]+[0-9a-f]+:[ 	]+0100000b[ 	]+wexti[ 	]+zero,zero,a6,0
++[ 	]+[0-9a-f]+:[ 	]+0110000b[ 	]+wexti[ 	]+zero,zero,a7,0
+ [ 	]+[0-9a-f]+:[ 	]+038e000b[ 	]+th.icache.ipa[ 	]+t3
+ [ 	]+[0-9a-f]+:[ 	]+030e800b[ 	]+th.icache.iva[ 	]+t4
+-[ 	]+[0-9a-f]+:[ 	]+0150000b[ 	]+th.l2cache.call
+-[ 	]+[0-9a-f]+:[ 	]+0170000b[ 	]+th.l2cache.ciall
+-[ 	]+[0-9a-f]+:[ 	]+0160000b[ 	]+th.l2cache.iall
++[ 	]+[0-9a-f]+:[ 	]+0150000b[ 	]+wexti[ 	]+zero,zero,s5,0
++[ 	]+[0-9a-f]+:[ 	]+0170000b[ 	]+wexti[ 	]+zero,zero,s7,0
++[ 	]+[0-9a-f]+:[ 	]+0160000b[ 	]+wexti[ 	]+zero,zero,s6,0
+diff --git a/gas/testsuite/gas/riscv/x-thead-int.d b/gas/testsuite/gas/riscv/x-thead-int.d
+index 23a82a2c..c518978b 100644
+--- a/gas/testsuite/gas/riscv/x-thead-int.d
++++ b/gas/testsuite/gas/riscv/x-thead-int.d
+@@ -7,5 +7,5 @@
+ Disassembly of section .text:
+ 
+ 0+000 <target>:
+-[ 	]+[0-9a-f]+:[ 	]+0040000b[ 	]+th.ipush
+-[ 	]+[0-9a-f]+:[ 	]+0050000b[ 	]+th.ipop
++[ 	]+[0-9a-f]+:[ 	]+0040000b[ 	]+wexti[ 	]+zero,zero,tp,0
++[ 	]+[0-9a-f]+:[ 	]+0050000b[ 	]+wexti[ 	]+zero,zero,t0,0
+diff --git a/gas/testsuite/gas/riscv/x-thead-sync.d b/gas/testsuite/gas/riscv/x-thead-sync.d
+index 3c5e9eaa..76682e54 100644
+--- a/gas/testsuite/gas/riscv/x-thead-sync.d
++++ b/gas/testsuite/gas/riscv/x-thead-sync.d
+@@ -7,8 +7,8 @@
+ Disassembly of section .text:
+ 
+ 0+000 <target>:
+-[ 	]+[0-9a-f]+:[ 	]+04b5000b[ 	]+th.sfence.vmas[ 	]+a0,a1
+-[ 	]+[0-9a-f]+:[ 	]+0180000b[ 	]+th.sync
+-[ 	]+[0-9a-f]+:[ 	]+01a0000b[ 	]+th.sync.i
+-[ 	]+[0-9a-f]+:[ 	]+01b0000b[ 	]+th.sync.is
+-[ 	]+[0-9a-f]+:[ 	]+0190000b[ 	]+th.sync.s
++[ 	]+[0-9a-f]+:[ 	]+04b5000b[ 	]+mrslu[ 	]+zero,a0,a1,0
++[ 	]+[0-9a-f]+:[ 	]+0180000b[ 	]+wexti[ 	]+zero,zero,s8,0
++[ 	]+[0-9a-f]+:[ 	]+01a0000b[ 	]+wexti[ 	]+zero,zero,s10,0
++[ 	]+[0-9a-f]+:[ 	]+01b0000b[ 	]+wexti[ 	]+zero,zero,s11,0
++[ 	]+[0-9a-f]+:[ 	]+0190000b[ 	]+wexti[ 	]+zero,zero,s9,0
+diff --git a/include/opcode/riscv-opc.h b/include/opcode/riscv-opc.h
+index c239f2ac..4e7715a9 100644
+--- a/include/opcode/riscv-opc.h
++++ b/include/opcode/riscv-opc.h
+@@ -2290,6 +2290,15 @@
+ #define MASK_XW_C_SBSP 0xf863
+ #define MATCH_XW_C_SHSP 0x8060
+ #define MASK_XW_C_SHSP 0xf863
++/* Vendor-specific WCH custom instructions.  */
++#define MATCH_MCPY 0x0000700f
++#define MASK_MCPY 0x06007fff
++#define MATCH_WEXTI 0x0000000b
++#define MASK_WEXTI 0x0600707f
++#define MATCH_MRSLU 0x0400000b
++#define MASK_MRSLU 0x0600707f
++#define MATCH_MRSL 0x0600000b
++#define MASK_MRSL 0x0600707f
+ /* Zcmop instructions.  */
+ #define MATCH_C_MOP_1 0x6081
+ #define MASK_C_MOP_1 0xffff
+@@ -4838,6 +4847,10 @@ DECLARE_INSN(xw_c_lbusp, MATCH_XW_C_LBUSP, MASK_XW_C_LBUSP)
+ DECLARE_INSN(xw_c_lhusp, MATCH_XW_C_LHUSP, MASK_XW_C_LHUSP)
+ DECLARE_INSN(xw_c_sbsp, MATCH_XW_C_SBSP, MASK_XW_C_SBSP)
+ DECLARE_INSN(xw_c_shsp, MATCH_XW_C_SHSP, MASK_XW_C_SHSP)
++DECLARE_INSN(mcpy, MATCH_MCPY, MASK_MCPY)
++DECLARE_INSN(wexti, MATCH_WEXTI, MASK_WEXTI)
++DECLARE_INSN(mrslu, MATCH_MRSLU, MASK_MRSLU)
++DECLARE_INSN(mrsl, MATCH_MRSL, MASK_MRSL)
+ /* Zcmop instructions.  */
+ DECLARE_INSN(c_mop_1, MATCH_C_MOP_1, MASK_C_MOP_1)
+ DECLARE_INSN(c_mop_3, MATCH_C_MOP_3, MASK_C_MOP_3)
+diff --git a/include/opcode/riscv.h b/include/opcode/riscv.h
+index 2a4d9e90..034ace93 100644
+--- a/include/opcode/riscv.h
++++ b/include/opcode/riscv.h
+@@ -345,6 +345,8 @@ static inline unsigned int riscv_insn_length (insn_t insn)
+ #define OP_SH_FUNCT3		12
+ #define OP_MASK_FUNCT7		0x7fU
+ #define OP_SH_FUNCT7		25
++#define OP_MASK_FUNCT5		0x1fU
++#define OP_SH_FUNCT5		27
+ #define OP_MASK_FUNCT2		0x3
+ #define OP_SH_FUNCT2		25
+ 
+diff --git a/opcodes/riscv-dis.c b/opcodes/riscv-dis.c
+index 18fe9dcb..f9e4d388 100644
+--- a/opcodes/riscv-dis.c
++++ b/opcodes/riscv-dis.c
+@@ -611,6 +611,18 @@ print_insn_args (const char *oparg, insn_t l, bfd_vma pc, disassemble_info *info
+ 		 EXTRACT_OPERAND (SHAMTW, l));
+ 	  break;
+ 
++	case 'F':
++	  switch (*++oparg)
++	    {
++	    case '5':
++	      print (info->stream, dis_style_immediate, "%u",
++		     (unsigned) EXTRACT_OPERAND (FUNCT5, l));
++	      break;
++	    default:
++	      goto undefined_modifier;
++	    }
++	  break;
++
+ 	case 'S':
+ 	case 'U':
+ 	  print (info->stream, dis_style_register, "%s",
+diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
+index 17eb5326..b4d81935 100644
+--- a/opcodes/riscv-opc.c
++++ b/opcodes/riscv-opc.c
+@@ -577,6 +577,10 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"mips.ehb", 0, INSN_CLASS_XMIPSEXECTL, "", MATCH_MIPS_EHB, MASK_MIPS_EHB, match_opcode, 0 },
+ {"mips.ihb", 0, INSN_CLASS_XMIPSEXECTL, "", MATCH_MIPS_IHB, MASK_MIPS_IHB, match_opcode, 0 },
+ {"mips.pause", 0, INSN_CLASS_XMIPSEXECTL, "", MATCH_MIPS_PAUSE, MASK_MIPS_PAUSE, match_opcode, 0 },
++{"mcpy",        0, INSN_CLASS_I, "s,t,r",    MATCH_MCPY, MASK_MCPY, match_opcode, 0 },
++{"mrsl",        0, INSN_CLASS_I, "d,s,t,F5", MATCH_MRSL, MASK_MRSL, match_opcode, 0 },
++{"mrslu",       0, INSN_CLASS_I, "d,s,t,F5", MATCH_MRSLU, MASK_MRSLU, match_opcode, 0 },
++{"wexti",       0, INSN_CLASS_I, "d,s,t,F5", MATCH_WEXTI, MASK_WEXTI, match_opcode, 0 },
+ {"slli",        0, INSN_CLASS_ZCA, "d,CU,C>",   MATCH_C_SLLI, MASK_C_SLLI, match_slli_as_c_slli, INSN_ALIAS },
+ {"slli",        0, INSN_CLASS_I, "d,s,>",     MATCH_SLLI, MASK_SLLI, match_opcode, 0 },
+ {"sll",         0, INSN_CLASS_ZCA, "d,CU,C>",   MATCH_C_SLLI, MASK_C_SLLI, match_slli_as_c_slli, INSN_ALIAS },
+-- 
+2.55.0
+

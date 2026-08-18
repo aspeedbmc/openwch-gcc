@@ -1,0 +1,297 @@
+From d779b3a497e3b79b9e1e7aac9b438d8ccce170c0 Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 3 <phase3@openwch.local>
+Date: Thu, 13 Aug 2026 03:48:55 +0900
+Subject: [PATCH 5/7] RISC-V: match WCH XW gate diagnostic bytes
+
+XW-disabled compressed instructions and the XW/ZCD conflict reported
+different GAS diagnostics from WCH even though their success paths and
+encodings matched.
+
+Reset the normal operand diagnostic before WCH candidate rejection and
+keep the XW/ZCD conflict in GAS, where the existing sticky initial-XW
+state can be honored; the shared BFD subset query keeps its upstream
+shape.  Preserve the unrecognized/missing C-or-Zca state for XW candidates
+while current RVC assembly is disabled.  Make the DejaGNU expectations
+assert the official text and RVC state transitions.
+
+Observed symptom: with compressed assembly disabled while XW is enabled,
+which is the ordinary EVT configuration of -march=rv32imac_xw plus a
+source-level .option norvc, every XW mnemonic reported "illegal operands"
+where WCH reports "unrecognized opcode", and the four sp forms
+additionally lost the whole ", extension ... required" clause because they
+have no later candidate to refill it.  The gate below therefore does not
+test the initial XW eligibility at all: compressed assembly being off is
+by itself enough to reject an XW candidate, in the same shape as the
+ordinary extension gate rejecting an unsupported class.  The same defect
+is reachable with malformed operands, and through an ELF .attribute arch
+instead of -march since both establish the eligibility through
+riscv_set_arch, so the new DejaGNU cases cover all four combinations.
+
+Three properties of the two XW gates are worth recording, because a later
+reader can otherwise undo this by accident:
+
+  * The two gates partition the XW state space and neither is redundant.
+    With compressed assembly off, the gate before the diagnostic reset
+    rejects every XW candidate; with it on, the gate after the reset
+    rejects them when the initial architecture never enabled XW; with both
+    on, the private encoding is assembled.  The comment in the source
+    carries the same table.
+
+  * The first gate reports INSN_CLASS_ZCA rather than the candidate's own
+    INSN_CLASS_XW.  That is the one substantive asymmetry with the
+    ordinary upstream gate and it is deliberate: every XW encoding is 16
+    bits wide, so the extension a user has to add to make the line
+    assemble is C or Zca, which is also the extension WCH names.
+
+  * Rejecting XW candidates this early is safe only because the opcode
+    table lists the XW entry of a mnemonic ahead of its non-XW entries, so
+    a later candidate of the same mnemonic still overwrites the extension
+    recorded here, and because every INSN_CLASS_XW entry encodes in two
+    bytes, so the existing instruction length check would have rejected it
+    a few lines further down anyway.
+
+Teaching riscv_multi_subset_supports about INSN_CLASS_XW instead is not an
+option: it decides from the current subset list, while WCH keys these
+private encodings on the initial architecture, which .option arch does not
+change.
+
+Behavior specification: direct WCH 15.2.0 assembler probes recorded for
+phase-3.1, including the RVC on/off and sticky-XW neighbor matrices, and
+  analysis/toolchain/phase3-review.md P2-2
+The expectations of the new and extended test cases were captured from the
+official WCH assembler on exactly these inputs.  Encoding and gate
+behavior remain sourced from
+  analysis/toolchain/wch-gcc-toolchain-survey.md sections 5.3 and 5.4
+---
+ gas/config/tc-riscv.c                         | 41 ++++++++++++++++---
+ .../xw-compressed-attribute-norvc-fail.d      |  3 ++
+ .../xw-compressed-attribute-norvc-fail.l      |  5 +++
+ .../xw-compressed-attribute-norvc-fail.s      |  6 +++
+ .../gas/riscv/xw-compressed-norvc-xw-fail.d   |  3 ++
+ .../gas/riscv/xw-compressed-norvc-xw-fail.l   | 11 +++++
+ .../gas/riscv/xw-compressed-norvc-xw-fail.s   | 11 +++++
+ .../gas/riscv/xw-compressed-option-fail.l     |  7 +++-
+ .../gas/riscv/xw-compressed-option-fail.s     |  7 ++++
+ .../gas/riscv/xw-compressed-rvc-cycle.d       |  4 +-
+ .../gas/riscv/xw-compressed-rvc-cycle.s       |  7 ++++
+ .../gas/riscv/xw-compressed-zcd-fail.l        |  3 +-
+ .../gas/riscv/xw-compressed-zcd-fail.s        |  2 +
+ 13 files changed, 102 insertions(+), 8 deletions(-)
+ create mode 100644 gas/testsuite/gas/riscv/xw-compressed-attribute-norvc-fail.d
+ create mode 100644 gas/testsuite/gas/riscv/xw-compressed-attribute-norvc-fail.l
+ create mode 100644 gas/testsuite/gas/riscv/xw-compressed-attribute-norvc-fail.s
+ create mode 100644 gas/testsuite/gas/riscv/xw-compressed-norvc-xw-fail.d
+ create mode 100644 gas/testsuite/gas/riscv/xw-compressed-norvc-xw-fail.l
+ create mode 100644 gas/testsuite/gas/riscv/xw-compressed-norvc-xw-fail.s
+
+diff --git a/gas/config/tc-riscv.c b/gas/config/tc-riscv.c
+index 9e89c6c6..fe55de82 100644
+--- a/gas/config/tc-riscv.c
++++ b/gas/config/tc-riscv.c
+@@ -2901,13 +2901,36 @@ riscv_ip (char *str, struct riscv_cl_insn *ip, expressionS *imm_expr,
+       if ((insn->xlen_requirement != 0) && (xlen != insn->xlen_requirement))
+ 	continue;
+ 
+-      if (insn->insn_class == INSN_CLASS_XW)
++      /* WCH keeps reporting XW candidates as a missing compressed extension
++	 while compressed instruction assembly is disabled, so reject them
++	 before the operand diagnostic is reset below.  Every XW encoding is
++	 16 bits wide, so what the user is missing is C or Zca rather than XW
++	 itself; unlike the ordinary gate below this one therefore reports
++	 INSN_CLASS_ZCA instead of the candidate's own class.  Rejecting here
++	 only anticipates the rejection that the instruction length check
++	 further down would make for these entries anyway.
++
++	 This gate and the XW test after the reset partition the XW state
++	 space; neither is redundant:
++
++	   riscv_opts.rvc  xw_enabled  XW candidate rejected by
++	   false           either      this gate
++	   true            false       the gate after the reset
++	   true            true        neither, the encoding is assembled
++
++	 Both rely on the opcode table listing the XW entry of a mnemonic
++	 ahead of its non-XW entries, so that a later candidate of the same
++	 mnemonic still overwrites the extension recorded here.  */
++      if (insn->insn_class == INSN_CLASS_XW
++	  && !riscv_opts.rvc)
+ 	{
+-	  if (!xw_enabled)
+-	    continue;
++	  error.missing_ext = riscv_multi_subset_supports_ext (&riscv_rps_as,
++							       INSN_CLASS_ZCA);
++	  continue;
+ 	}
+-      else if (!riscv_multi_subset_supports (&riscv_rps_as,
+-					     insn->insn_class))
++
++      if (insn->insn_class != INSN_CLASS_XW
++	  && !riscv_multi_subset_supports (&riscv_rps_as, insn->insn_class))
+ 	{
+ 	  error.missing_ext = riscv_multi_subset_supports_ext (&riscv_rps_as,
+ 							       insn->insn_class);
+@@ -2917,6 +2940,14 @@ riscv_ip (char *str, struct riscv_cl_insn *ip, expressionS *imm_expr,
+       error.msg = _("illegal operands");
+       error.missing_ext = NULL;
+ 
++      /* WCH uses the initial XW eligibility for both its private compressed
++	 encodings and the conflicting standard double-float encodings.  Only
++	 the compressed-assembly-enabled half of the XW state space reaches
++	 this test; the gate above already rejected the disabled half.  */
++      if ((insn->insn_class == INSN_CLASS_XW && !xw_enabled)
++	  || (insn->insn_class == INSN_CLASS_ZCD && xw_enabled))
++	continue;
++
+       /* Purge deferred symbols from the previous round, if any.  */
+       while (deferred_sym_rootP)
+ 	{
+diff --git a/gas/testsuite/gas/riscv/xw-compressed-attribute-norvc-fail.d b/gas/testsuite/gas/riscv/xw-compressed-attribute-norvc-fail.d
+new file mode 100644
+index 00000000..0c012b05
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-compressed-attribute-norvc-fail.d
+@@ -0,0 +1,3 @@
++#as: -march=rv32imac -mabi=ilp32
++#source: xw-compressed-attribute-norvc-fail.s
++#error_output: xw-compressed-attribute-norvc-fail.l
+diff --git a/gas/testsuite/gas/riscv/xw-compressed-attribute-norvc-fail.l b/gas/testsuite/gas/riscv/xw-compressed-attribute-norvc-fail.l
+new file mode 100644
+index 00000000..0aa186ab
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-compressed-attribute-norvc-fail.l
+@@ -0,0 +1,5 @@
++.*: Assembler messages:
++.*:3: Error: unrecognized opcode `c.lbu a0,0\(a1\)', extension `zcb' required
++.*:4: Error: unrecognized opcode `c.lbusp a0,0\(sp\)', extension `c' or `zca' required
++.*:5: Error: unrecognized opcode `c.lbu a0', extension `zcb' required
++.*:6: Error: unrecognized opcode `c.lbusp a0', extension `c' or `zca' required
+diff --git a/gas/testsuite/gas/riscv/xw-compressed-attribute-norvc-fail.s b/gas/testsuite/gas/riscv/xw-compressed-attribute-norvc-fail.s
+new file mode 100644
+index 00000000..d4e4a7cf
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-compressed-attribute-norvc-fail.s
+@@ -0,0 +1,6 @@
++	.attribute arch, "rv32imac_xw"
++	.option norvc
++	c.lbu a0,0(a1)
++	c.lbusp a0,0(sp)
++	c.lbu a0
++	c.lbusp a0
+diff --git a/gas/testsuite/gas/riscv/xw-compressed-norvc-xw-fail.d b/gas/testsuite/gas/riscv/xw-compressed-norvc-xw-fail.d
+new file mode 100644
+index 00000000..6eec6ea2
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-compressed-norvc-xw-fail.d
+@@ -0,0 +1,3 @@
++#as: -march=rv32imac_xw -mabi=ilp32
++#source: xw-compressed-norvc-xw-fail.s
++#error_output: xw-compressed-norvc-xw-fail.l
+diff --git a/gas/testsuite/gas/riscv/xw-compressed-norvc-xw-fail.l b/gas/testsuite/gas/riscv/xw-compressed-norvc-xw-fail.l
+new file mode 100644
+index 00000000..23259735
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-compressed-norvc-xw-fail.l
+@@ -0,0 +1,11 @@
++.*: Assembler messages:
++.*:2: Error: unrecognized opcode `c.lbu a0,0\(a1\)', extension `zcb' required
++.*:3: Error: unrecognized opcode `c.lhu a0,0\(a1\)', extension `zcb' required
++.*:4: Error: unrecognized opcode `c.sb a0,0\(a1\)', extension `zcb' required
++.*:5: Error: unrecognized opcode `c.sh a0,0\(a1\)', extension `zcb' required
++.*:6: Error: unrecognized opcode `c.lbusp a0,0\(sp\)', extension `c' or `zca' required
++.*:7: Error: unrecognized opcode `c.lhusp a0,0\(sp\)', extension `c' or `zca' required
++.*:8: Error: unrecognized opcode `c.sbsp a0,0\(sp\)', extension `c' or `zca' required
++.*:9: Error: unrecognized opcode `c.shsp a0,0\(sp\)', extension `c' or `zca' required
++.*:10: Error: unrecognized opcode `c.lbu a0', extension `zcb' required
++.*:11: Error: unrecognized opcode `c.lbusp a0', extension `c' or `zca' required
+diff --git a/gas/testsuite/gas/riscv/xw-compressed-norvc-xw-fail.s b/gas/testsuite/gas/riscv/xw-compressed-norvc-xw-fail.s
+new file mode 100644
+index 00000000..612f1bd1
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-compressed-norvc-xw-fail.s
+@@ -0,0 +1,11 @@
++	.option norvc
++	c.lbu a0,0(a1)
++	c.lhu a0,0(a1)
++	c.sb a0,0(a1)
++	c.sh a0,0(a1)
++	c.lbusp a0,0(sp)
++	c.lhusp a0,0(sp)
++	c.sbsp a0,0(sp)
++	c.shsp a0,0(sp)
++	c.lbu a0
++	c.lbusp a0
+diff --git a/gas/testsuite/gas/riscv/xw-compressed-option-fail.l b/gas/testsuite/gas/riscv/xw-compressed-option-fail.l
+index eb624d03..05f48f48 100644
+--- a/gas/testsuite/gas/riscv/xw-compressed-option-fail.l
++++ b/gas/testsuite/gas/riscv/xw-compressed-option-fail.l
+@@ -1,2 +1,7 @@
+ .*: Assembler messages:
+-.*: Error: unrecognized opcode `c.lbu a0,0\(a1\)', extension `zcb' required
++.*:1: Error: illegal operands `c.lbu a0,0\(a1\)', extension `zcb' required
++.*:2: Error: illegal operands `c.lbusp a0,0\(sp\)'
++.*:4: Error: illegal operands `c.lbu a0,0\(a1\)', extension `zcb' required
++.*:6: Error: unrecognized opcode `c.lbu a0,0\(a1\)', extension `zcb' required
++.*:7: Error: unrecognized opcode `c.lbusp a0,0\(sp\)', extension `c' or `zca' required
++.*:9: Error: illegal operands `c.lbusp a0,0\(sp\)'
+diff --git a/gas/testsuite/gas/riscv/xw-compressed-option-fail.s b/gas/testsuite/gas/riscv/xw-compressed-option-fail.s
+index cbf01618..37f4c695 100644
+--- a/gas/testsuite/gas/riscv/xw-compressed-option-fail.s
++++ b/gas/testsuite/gas/riscv/xw-compressed-option-fail.s
+@@ -1,2 +1,9 @@
++	c.lbu a0,0(a1)
++	c.lbusp a0,0(sp)
+ 	.option arch,+xw
+ 	c.lbu a0,0(a1)
++	.option norvc
++	c.lbu a0,0(a1)
++	c.lbusp a0,0(sp)
++	.option rvc
++	c.lbusp a0,0(sp)
+diff --git a/gas/testsuite/gas/riscv/xw-compressed-rvc-cycle.d b/gas/testsuite/gas/riscv/xw-compressed-rvc-cycle.d
+index 7ee1982a..7d2dc312 100644
+--- a/gas/testsuite/gas/riscv/xw-compressed-rvc-cycle.d
++++ b/gas/testsuite/gas/riscv/xw-compressed-rvc-cycle.d
+@@ -4,4 +4,6 @@
+ .*:     file format .*
+ 
+ Contents of section .text:
+- 0000 03c50500 8821 .*
++ 0000 03c50500 03d50500 2380a500 2390a500 .*
++ 0010 03450100 03550100 2300a100 2310a100 .*
++ 0020 8821 .*
+diff --git a/gas/testsuite/gas/riscv/xw-compressed-rvc-cycle.s b/gas/testsuite/gas/riscv/xw-compressed-rvc-cycle.s
+index eba8a0b0..10887fed 100644
+--- a/gas/testsuite/gas/riscv/xw-compressed-rvc-cycle.s
++++ b/gas/testsuite/gas/riscv/xw-compressed-rvc-cycle.s
+@@ -1,4 +1,11 @@
+ 	.option norvc
+ 	lbu a0,0(a1)
++	lhu a0,0(a1)
++	sb a0,0(a1)
++	sh a0,0(a1)
++	lbu a0,0(sp)
++	lhu a0,0(sp)
++	sb a0,0(sp)
++	sh a0,0(sp)
+ 	.option rvc
+ 	c.lbu a0,0(a1)
+diff --git a/gas/testsuite/gas/riscv/xw-compressed-zcd-fail.l b/gas/testsuite/gas/riscv/xw-compressed-zcd-fail.l
+index aba3f11f..ebd5942f 100644
+--- a/gas/testsuite/gas/riscv/xw-compressed-zcd-fail.l
++++ b/gas/testsuite/gas/riscv/xw-compressed-zcd-fail.l
+@@ -1,2 +1,3 @@
+ .*: Assembler messages:
+-.*: Error: unrecognized opcode `c.fld fa0,0\(a1\)', extension `d' and `c', or `zcd' required
++.*:1: Error: illegal operands `c.fld fa0,0\(a1\)'
++.*:3: Error: illegal operands `c.fld fa0,0\(a1\)'
+diff --git a/gas/testsuite/gas/riscv/xw-compressed-zcd-fail.s b/gas/testsuite/gas/riscv/xw-compressed-zcd-fail.s
+index ad7248f5..f7e0df1e 100644
+--- a/gas/testsuite/gas/riscv/xw-compressed-zcd-fail.s
++++ b/gas/testsuite/gas/riscv/xw-compressed-zcd-fail.s
+@@ -1 +1,3 @@
+ 	c.fld fa0,0(a1)
++	.option arch,rv32imafdc
++	c.fld fa0,0(a1)
+-- 
+2.55.0
+

@@ -1,0 +1,22 @@
+schema_version	command_id	label	normalized_command	tool_sha256	status
+2	cmd-f5ee3963d842b9f6e1e8452667552587aa1ffe1770bbd6dd809b30ed9a4e5705	acceptance	python3 <RUN_ROOT>/r2_acceptance.py --run-root <RUN_ROOT>	970aa0ecafda5b81d8bbe12ec9d17de2f883027b2bcb6e3f3055beb418b172f3	pass
+2	cmd-51413bd28de03e54d9a8eabbcc5624e8194ecb44206c179d9e0ffdafb7e5271e	acceptance-final	python3 <RUN_ROOT>/r2_acceptance.py --run-root <RUN_ROOT> --require-report	970aa0ecafda5b81d8bbe12ec9d17de2f883027b2bcb6e3f3055beb418b172f3	pass
+2	cmd-d38db4c01db71f50ceb1806a3a5f469be2197c9c3802ec462f29e06c974aed95	baseline	python3 <RUN_ROOT>/baseline_r2.py	ed7640d1c8dedcfd5eb2be8515e7ad03a278d82922cfd9c5cc3ab3e22ef22e96	pass
+2	cmd-c1bd712ca0b66726b2e43ff7ae84a146ad14b3b6ec3b45c6d14694f6404dfd7a	build-context	python3 <RUN_ROOT>/r2_build_contexts.py --run-root <RUN_ROOT>	38bc429e4ce37020c9a74fd1cb4db20c8fbca8ce0f030c3905cbe9d8890b9397	pass
+2	cmd-1aa00a67f176f579b533ebffc80b51bc4880e1d8da6d4945db95fe1904c5e8fe	compact-sets	python3 <RUN_ROOT>/r2_compact_sets.py --run-root <RUN_ROOT>	5d1a006e1dd6745f6daf5d993c58e8f980cb66b9de14189d998f35d895de46f9	pass
+2	cmd-0d6914529b426a38fb7a96b06e198219107b87f32746723941636d39311cf5a1	compare	python3 <RUN_ROOT>/r2_compare.py --run-root <RUN_ROOT>	c80163d6a46faf98fba4033a1e72ebd5df7f32778fe7d67ea27d89fe1eefb5f8	pass
+2	cmd-6a837e078a3176e581e4a872e5faea39db6cfde75edcbe67d6d37137b264825f	core-controls	python3 <RUN_ROOT>/r2_controls.py --run-root <RUN_ROOT>	9f1cd9db7abd538c6e4a6b2b55d1801b291ff25fd1632966eea136af159b9d5a	pass
+2	cmd-620eaeaee0b360803ab04a779cf6d80fadd5fcaeba171828efeb807b3c34b4ac	document-controls	python3 <RUN_ROOT>/r2_doc_controls.py --run-root <RUN_ROOT>	0a5a55b1c7e3830df266e91625fcc600a3f35a37d7a1db69c47e58ad1fe9dd0f	pass
+2	cmd-55dc9af456d9dea25e07abdda56afe406f89d01aac70440c6c56e0fab9cbd061	documents	python3 <RUN_ROOT>/r2_docs.py --run-root <RUN_ROOT>	5108c406284df7fe228ba0e093d481ed9c8bb0511b90b8df0594a7aaa14946a8	pass
+2	cmd-d46b5b5c147f3ad19ec4eaeb2f37fa6ed4eaf7b596e2a6688266ade4598b1972	finalize	python3 <RUN_ROOT>/r2_finalize.py --run-root <RUN_ROOT> --build	1fb9a8882bb51c8bcfb84403e1df31d567633a4e6f92617ff98f4aa32d88bd1d	pass
+2	cmd-4bbd115eea018473b6701c224172e6db075591b8cdb7385372a69cddfff2162e	independent	python3 <RUN_ROOT>/r2_independent.py --run-root <RUN_ROOT>	b30dac604d6044b8cb0baab74fcfb04f7e60e0d98f4d86a3d4714cb29c33ca45	pass
+2	cmd-bd3b8d874961c9df632ddbc20832c1953c0c154efdc5f4489f887cfd43cd9314	positive-evidence	python3 <RUN_ROOT>/r2_positive_evidence.py --run-root <RUN_ROOT>	58b50ce265a1486bd3005942dfb187c233eab8ef83b6c05184553aefc4cb71cf	pass
+2	cmd-ceb86d0741ffc363af5fbf5f12616fbc7582f2ab33c1ee5dd7db644750a59b11	primary	python3 <RUN_ROOT>/r2_primary.py --run-root <RUN_ROOT>	bf6783c7c050abd6038990ce461d8c03919064692910fadd05c987fcd200f618	pass
+2	cmd-5b4d33ce856d333b3a120a3990711b2006c3c488de4c99bb254ecf918fbf6646	prior-review	python3 <RUN_ROOT>/review_prior_r2.py	a47a8bf05f0dc81ef0f55b3e54460b78a2fef196d4c69e751f7dc0cf60103798	pass
+2	cmd-f18edddda6a63551d10abb852ae27d97c38f408764f0a85247e70bf905f5dfd2	rawscan-smoke	find tmp/wch-evt/evt -name '*.a' -type f -print0 | xargs -0 python3 audit-report-f/followup/tools/rawscan.py	ad87157c51ad292ddc9fa54cc491de897f7e0cd97d5e2a52a65526b2a723c17c	pass
+2	cmd-7a1ec1dd213cb36e2e6fd8c12a01d07f8dc6c6f72ae4806851f132314dfed3cd	rebind	python3 <RUN_ROOT>/r2_finalize.py --run-root <RUN_ROOT> --rebind	1fb9a8882bb51c8bcfb84403e1df31d567633a4e6f92617ff98f4aa32d88bd1d	pass
+2	cmd-2e485e3461d585d46ee94c8364d71eba47231ef993cdb05e0d5f4fa9b1476054	report	python3 <RUN_ROOT>/r2_finalize.py --run-root <RUN_ROOT> --report-only	1fb9a8882bb51c8bcfb84403e1df31d567633a4e6f92617ff98f4aa32d88bd1d	pass
+2	cmd-4ce3cb1e72b5638a6d752dd46193eb971770ba043fb70c03baab1206b686c25b	rom-control	python3 <RUN_ROOT>/r2_rom_control.py --run-root <RUN_ROOT>	ece51b4b5060fe9cb741276b188d54e8f3994cbe5e2fc292b3c0a0b72d33fb38	pass
+2	cmd-6a4b3acd1d6f0a3f188660c6fd4a7697c6ade6d129fce835dcecf7f09f90cf82	tar-closure	python3 <RUN_ROOT>/r2_tar_closure.py --run-root <RUN_ROOT>	ffe02924527bb8b204c26eb805d38d73f31af63da70fd1c62b688270f4662283	pass
+2	cmd-01793964eaf11e967f8652879ddbedb0ce6af500eb9ddc4e2c30f811f3a9b2d3	xw-boundaries	python3 <RUN_ROOT>/r2_xw_boundaries.py --run-root <RUN_ROOT>	34543bb654290a780a829b3f07c51d739f0981138ec53b2271cfa0c87ef7b9c4	pass
+2	cmd-36a5444f62be01e746166f65ac6203eff2ce0e5a401f0902797d8526b9c29dfd	xw-fixture	python3 <RUN_ROOT>/r2_xw_fixture.py --run-root <RUN_ROOT>	fd9974c62d07cb5ebdbc12c778e5653dd79b2e430433e7bdec35c42064aa3985	pass

@@ -1,0 +1,468 @@
+
+<RUN_ROOT>/controls/positive-r2/objects/b0698d11172d8f34a48b26652eb34b238f93959175a73305bddefa342eb2914c.o:     file format elf32-littleriscv
+
+
+Disassembly of section .text.IoCHub_MsgSend.part.2:
+
+Disassembly of section .text.IoCHub_MsgSend:
+
+Disassembly of section .text.IoCHub_DataSend:
+
+Disassembly of section .text.IoCHub_SahodyFrame:
+
+Disassembly of section .text.IoCHub_SendFrame:
+
+Disassembly of section .text.IoCHub_FrameInit:
+
+Disassembly of section .text.IoCHub_CliConnAutoReg:
+
+Disassembly of section .text.IoCHub_CliConnLogin:
+
+Disassembly of section .text.IoCHub_CliConnSer:
+
+Disassembly of section .text.IoCHub_CliUdpNatConnProbe:
+
+Disassembly of section .text.IoCHub_CliTcpUploadUdpProbeStatus:
+
+Disassembly of section .text.IoCHub_CliAConnReq:
+
+Disassembly of section .text.IoCHub_CliAConnResultRecvCallback:
+
+Disassembly of section .text.IoCHub_SerNotiCliBReplySend:
+
+Disassembly of section .text.IoCHub_SerNotiCliHoldingRespSend:
+
+Disassembly of section .text.IoCHub_CliExchangeHoldingSend:
+
+Disassembly of section .text.IoCHub_CliUploadP2pConnResSend:
+
+Disassembly of section .text.IoCHub_SerNotiCliP2pResRespSend:
+
+Disassembly of section .text.IoCHub_DataTimeoutSend:
+
+Disassembly of section .text.IoCHub_CliDataTransferSend:
+
+Disassembly of section .text.IoCHub_CliDataTransferRespSend:
+
+Disassembly of section .text.IoCHub_CliDataKeepliveSend:
+
+Disassembly of section .text.IoCHub_CliDataSend:
+
+Disassembly of section .text.IoCHub_CliCloseDataConnSend:
+
+Disassembly of section .text.IoCHub_CliCloseDataConnRespSend:
+
+Disassembly of section .text.IoCHub_SerAutoHbTcpSend:
+
+Disassembly of section .text.IoCHub_SerAutoHbTcpRecv:
+
+Disassembly of section .text.IoCHub_SerAutoHbUdpSend:
+
+Disassembly of section .text.IoCHub_SerAutoHbUdpRecv:
+
+Disassembly of section .text.IoCHub_CliLanConnReqSend:
+
+Disassembly of section .text.IoCHub_CliLanConnReqRespSend:
+
+Disassembly of section .text.IoCHub_CliUdpBroadcastScanSend:
+
+Disassembly of section .text.IoCHub_SessionCreatSucc:
+
+Disassembly of section .text.IoCHub_SessionClose:
+
+Disassembly of section .text.IocServerSocketRecv:
+
+Disassembly of section .text.WCHIOCHUB_Init:
+
+00000000 <WCHIOCHUB_Init>:
+   0:	7179                	addi	sp,sp,-48
+   2:	000006b7          	lui	a3,0x0	2: R_RISCV_HI20	task_list
+	2: R_RISCV_RELAX	*ABS*
+   6:	87aa                	mv	a5,a0
+   8:	00068613          	mv	a2,a3	8: R_RISCV_LO12_I	task_list
+	8: R_RISCV_RELAX	*ABS*
+   c:	d606                	sw	ra,44(sp)
+   e:	d422                	sw	s0,40(sp)
+  10:	d226                	sw	s1,36(sp)
+  12:	d04a                	sw	s2,32(sp)
+  14:	ce4e                	sw	s3,28(sp)
+  16:	cc52                	sw	s4,24(sp)
+  18:	ca56                	sw	s5,20(sp)
+  1a:	c85a                	sw	s6,16(sp)
+  1c:	c65e                	sw	s7,12(sp)
+  1e:	c462                	sw	s8,8(sp)
+  20:	c266                	sw	s9,4(sp)
+  22:	c06a                	sw	s10,0(sp)
+  24:	4701                	li	a4,0
+  26:	00068693          	mv	a3,a3	26: R_RISCV_LO12_I	task_list
+	26: R_RISCV_RELAX	*ABS*
+  2a:	02800813          	li	a6,40
+  2e:	451d                	li	a0,7
+
+00000030 <.L479>:
+  30:	030705b3          	mul	a1,a4,a6
+  34:	0705                	addi	a4,a4,1
+  36:	02860613          	addi	a2,a2,40
+  3a:	95b6                	add	a1,a1,a3
+  3c:	00058023          	sb	zero,0(a1)
+  40:	fe062e23          	sw	zero,-4(a2)
+  44:	fea716e3          	bne	a4,a0,30 <.L479>	44: R_RISCV_BRANCH	.L479
+  48:	00000737          	lui	a4,0x0	48: R_RISCV_HI20	sessionProcessCB
+	48: R_RISCV_RELAX	*ABS*
+  4c:	00072023          	sw	zero,0(a4) # 0 <WCHIOCHUB_Init>	4c: R_RISCV_LO12_S	sessionProcessCB
+	4c: R_RISCV_RELAX	*ABS*
+  50:	00070713          	mv	a4,a4	50: R_RISCV_LO12_I	sessionProcessCB
+	50: R_RISCV_RELAX	*ABS*
+  54:	00072a23          	sw	zero,20(a4)
+  58:	00072c23          	sw	zero,24(a4)
+  5c:	00072223          	sw	zero,4(a4)
+  60:	00072423          	sw	zero,8(a4)
+  64:	00072623          	sw	zero,12(a4)
+  68:	00072823          	sw	zero,16(a4)
+  6c:	4705                	li	a4,1
+  6e:	10e68c23          	sb	a4,280(a3) # 118 <.L481>
+  72:	43c8                	lw	a0,4(a5)
+  74:	0087a383          	lw	t2,8(a5)
+  78:	00c7af03          	lw	t5,12(a5)
+  7c:	0107ae83          	lw	t4,16(a5)
+  80:	0147a283          	lw	t0,20(a5)
+  84:	0187af83          	lw	t6,24(a5)
+  88:	01c7ae03          	lw	t3,28(a5)
+  8c:	0007a903          	lw	s2,0(a5)
+  90:	00000737          	lui	a4,0x0	90: R_RISCV_HI20	IoCHub_ProcessEvent
+	90: R_RISCV_RELAX	*ABS*
+  94:	00070713          	mv	a4,a4	94: R_RISCV_LO12_I	IoCHub_ProcessEvent
+	94: R_RISCV_RELAX	*ABS*
+  98:	0207a303          	lw	t1,32(a5)
+  9c:	000004b7          	lui	s1,0x0	9c: R_RISCV_HI20	.LANCHOR44
+	9c: R_RISCV_RELAX	*ABS*
+  a0:	12e6ae23          	sw	a4,316(a3)
+  a4:	00048713          	mv	a4,s1	a4: R_RISCV_LO12_I	.LANCHOR44
+	a4: R_RISCV_RELAX	*ABS*
+  a8:	0007d583          	lhu	a1,0(a5)
+  ac:	01272023          	sw	s2,0(a4) # 0 <WCHIOCHUB_Init>
+  b0:	c348                	sw	a0,4(a4)
+  b2:	00772423          	sw	t2,8(a4)
+  b6:	01e72623          	sw	t5,12(a4)
+  ba:	01d72823          	sw	t4,16(a4)
+  be:	00572a23          	sw	t0,20(a4)
+  c2:	01f72c23          	sw	t6,24(a4)
+  c6:	01c72e23          	sw	t3,28(a4)
+  ca:	02e7c803          	lbu	a6,46(a5)
+  ce:	02c7d403          	lhu	s0,44(a5)
+  d2:	0247a883          	lw	a7,36(a5)
+  d6:	0287d603          	lhu	a2,40(a5)
+  da:	02a7d683          	lhu	a3,42(a5)
+  de:	02672023          	sw	t1,32(a4)
+  e2:	579c                	lw	a5,40(a5)
+  e4:	00000b37          	lui	s6,0x0	e4: R_RISCV_HI20	.LANCHOR33
+	e4: R_RISCV_RELAX	*ABS*
+  e8:	15b1                	addi	a1,a1,-20
+  ea:	00bb1023          	sh	a1,0(s6) # 0 <WCHIOCHUB_Init>	ea: R_RISCV_LO12_S	.LANCHOR33
+	ea: R_RISCV_RELAX	*ABS*
+  ee:	03172223          	sw	a7,36(a4)
+  f2:	d71c                	sw	a5,40(a4)
+  f4:	02871623          	sh	s0,44(a4)
+  f8:	03070723          	sb	a6,46(a4)
+  fc:	00048493          	mv	s1,s1	fc: R_RISCV_LO12_I	.LANCHOR44
+	fc: R_RISCV_RELAX	*ABS*
+ 100:	000b0b13          	mv	s6,s6	100: R_RISCV_LO12_I	.LANCHOR33
+	100: R_RISCV_RELAX	*ABS*
+ 104:	e211                	bnez	a2,108 <.L480>	104: R_RISCV_RVC_BRANCH	.L480
+ 106:	4605                	li	a2,1
+
+00000108 <.L480>:
+ 108:	000009b7          	lui	s3,0x0	108: R_RISCV_HI20	.LANCHOR34
+	108: R_RISCV_RELAX	*ABS*
+ 10c:	00c99023          	sh	a2,0(s3) # 0 <WCHIOCHUB_Init>	10c: R_RISCV_LO12_S	.LANCHOR34
+	10c: R_RISCV_RELAX	*ABS*
+ 110:	00098993          	mv	s3,s3	110: R_RISCV_LO12_I	.LANCHOR34
+	110: R_RISCV_RELAX	*ABS*
+ 114:	e291                	bnez	a3,118 <.L481>	114: R_RISCV_RVC_BRANCH	.L481
+ 116:	46d1                	li	a3,20
+
+00000118 <.L481>:
+ 118:	000007b7          	lui	a5,0x0	118: R_RISCV_HI20	.LANCHOR23
+	118: R_RISCV_RELAX	*ABS*
+ 11c:	00d79023          	sh	a3,0(a5) # 0 <WCHIOCHUB_Init>	11c: R_RISCV_LO12_S	.LANCHOR23
+	11c: R_RISCV_RELAX	*ABS*
+ 120:	000007b7          	lui	a5,0x0	120: R_RISCV_HI20	IocosGetTimeIsr
+	120: R_RISCV_RELAX	*ABS*
+ 124:	0077a023          	sw	t2,0(a5) # 0 <WCHIOCHUB_Init>	124: R_RISCV_LO12_S	IocosGetTimeIsr
+	124: R_RISCV_RELAX	*ABS*
+ 128:	000007b7          	lui	a5,0x0	128: R_RISCV_HI20	.LANCHOR45
+	128: R_RISCV_RELAX	*ABS*
+ 12c:	0057a023          	sw	t0,0(a5) # 0 <WCHIOCHUB_Init>	12c: R_RISCV_LO12_S	.LANCHOR45
+	12c: R_RISCV_RELAX	*ABS*
+ 130:	000007b7          	lui	a5,0x0	130: R_RISCV_HI20	.LANCHOR2
+	130: R_RISCV_RELAX	*ABS*
+ 134:	01e7a023          	sw	t5,0(a5) # 0 <WCHIOCHUB_Init>	134: R_RISCV_LO12_S	.LANCHOR2
+	134: R_RISCV_RELAX	*ABS*
+ 138:	000007b7          	lui	a5,0x0	138: R_RISCV_HI20	.LANCHOR0
+	138: R_RISCV_RELAX	*ABS*
+ 13c:	01d7a023          	sw	t4,0(a5) # 0 <WCHIOCHUB_Init>	13c: R_RISCV_LO12_S	.LANCHOR0
+	13c: R_RISCV_RELAX	*ABS*
+ 140:	000007b7          	lui	a5,0x0	140: R_RISCV_HI20	.LANCHOR24
+	140: R_RISCV_RELAX	*ABS*
+ 144:	01c7a023          	sw	t3,0(a5) # 0 <WCHIOCHUB_Init>	144: R_RISCV_LO12_S	.LANCHOR24
+	144: R_RISCV_RELAX	*ABS*
+ 148:	00000cb7          	lui	s9,0x0	148: R_RISCV_HI20	.LANCHOR21
+	148: R_RISCV_RELAX	*ABS*
+ 14c:	000007b7          	lui	a5,0x0	14c: R_RISCV_HI20	.LANCHOR26
+	14c: R_RISCV_RELAX	*ABS*
+ 150:	0067a023          	sw	t1,0(a5) # 0 <WCHIOCHUB_Init>	150: R_RISCV_LO12_S	.LANCHOR26
+	150: R_RISCV_RELAX	*ABS*
+ 154:	000c8413          	mv	s0,s9	154: R_RISCV_LO12_I	.LANCHOR21
+	154: R_RISCV_RELAX	*ABS*
+ 158:	000007b7          	lui	a5,0x0	158: R_RISCV_HI20	.LANCHOR7
+	158: R_RISCV_RELAX	*ABS*
+ 15c:	00000c37          	lui	s8,0x0	15c: R_RISCV_HI20	.LANCHOR46
+	15c: R_RISCV_RELAX	*ABS*
+ 160:	01fc2023          	sw	t6,0(s8) # 0 <WCHIOCHUB_Init>	160: R_RISCV_LO12_S	.LANCHOR46
+	160: R_RISCV_RELAX	*ABS*
+ 164:	01178023          	sb	a7,0(a5) # 0 <WCHIOCHUB_Init>	164: R_RISCV_LO12_S	.LANCHOR7
+	164: R_RISCV_RELAX	*ABS*
+ 168:	01040023          	sb	a6,0(s0)
+ 16c:	00000097          	auipc	ra,0x0	16c: R_RISCV_CALL	iocos_meminit
+	16c: R_RISCV_RELAX	*ABS*
+ 170:	000080e7          	jalr	ra # 16c <.L481+0x54>
+ 174:	0024d583          	lhu	a1,2(s1) # 2 <WCHIOCHUB_Init+0x2>
+ 178:	00000537          	lui	a0,0x0	178: R_RISCV_HI20	recvRingBuff
+	178: R_RISCV_RELAX	*ABS*
+ 17c:	00050513          	mv	a0,a0	17c: R_RISCV_LO12_I	recvRingBuff
+	17c: R_RISCV_RELAX	*ABS*
+ 180:	00000097          	auipc	ra,0x0	180: R_RISCV_CALL	ringBufInit
+	180: R_RISCV_RELAX	*ABS*
+ 184:	000080e7          	jalr	ra # 180 <.L481+0x68>
+ 188:	00044503          	lbu	a0,0(s0)
+ 18c:	02c00793          	li	a5,44
+ 190:	00000437          	lui	s0,0x0	190: R_RISCV_HI20	.LANCHOR3
+	190: R_RISCV_RELAX	*ABS*
+ 194:	02f50533          	mul	a0,a0,a5
+ 198:	6bc1                	lui	s7,0x10
+ 19a:	4a81                	li	s5,0
+ 19c:	000c0c13          	mv	s8,s8	19c: R_RISCV_LO12_I	.LANCHOR46
+	19c: R_RISCV_RELAX	*ABS*
+ 1a0:	000c8c93          	mv	s9,s9	1a0: R_RISCV_LO12_I	.LANCHOR21
+	1a0: R_RISCV_RELAX	*ABS*
+ 1a4:	02c00d13          	li	s10,44
+ 1a8:	1bfd                	addi	s7,s7,-1 # ffff <.L392+0xe625>
+ 1aa:	00000097          	auipc	ra,0x0	1aa: R_RISCV_CALL	iocos_malloc
+	1aa: R_RISCV_RELAX	*ABS*
+ 1ae:	000080e7          	jalr	ra # 1aa <.L481+0x92>
+ 1b2:	00a42023          	sw	a0,0(s0) # 0 <WCHIOCHUB_Init>	1b2: R_RISCV_LO12_S	.LANCHOR3
+	1b2: R_RISCV_RELAX	*ABS*
+ 1b6:	0004d503          	lhu	a0,0(s1)
+ 1ba:	00040413          	mv	s0,s0	1ba: R_RISCV_LO12_I	.LANCHOR3
+	1ba: R_RISCV_RELAX	*ABS*
+ 1be:	00000097          	auipc	ra,0x0	1be: R_RISCV_CALL	iocos_malloc
+	1be: R_RISCV_RELAX	*ABS*
+ 1c2:	000080e7          	jalr	ra # 1be <.L481+0xa6>
+ 1c6:	000007b7          	lui	a5,0x0	1c6: R_RISCV_HI20	.LANCHOR47
+	1c6: R_RISCV_RELAX	*ABS*
+ 1ca:	00a7a023          	sw	a0,0(a5) # 0 <WCHIOCHUB_Init>	1ca: R_RISCV_LO12_S	.LANCHOR47
+	1ca: R_RISCV_RELAX	*ABS*
+ 1ce:	0004d503          	lhu	a0,0(s1)
+ 1d2:	00000097          	auipc	ra,0x0	1d2: R_RISCV_CALL	iocos_malloc
+	1d2: R_RISCV_RELAX	*ABS*
+ 1d6:	000080e7          	jalr	ra # 1d2 <.L481+0xba>
+ 1da:	000007b7          	lui	a5,0x0	1da: R_RISCV_HI20	.LANCHOR15
+	1da: R_RISCV_RELAX	*ABS*
+ 1de:	00a7a023          	sw	a0,0(a5) # 0 <WCHIOCHUB_Init>	1de: R_RISCV_LO12_S	.LANCHOR15
+	1de: R_RISCV_RELAX	*ABS*
+
+000001e2 <.L482>:
+ 1e2:	000cc783          	lbu	a5,0(s9) # 0 <WCHIOCHUB_Init>
+ 1e6:	04faed63          	bltu	s5,a5,240 <.L483>	1e6: R_RISCV_BRANCH	.L483
+ 1ea:	000b5783          	lhu	a5,0(s6)
+ 1ee:	5422                	lw	s0,40(sp)
+ 1f0:	000c2303          	lw	t1,0(s8)
+ 1f4:	00879713          	slli	a4,a5,0x8
+ 1f8:	83a1                	srli	a5,a5,0x8
+ 1fa:	8fd9                	or	a5,a5,a4
+ 1fc:	00000737          	lui	a4,0x0	1fc: R_RISCV_HI20	.LANCHOR48
+	1fc: R_RISCV_RELAX	*ABS*
+ 200:	00f71023          	sh	a5,0(a4) # 0 <WCHIOCHUB_Init>	200: R_RISCV_LO12_S	.LANCHOR48
+	200: R_RISCV_RELAX	*ABS*
+ 204:	0009d783          	lhu	a5,0(s3)
+ 208:	50b2                	lw	ra,44(sp)
+ 20a:	5492                	lw	s1,36(sp)
+ 20c:	00879713          	slli	a4,a5,0x8
+ 210:	83a1                	srli	a5,a5,0x8
+ 212:	8fd9                	or	a5,a5,a4
+ 214:	5902                	lw	s2,32(sp)
+ 216:	49f2                	lw	s3,28(sp)
+ 218:	4a62                	lw	s4,24(sp)
+ 21a:	4ad2                	lw	s5,20(sp)
+ 21c:	4b42                	lw	s6,16(sp)
+ 21e:	4bb2                	lw	s7,12(sp)
+ 220:	4c22                	lw	s8,8(sp)
+ 222:	4c92                	lw	s9,4(sp)
+ 224:	4d02                	lw	s10,0(sp)
+ 226:	00000737          	lui	a4,0x0	226: R_RISCV_HI20	.LANCHOR49
+	226: R_RISCV_RELAX	*ABS*
+ 22a:	00f71023          	sh	a5,0(a4) # 0 <WCHIOCHUB_Init>	22a: R_RISCV_LO12_S	.LANCHOR49
+	22a: R_RISCV_RELAX	*ABS*
+ 22e:	000005b7          	lui	a1,0x0	22e: R_RISCV_HI20	SocketIdForLAN
+	22e: R_RISCV_RELAX	*ABS*
+ 232:	6509                	lui	a0,0x2
+ 234:	00058593          	mv	a1,a1	234: R_RISCV_LO12_I	SocketIdForLAN
+	234: R_RISCV_RELAX	*ABS*
+ 238:	71050513          	addi	a0,a0,1808 # 2710 <.L392+0xd36>
+ 23c:	6145                	addi	sp,sp,48
+ 23e:	8302                	jr	t1
+
+00000240 <.L483>:
+ 240:	03aa8933          	mul	s2,s5,s10
+ 244:	4008                	lw	a0,0(s0)
+ 246:	4621                	li	a2,8
+ 248:	4581                	li	a1,0
+ 24a:	0a85                	addi	s5,s5,1
+ 24c:	0ffafa93          	zext.b	s5,s5
+ 250:	954a                	add	a0,a0,s2
+ 252:	020500a3          	sb	zero,33(a0)
+ 256:	00000097          	auipc	ra,0x0	256: R_RISCV_CALL	iocos_memset
+	256: R_RISCV_RELAX	*ABS*
+ 25a:	000080e7          	jalr	ra # 256 <.L483+0x16>
+ 25e:	00042a03          	lw	s4,0(s0)
+ 262:	0004d503          	lhu	a0,0(s1)
+ 266:	9a4a                	add	s4,s4,s2
+ 268:	000a1723          	sh	zero,14(s4)
+ 26c:	017a2823          	sw	s7,16(s4)
+ 270:	020a1323          	sh	zero,38(s4)
+ 274:	00000097          	auipc	ra,0x0	274: R_RISCV_CALL	iocos_malloc
+	274: R_RISCV_RELAX	*ABS*
+ 278:	000080e7          	jalr	ra # 274 <.L483+0x34>
+ 27c:	00aa2e23          	sw	a0,28(s4)
+ 280:	4551                	li	a0,20
+ 282:	00042a03          	lw	s4,0(s0)
+ 286:	00000097          	auipc	ra,0x0	286: R_RISCV_CALL	iocos_malloc
+	286: R_RISCV_RELAX	*ABS*
+ 28a:	000080e7          	jalr	ra # 286 <.L483+0x46>
+ 28e:	401c                	lw	a5,0(s0)
+ 290:	9a4a                	add	s4,s4,s2
+ 292:	00aa2a23          	sw	a0,20(s4)
+ 296:	97ca                	add	a5,a5,s2
+ 298:	0147aa03          	lw	s4,20(a5)
+ 29c:	0009d503          	lhu	a0,0(s3)
+ 2a0:	0004d783          	lhu	a5,0(s1)
+ 2a4:	00aa09a3          	sb	a0,19(s4)
+ 2a8:	02a78533          	mul	a0,a5,a0
+ 2ac:	0087d713          	srli	a4,a5,0x8
+ 2b0:	00ea08a3          	sb	a4,17(s4)
+ 2b4:	00fa0823          	sb	a5,16(s4)
+ 2b8:	00000097          	auipc	ra,0x0	2b8: R_RISCV_CALL	iocos_malloc
+	2b8: R_RISCV_RELAX	*ABS*
+ 2bc:	000080e7          	jalr	ra # 2b8 <.L483+0x78>
+ 2c0:	00855793          	srli	a5,a0,0x8
+ 2c4:	00fa02a3          	sb	a5,5(s4)
+ 2c8:	01055793          	srli	a5,a0,0x10
+ 2cc:	00aa0223          	sb	a0,4(s4)
+ 2d0:	00fa0323          	sb	a5,6(s4)
+ 2d4:	8161                	srli	a0,a0,0x18
+ 2d6:	401c                	lw	a5,0(s0)
+ 2d8:	00aa03a3          	sb	a0,7(s4)
+ 2dc:	0009d503          	lhu	a0,0(s3)
+ 2e0:	97ca                	add	a5,a5,s2
+ 2e2:	0147aa03          	lw	s4,20(a5)
+ 2e6:	0506                	slli	a0,a0,0x1
+ 2e8:	00000097          	auipc	ra,0x0	2e8: R_RISCV_CALL	iocos_malloc
+	2e8: R_RISCV_RELAX	*ABS*
+ 2ec:	000080e7          	jalr	ra # 2e8 <.L483+0xa8>
+ 2f0:	00855793          	srli	a5,a0,0x8
+ 2f4:	00fa04a3          	sb	a5,9(s4)
+ 2f8:	01055793          	srli	a5,a0,0x10
+ 2fc:	00aa0423          	sb	a0,8(s4)
+ 300:	00fa0523          	sb	a5,10(s4)
+ 304:	8161                	srli	a0,a0,0x18
+ 306:	401c                	lw	a5,0(s0)
+ 308:	00aa05a3          	sb	a0,11(s4)
+ 30c:	0009d503          	lhu	a0,0(s3)
+ 310:	97ca                	add	a5,a5,s2
+ 312:	0147aa03          	lw	s4,20(a5)
+ 316:	0506                	slli	a0,a0,0x1
+ 318:	00000097          	auipc	ra,0x0	318: R_RISCV_CALL	iocos_malloc
+	318: R_RISCV_RELAX	*ABS*
+ 31c:	000080e7          	jalr	ra # 318 <.L483+0xd8>
+ 320:	00855793          	srli	a5,a0,0x8
+ 324:	00aa0623          	sb	a0,12(s4)
+ 328:	00fa06a3          	sb	a5,13(s4)
+ 32c:	01055793          	srli	a5,a0,0x10
+ 330:	8161                	srli	a0,a0,0x18
+ 332:	00fa0723          	sb	a5,14(s4)
+ 336:	00aa07a3          	sb	a0,15(s4)
+ 33a:	4531                	li	a0,12
+ 33c:	00042a03          	lw	s4,0(s0)
+ 340:	00000097          	auipc	ra,0x0	340: R_RISCV_CALL	iocos_malloc
+	340: R_RISCV_RELAX	*ABS*
+ 344:	000080e7          	jalr	ra # 340 <.L483+0x100>
+ 348:	401c                	lw	a5,0(s0)
+ 34a:	9a4a                	add	s4,s4,s2
+ 34c:	00aa2c23          	sw	a0,24(s4)
+ 350:	97ca                	add	a5,a5,s2
+ 352:	4f88                	lw	a0,24(a5)
+ 354:	02c4d583          	lhu	a1,44(s1)
+ 358:	00000097          	auipc	ra,0x0	358: R_RISCV_CALL	ringBufInit
+	358: R_RISCV_RELAX	*ABS*
+ 35c:	000080e7          	jalr	ra # 358 <.L483+0x118>
+ 360:	401c                	lw	a5,0(s0)
+ 362:	993e                	add	s2,s2,a5
+ 364:	01492783          	lw	a5,20(s2)
+ 368:	00078023          	sb	zero,0(a5)
+ 36c:	000780a3          	sb	zero,1(a5)
+ 370:	00078123          	sb	zero,2(a5)
+ 374:	000781a3          	sb	zero,3(a5)
+ 378:	00078923          	sb	zero,18(a5)
+ 37c:	b59d                	j	1e2 <.L482>	37c: R_RISCV_RVC_JUMP	.L482
+
+Disassembly of section .text.WCHIOCHUB_DeInit:
+
+Disassembly of section .text.WCHIOCHUB_GetCurrentCfg:
+
+Disassembly of section .text.WCHIOCHUB_Start:
+
+Disassembly of section .text.WCHIOCHUB_Stop:
+
+Disassembly of section .text.WCHIOCHUB_OpenSession:
+
+Disassembly of section .text.WCHIOCHUB_CloseSession:
+
+Disassembly of section .text.WCHIOCHUB_DataSend:
+
+Disassembly of section .text.WCHIOCHUB_GetSessionSendableLen:
+
+Disassembly of section .text.WCHIOCHUB_DataRecv:
+
+Disassembly of section .text.WCHIOCHUB_GetSessionRecvLen:
+
+Disassembly of section .text.WCHIOCHUB_SetBrdcstAddr:
+
+Disassembly of section .text.WCHIOCHUB_SetLanScan:
+
+Disassembly of section .text.WCHIOCHUB_LanScan:
+
+Disassembly of section .text.IoCHub_SessionEventProcess:
+
+Disassembly of section .text.WCHIOCHUB_TcpConnectRetry:
+
+Disassembly of section .text.IoCHub_ProcessEvent:
+
+Disassembly of section .text.WCHIOCHUB_SetAccessMode:
+
+Disassembly of section .text.WCHIOCHUB_GetAccessMode:
+
+Disassembly of section .text.WCHIOCHUB_GetSDKVer:
+
+Disassembly of section .text.WCHIOCHUB_GetLocalID:
+
+Disassembly of section .text.WCHIOCHUB_GetNodeID:
+
+Disassembly of section .text.WCHIOCHUB_GetNodeIP:
+
+Disassembly of section .text.WCHIOCHUB_GetNATType:
+
+Disassembly of section .text.WCHIOCHUB_GetTransferType:
+
+Disassembly of section .text.WCHIOCHUB_NetDataToUsrData:
+
+Disassembly of section .text.WCHIOCHUB_GetDeviceSerState:

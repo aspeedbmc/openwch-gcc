@@ -1,0 +1,10 @@
+slug	project_path	native_major	notes
+v2ac-gpio	QingkeV2AC_CH32V00x/EXAM/GPIO/GPIO_Toggle	12	RV32E/ilp32e + XW
+v3a-gpio	QingkeV3A_CH32V103/EXAM/GPIO/GPIO_Toggle	8	无 XW
+v3b-pioc	QingkeV3B_CH32V205/EXAM/PIOC/PIOC_1_Wire	12	只构建 RISC-V 主控部分；RGB1W.BIN/.LST 等 PIOC/RISC8B 随包产物不进 manifest
+v3c-led	QingkeV3C_CH587_EVT/EXAM/LED	12	目录内随包 obj/LED.hex 不进 manifest
+v3f-gpio	QingkeV3F_CH32X315/EXAM/GPIO/GPIO_Toggle	15	
+v3f2-gpio	QingkeV3F_CH32X315_EVT/EXAM/GPIO/GPIO_Toggle	15	与 v3f-gpio 内容近同，独立计
+v4bc-pmp	QingkeV4BC_CH32V20x/EXAM/PMP/PMP	8	
+v4f-fpu	QingkeV4F_CH32V30x/EXAM/FPU/FPU	8	F(single)/ilp32f
+v5f-fpu	QingkeV5F_CH32H417EVT/EXAM/CPU/FPU/FPU/V5F	12	认准 V5F kernel，勿混同目录 V3F 兄弟工程

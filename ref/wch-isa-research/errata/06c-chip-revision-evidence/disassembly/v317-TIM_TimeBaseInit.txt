@@ -1,0 +1,316 @@
+
+/Users/apple/Projects/gccriscv-wch/tmp/wch-evt/validation/round2/byte-identical-r12b-run/wch/QingkeV4F_CH32V317_EVT_EXAM_TOUCHKEY_TKey--80ecbef700c9/obj/0025_ch32v30x_tim.o:     file format elf32-littleriscv
+
+
+Disassembly of section .text.TI1_Config:
+
+Disassembly of section .text.TI2_Config:
+
+Disassembly of section .text.TIM_DeInit:
+
+Disassembly of section .text.TIM_TimeBaseInit:
+
+00000000 <TIM_TimeBaseInit>:
+   0:	1ffff737          	lui	a4,0x1ffff
+   4:	70472703          	lw	a4,1796(a4) # 1ffff704 <.L13+0x1ffff5de>
+   8:	211e                	.insn	2, 0x211e
+   a:	4691                	li	a3,4
+   c:	8311                	srli	a4,a4,0x4
+   e:	8b3d                	andi	a4,a4,15
+  10:	1771                	addi	a4,a4,-4
+  12:	0ee6ef63          	bltu	a3,a4,110 <.L18>
+			12: R_RISCV_BRANCH	.L18
+  16:	40013737          	lui	a4,0x40013
+  1a:	c0070713          	addi	a4,a4,-1024 # 40012c00 <.L13+0x40012ada>
+  1e:	00e51963          	bne	a0,a4,30 <.L19>
+			1e: R_RISCV_BRANCH	.L19
+  22:	6709                	lui	a4,0x2
+  24:	8fd9                	or	a5,a5,a4
+
+00000026 <.L20>:
+  26:	21ba                	.insn	2, 0x21ba
+  28:	f8f7f793          	andi	a5,a5,-113
+  2c:	8fd9                	or	a5,a5,a4
+  2e:	a8ad                	j	a8 <.L24>
+			2e: R_RISCV_RVC_JUMP	.L24
+
+00000030 <.L19>:
+  30:	40013737          	lui	a4,0x40013
+  34:	40070713          	addi	a4,a4,1024 # 40013400 <.L13+0x400132da>
+  38:	00e50a63          	beq	a0,a4,4c <.L21>
+			38: R_RISCV_BRANCH	.L21
+  3c:	400156b7          	lui	a3,0x40015
+  40:	c0068713          	addi	a4,a3,-1024 # 40014c00 <.L13+0x40014ada>
+  44:	00e50463          	beq	a0,a4,4c <.L21>
+			44: R_RISCV_BRANCH	.L21
+  48:	0cd51463          	bne	a0,a3,110 <.L18>
+			48: R_RISCV_BRANCH	.L18
+
+0000004c <.L21>:
+  4c:	6709                	lui	a4,0x2
+  4e:	8fd9                	or	a5,a5,a4
+
+00000050 <.L23>:
+  50:	c00006b7          	lui	a3,0xc0000
+  54:	c0000737          	lui	a4,0xc0000
+  58:	80068693          	addi	a3,a3,-2048 # bffff800 <.L13+0xbffff6da>
+  5c:	c0070713          	addi	a4,a4,-1024 # bffffc00 <.L13+0xbffffada>
+  60:	96aa                	add	a3,a3,a0
+  62:	972a                	add	a4,a4,a0
+  64:	00173713          	seqz	a4,a4
+  68:	0016b693          	seqz	a3,a3
+  6c:	8ed9                	or	a3,a3,a4
+  6e:	bffff737          	lui	a4,0xbffff
+  72:	40070713          	addi	a4,a4,1024 # bffff400 <.L13+0xbffff2da>
+  76:	972a                	add	a4,a4,a0
+  78:	00173713          	seqz	a4,a4
+  7c:	8f55                	or	a4,a4,a3
+  7e:	bffed6b7          	lui	a3,0xbffed
+  82:	c0068693          	addi	a3,a3,-1024 # bffecc00 <.L13+0xbffecada>
+  86:	96aa                	add	a3,a3,a0
+  88:	0016b693          	seqz	a3,a3
+  8c:	8ed9                	or	a3,a3,a4
+  8e:	bffeb737          	lui	a4,0xbffeb
+  92:	40070713          	addi	a4,a4,1024 # bffeb400 <.L13+0xbffeb2da>
+  96:	972a                	add	a4,a4,a0
+  98:	00173713          	seqz	a4,a4
+  9c:	8f55                	or	a4,a4,a3
+  9e:	f741                	bnez	a4,26 <.L20>
+			9e: R_RISCV_RVC_BRANCH	.L20
+  a0:	bffeb737          	lui	a4,0xbffeb
+  a4:	972a                	add	a4,a4,a0
+  a6:	d341                	beqz	a4,26 <.L20>
+			a6: R_RISCV_RVC_BRANCH	.L20
+
+000000a8 <.L24>:
+  a8:	bffff737          	lui	a4,0xbffff
+  ac:	c0070713          	addi	a4,a4,-1024 # bfffec00 <.L13+0xbfffeada>
+  b0:	972a                	add	a4,a4,a0
+  b2:	cb09                	beqz	a4,c4 <.L26>
+			b2: R_RISCV_RVC_BRANCH	.L26
+  b4:	bffff737          	lui	a4,0xbffff
+  b8:	972a                	add	a4,a4,a0
+  ba:	c709                	beqz	a4,c4 <.L26>
+			ba: R_RISCV_RVC_BRANCH	.L26
+  bc:	21fa                	.insn	2, 0x21fa
+  be:	cff7f793          	andi	a5,a5,-769
+  c2:	8fd9                	or	a5,a5,a4
+
+000000c4 <.L26>:
+  c4:	a11e                	.insn	2, 0xa11e
+  c6:	21de                	.insn	2, 0x21de
+  c8:	bffed737          	lui	a4,0xbffed
+  cc:	c0070713          	addi	a4,a4,-1024 # bffecc00 <.L13+0xbffecada>
+  d0:	b55e                	.insn	2, 0xb55e
+  d2:	219e                	.insn	2, 0x219e
+  d4:	972a                	add	a4,a4,a0
+  d6:	00173713          	seqz	a4,a4
+  da:	b51e                	.insn	2, 0xb51e
+  dc:	bffed7b7          	lui	a5,0xbffed
+  e0:	40078793          	addi	a5,a5,1024 # bffed400 <.L13+0xbffed2da>
+  e4:	97aa                	add	a5,a5,a0
+  e6:	0017b793          	seqz	a5,a5
+  ea:	8f5d                	or	a4,a4,a5
+  ec:	bffeb7b7          	lui	a5,0xbffeb
+  f0:	40078793          	addi	a5,a5,1024 # bffeb400 <.L13+0xbffeb2da>
+  f4:	97aa                	add	a5,a5,a0
+  f6:	0017b793          	seqz	a5,a5
+  fa:	8fd9                	or	a5,a5,a4
+  fc:	e789                	bnez	a5,106 <.L29>
+			fc: R_RISCV_RVC_BRANCH	.L29
+  fe:	bffeb7b7          	lui	a5,0xbffeb
+ 102:	97aa                	add	a5,a5,a0
+ 104:	e399                	bnez	a5,10a <.L27>
+			104: R_RISCV_RVC_BRANCH	.L27
+
+00000106 <.L29>:
+ 106:	259c                	.insn	2, 0x259c
+ 108:	b91e                	.insn	2, 0xb91e
+
+0000010a <.L27>:
+ 10a:	4785                	li	a5,1
+ 10c:	a95e                	.insn	2, 0xa95e
+ 10e:	8082                	ret
+
+00000110 <.L18>:
+ 110:	c0000737          	lui	a4,0xc0000
+ 114:	972a                	add	a4,a4,a0
+ 116:	db01                	beqz	a4,26 <.L20>
+			116: R_RISCV_RVC_BRANCH	.L20
+ 118:	bffed737          	lui	a4,0xbffed
+ 11c:	40070713          	addi	a4,a4,1024 # bffed400 <.L13+0xbffed2da>
+ 120:	972a                	add	a4,a4,a0
+ 122:	f71d                	bnez	a4,50 <.L23>
+			122: R_RISCV_RVC_BRANCH	.L23
+ 124:	b709                	j	26 <.L20>
+			124: R_RISCV_RVC_JUMP	.L20
+
+Disassembly of section .text.TIM_OC1Init:
+
+Disassembly of section .text.TIM_OC2Init:
+
+Disassembly of section .text.TIM_OC3Init:
+
+Disassembly of section .text.TIM_OC4Init:
+
+Disassembly of section .text.TIM_BDTRConfig:
+
+Disassembly of section .text.TIM_TimeBaseStructInit:
+
+Disassembly of section .text.TIM_OCStructInit:
+
+Disassembly of section .text.TIM_ICStructInit:
+
+Disassembly of section .text.TIM_BDTRStructInit:
+
+Disassembly of section .text.TIM_Cmd:
+
+Disassembly of section .text.TIM_CtrlPWMOutputs:
+
+Disassembly of section .text.TIM_ITConfig:
+
+Disassembly of section .text.TIM_GenerateEvent:
+
+Disassembly of section .text.TIM_DMAConfig:
+
+Disassembly of section .text.TIM_DMACmd:
+
+Disassembly of section .text.TIM_InternalClockConfig:
+
+Disassembly of section .text.TIM_ITRxExternalClockConfig:
+
+Disassembly of section .text.TIM_TIxExternalClockConfig:
+
+Disassembly of section .text.TIM_ETRConfig:
+
+Disassembly of section .text.TIM_ETRClockMode1Config:
+
+Disassembly of section .text.TIM_ETRClockMode2Config:
+
+Disassembly of section .text.TIM_PrescalerConfig:
+
+Disassembly of section .text.TIM_CounterModeConfig:
+
+Disassembly of section .text.TIM_SelectInputTrigger:
+
+Disassembly of section .text.TIM_EncoderInterfaceConfig:
+
+Disassembly of section .text.TIM_ForcedOC1Config:
+
+Disassembly of section .text.TIM_ForcedOC2Config:
+
+Disassembly of section .text.TIM_ForcedOC3Config:
+
+Disassembly of section .text.TIM_ForcedOC4Config:
+
+Disassembly of section .text.TIM_ARRPreloadConfig:
+
+Disassembly of section .text.TIM_SelectCOM:
+
+Disassembly of section .text.TIM_SelectCCDMA:
+
+Disassembly of section .text.TIM_CCPreloadControl:
+
+Disassembly of section .text.TIM_OC1PreloadConfig:
+
+Disassembly of section .text.TIM_OC2PreloadConfig:
+
+Disassembly of section .text.TIM_OC3PreloadConfig:
+
+Disassembly of section .text.TIM_OC4PreloadConfig:
+
+Disassembly of section .text.TIM_OC1FastConfig:
+
+Disassembly of section .text.TIM_OC2FastConfig:
+
+Disassembly of section .text.TIM_OC3FastConfig:
+
+Disassembly of section .text.TIM_OC4FastConfig:
+
+Disassembly of section .text.TIM_ClearOC1Ref:
+
+Disassembly of section .text.TIM_ClearOC2Ref:
+
+Disassembly of section .text.TIM_ClearOC3Ref:
+
+Disassembly of section .text.TIM_ClearOC4Ref:
+
+Disassembly of section .text.TIM_OC1PolarityConfig:
+
+Disassembly of section .text.TIM_OC1NPolarityConfig:
+
+Disassembly of section .text.TIM_OC2PolarityConfig:
+
+Disassembly of section .text.TIM_OC2NPolarityConfig:
+
+Disassembly of section .text.TIM_OC3PolarityConfig:
+
+Disassembly of section .text.TIM_OC3NPolarityConfig:
+
+Disassembly of section .text.TIM_OC4PolarityConfig:
+
+Disassembly of section .text.TIM_CCxCmd:
+
+Disassembly of section .text.TIM_CCxNCmd:
+
+Disassembly of section .text.TIM_SelectOCxM:
+
+Disassembly of section .text.TIM_UpdateDisableConfig:
+
+Disassembly of section .text.TIM_UpdateRequestConfig:
+
+Disassembly of section .text.TIM_SelectHallSensor:
+
+Disassembly of section .text.TIM_SelectOnePulseMode:
+
+Disassembly of section .text.TIM_SelectOutputTrigger:
+
+Disassembly of section .text.TIM_SelectSlaveMode:
+
+Disassembly of section .text.TIM_SelectMasterSlaveMode:
+
+Disassembly of section .text.TIM_SetCounter:
+
+Disassembly of section .text.TIM_SetAutoreload:
+
+Disassembly of section .text.TIM_SetCompare1:
+
+Disassembly of section .text.TIM_SetCompare2:
+
+Disassembly of section .text.TIM_SetCompare3:
+
+Disassembly of section .text.TIM_SetCompare4:
+
+Disassembly of section .text.TIM_SetIC1Prescaler:
+
+Disassembly of section .text.TIM_SetIC2Prescaler:
+
+Disassembly of section .text.TIM_PWMIConfig:
+
+Disassembly of section .text.TIM_SetIC3Prescaler:
+
+Disassembly of section .text.TIM_SetIC4Prescaler:
+
+Disassembly of section .text.TIM_ICInit:
+
+Disassembly of section .text.TIM_SetClockDivision:
+
+Disassembly of section .text.TIM_GetCapture1:
+
+Disassembly of section .text.TIM_GetCapture2:
+
+Disassembly of section .text.TIM_GetCapture3:
+
+Disassembly of section .text.TIM_GetCapture4:
+
+Disassembly of section .text.TIM_GetCounter:
+
+Disassembly of section .text.TIM_GetPrescaler:
+
+Disassembly of section .text.TIM_GetFlagStatus:
+
+Disassembly of section .text.TIM_ClearFlag:
+
+Disassembly of section .text.TIM_GetITStatus:
+
+Disassembly of section .text.TIM_ClearITPendingBit:

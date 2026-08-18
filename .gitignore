@@ -1,0 +1,8 @@
+ref/gcc
+ref/MRS_Toolchain_Linux_X64_V250
+ref/*app
+tmp/
+ref/*.zip
+ref/*.tar
+ref/wch-evt/Qingke*/
+.DS_Store

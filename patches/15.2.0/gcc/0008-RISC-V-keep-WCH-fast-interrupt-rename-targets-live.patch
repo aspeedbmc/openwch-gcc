@@ -1,0 +1,87 @@
+From 2fca8c0984065ce67001ab715053ae9e8e6cb16c Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 3 <phase3@openwch.local>
+Date: Thu, 13 Aug 2026 23:31:24 +0900
+Subject: [PATCH 8/9] RISC-V: keep WCH fast-interrupt rename targets live
+
+This adds a regression guard, not a code change.  WCH fast interrupt
+handlers run under the upstream interrupt rename contract: a rename target
+must already be live and therefore covered by the prologue.  That contract
+is what reproduces the official compiler's output, and the official
+compiler is what the expectation below is taken from.
+
+Relaxing it for the hardware-saved register set -- letting -frename-registers
+pick any call-clobbered GPR because the hardware prologue saved it anyway --
+is the tempting shortcut, and it is wrong: measured on five non-returning
+CoreMark handlers it moved the final reset-value chain from a5 to a
+previously unused t0, which the official compiler never emits.
+
+The test therefore pins the a5 chain in a non-returning reset idiom that
+exercises -frename-registers, without synthesizing an interrupt return, so
+that the shortcut cannot be introduced again unnoticed.
+
+The distilled official probe matches assembly byte-for-byte.  All five
+affected projects match 199/199 gate artifacts, the selected EVT gate
+remains 274/274, and all 30493 PASS tuples of the RC05 (ccv-abi repair
+round) RISC-V suite baseline remain PASS.
+
+Behavior evidence:
+  tmp/phase3d-evidence/t4-rc07/probe
+  tmp/phase3d-evidence/t4-rc07/cluster-run
+  tmp/phase3d-evidence/t4-rc07/suite-diff-riscv
+  tmp/phase3d-evidence/t4-rc07/quick-gate
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/riscv/wch-fast-interrupt-noreturn-rename.c: New test.
+---
+ .../wch-fast-interrupt-noreturn-rename.c      | 38 +++++++++++++++++++
+ 1 file changed, 38 insertions(+)
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-noreturn-rename.c
+
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-noreturn-rename.c b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-noreturn-rename.c
+new file mode 100644
+index 000000000..2fe0bcaf0
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-noreturn-rename.c
+@@ -0,0 +1,38 @@
++/* Verify register renaming in a non-returning WCH fast interrupt.  */
++/* { dg-do compile } */
++/* { dg-options "-Ofast -frename-registers -march=rv32imac_zba_zbb_zbc_zbs_xw -mabi=ilp32" } */
++/* { dg-skip-if "" { *-*-* } { "-flto" } { "" } } */
++
++typedef struct
++{
++  unsigned int reserved[18];
++  volatile unsigned int cfgr;
++} nvic_type;
++
++#define NVIC ((nvic_type *) 0xe000e000u)
++#define NVIC_KEY3 0xbeef0000u
++
++static __inline__ __attribute__ ((always_inline)) void
++system_reset (void)
++{
++  NVIC->cfgr = NVIC_KEY3 | (1u << 7);
++}
++
++void __attribute__ ((interrupt ("WCH-Interrupt-fast")))
++nmi (void)
++{
++  for (;;)
++    ;
++}
++
++void __attribute__ ((interrupt ("WCH-Interrupt-fast")))
++handler (void)
++{
++  system_reset ();
++  for (;;)
++    ;
++}
++
++/* { dg-final { scan-assembler-times {addi\s+a5,\s*a5,\s*128} 1 } } */
++/* { dg-final { scan-assembler-not {\mt0\M} } } */
++/* { dg-final { scan-assembler-not {\mmret\M} } } */
+-- 
+2.55.0
+

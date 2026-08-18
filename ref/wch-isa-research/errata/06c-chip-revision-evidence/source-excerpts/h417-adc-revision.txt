@@ -1,0 +1,24 @@
+source	tmp/wch-evt/evt/QingkeV5F_CH32H417_EVT/EXAM/ADC/DualADC_FastInterleaved/Common/hardware.c
+sha256	6b7c9b97da0b04e9e520458835bfbd5d3598cb44825fda0868b5e0e3ff6f8b59
+range	50-70
+000050	    ADC_Init(ADC1, &ADC_InitStructure);
+000051	    ADC_RegularChannelConfig(ADC1, ADC_Channel_1, 1, ADC_SampleTime_CyclesMode0 );
+000052
+000053	    ADC_ITConfig( ADC1, ADC_IT_EOC, ENABLE);
+000054	    ADC_Cmd(ADC1, ENABLE);
+000055
+000056	    ADC_BufferCmd(ADC1, DISABLE);   //disable buffer
+000057	    ADC_ResetCalibration(ADC1);
+000058	    while(ADC_GetResetCalibrationStatus(ADC1));
+000059	    ADC_StartCalibration(ADC1);
+000060	    while(ADC_GetCalibrationStatus(ADC1));
+000061	    if(((DBGMCU_GetCHIPID())&0xF0)==0)
+000062		{
+000063	      ADC_HD_CalibrationCmd(ADC1,DISABLE);
+000064		}
+000065
+000066	    ADC_Init(ADC2, &ADC_InitStructure);
+000067	    ADC_RegularChannelConfig(ADC2, ADC_Channel_1, 1, ADC_SampleTime_CyclesMode0 );
+000068
+000069	    ADC_SoftwareStartConvCmd(ADC2, ENABLE);
+000070	    ADC_Cmd(ADC2, ENABLE);

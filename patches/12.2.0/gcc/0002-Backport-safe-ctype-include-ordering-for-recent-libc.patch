@@ -1,0 +1,81 @@
+From c528a71285c07744fb5b33c5852ba27a77ecd8cc Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 4 <phase4@openwch.local>
+Date: Thu, 13 Aug 2026 05:20:42 +0900
+Subject: [PATCH 2/9] Backport safe-ctype include ordering for recent libc++
+
+Backport GCC releases/gcc-12 commit a995fded34fe488153b06bb41e026277f01efded (PR middle-end/111632). Include C++ standard headers before safe-ctype.h so modern libc++ locale declarations are not poisoned during the host compiler build.
+
+Upstream provenance and Phase 4 use are recorded in analysis/toolchain/phase4-literal-surface.md.
+
+gcc/ChangeLog:
+
+	PR middle-end/111632
+	* system.h: Include the C++ standard headers before "safe-ctype.h".
+---
+ gcc/system.h | 39 ++++++++++++++++++---------------------
+ 1 file changed, 18 insertions(+), 21 deletions(-)
+
+diff --git a/gcc/system.h b/gcc/system.h
+index e10c34f70..38733dd81 100644
+--- a/gcc/system.h
++++ b/gcc/system.h
+@@ -194,27 +194,8 @@ extern int fprintf_unlocked (FILE *, const char *, ...);
+ #undef fread_unlocked
+ #undef fwrite_unlocked
+ 
+-/* Include <string> before "safe-ctype.h" to avoid GCC poisoning
+-   the ctype macros through safe-ctype.h */
+-
+-#ifdef __cplusplus
+-#ifdef INCLUDE_STRING
+-# include <string>
+-#endif
+-#endif
+-
+-/* There are an extraordinary number of issues with <ctype.h>.
+-   The last straw is that it varies with the locale.  Use libiberty's
+-   replacement instead.  */
+-#include "safe-ctype.h"
+-
+-#include <sys/types.h>
+-
+-#include <errno.h>
+-
+-#if !defined (errno) && defined (HAVE_DECL_ERRNO) && !HAVE_DECL_ERRNO
+-extern int errno;
+-#endif
++/* Include C++ standard headers before "safe-ctype.h" to avoid GCC
++   poisoning the ctype macros through safe-ctype.h */
+ 
+ #ifdef __cplusplus
+ #if defined (INCLUDE_ALGORITHM) || !defined (HAVE_SWAP_IN_UTILITY)
+@@ -229,6 +210,9 @@ extern int errno;
+ #ifdef INCLUDE_SET
+ # include <set>
+ #endif
++#ifdef INCLUDE_STRING
++# include <string>
++#endif
+ #ifdef INCLUDE_VECTOR
+ # include <vector>
+ #endif
+@@ -245,6 +229,19 @@ extern int errno;
+ # include <type_traits>
+ #endif
+ 
++/* There are an extraordinary number of issues with <ctype.h>.
++   The last straw is that it varies with the locale.  Use libiberty's
++   replacement instead.  */
++#include "safe-ctype.h"
++
++#include <sys/types.h>
++
++#include <errno.h>
++
++#if !defined (errno) && defined (HAVE_DECL_ERRNO) && !HAVE_DECL_ERRNO
++extern int errno;
++#endif
++
+ /* Some of glibc's string inlines cause warnings.  Plus we'd rather
+    rely on (and therefore test) GCC's string builtins.  */
+ #define __NO_STRING_INLINES

@@ -1,0 +1,6 @@
+schema_version	document_id	pdf_page	printed_page	image	review_result
+1	DOC-REV-001	261	256	visual-pages/CH32V205RM-p261.png	manual image confirms CHIPID condition and pull-up-input requirement
+1	DOC-REV-002	262	257	visual-pages/CH32L103RM-p262.png	manual image confirms CHIPID condition and pull-up-input requirement
+1	LOT-H417-002	1	front-matter	visual-pages/CH32H417RM-p001.png	manual image confirms lot-gated memory-protection note
+1	LOT-H417-001	375	371	visual-pages/CH32H417RM-p375.png	manual image confirms IBIF failure and EVT handling reference
+1	LOT-FV3X-001	148	145	visual-pages/CH32FV2x_V3xRM-p148.png	manual image confirms DMA boundary restrictions and lot conditions

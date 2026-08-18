@@ -1,0 +1,165 @@
+source	tmp/wch-evt/evt/QingkeV4F_CH32V317_EVT/EXAM/ETH/NetLib/eth_driver_10M.c
+sha256	943269dfaad6ddb712086536217c53491e2a98a7dbe1d9d61072bfc7aef13984
+range	152-159
+000152	void WCHNET_RecProcess(void)
+000153	{
+000154	    if(((ChipId & 0xf0) == 0x20) && \
+000155	            ((ETH->DMAMFBOCR & 0x1FFE0000) != 0))
+000156	    {
+000157	        ReInitMACReg();
+000158	    }
+000159	}
+range	460-548
+000460	{
+000461	    u16 phy_bsr, phy_stat, phy_anlpar, phy_bcr;
+000462
+000463	    phy_bsr = ETH_ReadPHYRegister( gPHYAddress, PHY_BSR);
+000464	    phy_bcr = ETH_ReadPHYRegister( gPHYAddress, PHY_BCR);
+000465	    phy_anlpar = ETH_ReadPHYRegister( gPHYAddress, PHY_ANLPAR);
+000466
+000467	    if(phy_bsr & PHY_Linked_Status)   //LinkUp
+000468	    {
+000469	        if(phy_bcr & PHY_AutoNegotiation)   //determine whether auto-negotiation is enable
+000470	        {
+000471	            if(phy_anlpar == 0)
+000472	            {
+000473	                if(phy_bsr & PHY_AutoNego_Complete)
+000474	                {
+000475	                    ETH->MACCR &= ~ETH_Mode_FullDuplex;
+000476	                    ETH_LinkUpCfg(phy_bsr);
+000477	                    if((ChipId & 0xf0) == 0x20)
+000478	                    {
+000479	                        if(phyNegoStat & TURN_PN_POLARITY)
+000480	                        {
+000481	                            //select N polarity
+000482	                            ETH_WritePHYRegister(gPHYAddress, PHY_MDIX, PHY_PN_SWITCH_N);
+000483	                        }
+000484	                        else {
+000485	                            //select P polarity
+000486	                            ETH_WritePHYRegister(gPHYAddress, PHY_MDIX, PHY_PN_SWITCH_P);
+000487	                            phyNegoStat |= LAST_NEGO_STAT;
+000488	                        }
+000489	                        phyNegoLinkTime = LocalTime;
+000490	                    }
+000491	                }
+000492	                else{
+000493	                    PHY_LINK_RESET();
+000494	                }
+000495	            }
+000496	            else {
+000497	                phyNegoStat = 0;
+000498	                if(phy_bsr & PHY_AutoNego_Complete)
+000499	                {
+000500	                    phy_stat = ETH_ReadPHYRegister( gPHYAddress, PHY_STATUS );
+000501	                    if( phy_stat & (1<<2) )
+000502	                    {
+000503	                        ETH->MACCR |= ETH_Mode_FullDuplex;
+000504	                    }
+000505	                    else
+000506	                    {
+000507	                        if( (phy_anlpar&PHY_ANLPAR_SELECTOR_FIELD) != PHY_ANLPAR_SELECTOR_VALUE )
+000508	                        {
+000509	                            ETH->MACCR |= ETH_Mode_FullDuplex;
+000510	                        }
+000511	                        else
+000512	                        {
+000513	                            ETH->MACCR &= ~ETH_Mode_FullDuplex;
+000514	                        }
+000515	                    }
+000516	                    ETH_LinkUpCfg(phy_bsr);
+000517	                }
+000518	                else{
+000519	                    EXTEN->EXTEN_CTR &= ~EXTEN_ETH_10M_EN;
+000520	                    phyLinkReset = 1;
+000521	                    phyLinkTime = LocalTime;
+000522	                }
+000523	            }
+000524	        }
+000525	        else {
+000526	            ETH->MACCR &= ~ETH_Mode_FullDuplex;
+000527	            ETH_LinkUpCfg(phy_bsr);
+000528	        }
+000529	    }
+000530	    else {                              //LinkDown
+000531	        WCHNET_PhyStatus( phy_bsr );
+000532	        EXTEN->EXTEN_CTR &= ~EXTEN_ETH_10M_EN;
+000533	        phyLinkReset = 1;
+000534	        phyLinkTime = LocalTime;
+000535	        if((ChipId & 0xf0) == 0x20)
+000536	        {
+000537	            if(phyNegoStat & LAST_NEGO_STAT)
+000538	            {
+000539	                if(LocalTime - phyNegoLinkTime < 100)
+000540	                {
+000541	                    phyNegoLinkTime = 0;
+000542	                    //Clear any existing error count values.
+000543	                    ETH->DMAMFBOCR;
+000544	                    phyNegoStat ^= TURN_PN_POLARITY;
+000545	                }
+000546	            }
+000547	        }
+000548	    }
+range	845-907
+000845	void WCHNET_ETHIsr(void)
+000846	{
+000847	    uint32_t int_sta;
+000848
+000849	    int_sta = ETH->DMASR;
+000850	    if (int_sta & ETH_DMA_IT_AIS)
+000851	    {
+000852	        if (int_sta & ETH_DMA_IT_RBU)
+000853	        {
+000854	            if((ChipId & 0xf0) == 0x10)
+000855	            {
+000856	                ((ETH_DMADESCTypeDef *)(((ETH_DMADESCTypeDef *)(ETH->DMACHRDR))->Buffer2NextDescAddr))->Status = ETH_DMARxDesc_OWN;
+000857
+000858	                /* Resume DMA reception */
+000859	                ETH->DMARPDR = 0;
+000860	            }
+000861	            ETH_DMAClearITPendingBit(ETH_DMA_IT_RBU);
+000862	        }
+000863	        ETH_DMAClearITPendingBit(ETH_DMA_IT_AIS);
+000864	    }
+000865
+000866	    if( int_sta & ETH_DMA_IT_NIS )
+000867	    {
+000868	        if( int_sta & ETH_DMA_IT_R )
+000869	        {
+000870	            /*If you don't use the Ethernet library,
+000871	             * you can do some data processing operations here*/
+000872	            ETH_DMAClearITPendingBit(ETH_DMA_IT_R);
+000873	        }
+000874	        if( int_sta & ETH_DMA_IT_T )
+000875	        {
+000876	            ETH_DMAClearITPendingBit(ETH_DMA_IT_T);
+000877	        }
+000878	        if( int_sta & ETH_DMA_IT_PHYLINK)
+000879	        {
+000880	            ETH_PHYLink( );
+000881	            ETH_DMAClearITPendingBit(ETH_DMA_IT_PHYLINK);
+000882	        }
+000883	        ETH_DMAClearITPendingBit(ETH_DMA_IT_NIS);
+000884	    }
+000885	}
+000886
+000887	/*********************************************************************
+000888	 * @fn      ETH_Init
+000889	 *
+000890	 * @brief   Ethernet initialization.
+000891	 *
+000892	 * @return  none
+000893	 */
+000894	void ETH_Init( uint8_t *macAddr )
+000895	{
+000896	    Delay_Ms(100);
+000897	    ChipId = DBGMCU_GetCHIPID();
+000898	    ETH_LedConfiguration( );
+000899	    RandVal = (macAddr[3]^macAddr[4]^macAddr[5]) * 214017 + 2531017;
+000900	    ETH_Configuration( macAddr );
+000901	    ETH_DMATxDescChainInit(DMATxDscrTab, MACTxBuf, ETH_TXBUFNB);
+000902	    ETH_DMARxDescChainInit(DMARxDscrTab, MACRxBuf, ETH_RXBUFNB);
+000903	    pDMARxSet = DMARxDscrTab;
+000904	    pDMATxSet = DMATxDscrTab;
+000905	    NVIC_EnableIRQ(ETH_IRQn);
+000906	    NVIC_SetPriority(ETH_IRQn, 0);
+000907	}

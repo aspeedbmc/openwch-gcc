@@ -1,0 +1,118 @@
+source	tmp/wch-evt/evt/QingkeV5F_CH32H417_EVT/EXAM/SRC/Peripheral/src/ch32h417_can.c
+sha256	22d41eac6b1f3cf267c097d40ecf9f0016a777ff2b25943a788d1a2e67029a3b
+range	91-205
+000091	uint8_t CAN_Init(CAN_TypeDef* CANx, CAN_InitTypeDef* CAN_InitStruct)
+000092	{
+000093		uint8_t InitStatus = CAN_InitStatus_Failed;
+000094		uint32_t wait_ack = 0x00000000;
+000095		uint32_t chip = DBGMCU_GetCHIPID();
+000096
+000097		if((chip & 0x000000F0) == 0)
+000098		{
+000099			if(CAN1 == CANx)
+000100	        {
+000101	            (*(__IO uint32_t *)(0x40021014)) |= 0x02000000;
+000102	            (*(__IO uint32_t *)(0x40021014)) &= ~(0x02000000);
+000103	        }else if(CAN2 == CANx)
+000104	        {
+000105	            (*(__IO uint32_t *)(0x40021014)) |= 0x04000000;
+000106	            (*(__IO uint32_t *)(0x40021014)) &= ~(0x04000000);
+000107	        }else if(CAN3 == CANx)
+000108			{
+000109				(*(__IO uint32_t *)(0x40021014)) |= 0x01000000;
+000110	            (*(__IO uint32_t *)(0x40021014)) &= ~(0x01000000);
+000111			}
+000112
+000113	        CANx->CTLR &= ~0x2;
+000114	        CANx->CTLR |= 0x1;
+000115
+000116	        while(!(CANx->STATR & 0x1) && (wait_ack != 0x0000FFFF))
+000117	        {
+000118	            wait_ack++;
+000119	        }
+000120
+000121	        if((CANx->STATR & 0x1))
+000122	        {
+000123	            CANx->BTIMR = ( uint32_t)0xC1100000| \
+000124	                                    ((uint32_t)SystemCoreClock/(((((*(__IO uint32_t *)(0x40021004)) >> 8) & 0x7) < 0x4) ? 1 : (uint32_t)0x2<<(((*(__IO uint32_t *)(0x40021004)) >> 8) & 0x3))/4000000 - 1);
+000125	        }
+000126	        else
+000127	        {
+000128	            return CAN_InitStatus_Failed;
+000129	        }
+000130	        CANx->CTLR &= ~0x1;
+000131	        wait_ack = 0;
+000132	        while((CANx->STATR & 0x1) && (wait_ack != 0x0000FFFF))
+000133	        {
+000134	            wait_ack++;
+000135	        }
+000136
+000137	        if((CANx->STATR & 0x1)){
+000138	            return CAN_InitStatus_Failed;
+000139	        }
+000140
+000141	        (*(__IO uint32_t *)(0x4000660C)) |= 0xFFFFFFF;
+000142			(*(__IO uint32_t *)(0x40006620)) |= 0x3FF;
+000143	        (*(__IO uint32_t *)(0x40006640)) = 0x0;
+000144	        (*(__IO uint32_t *)(0x40006644)) = 0x0;
+000145	        (*(__IO uint32_t *)(0x40006648)) = 0x0;
+000146	        (*(__IO uint32_t *)(0x4000664C)) = 0x0;
+000147			(*(__IO uint32_t *)(0x40006650)) = 0x0;
+000148	        (*(__IO uint32_t *)(0x40006654)) = 0x0;
+000149	        (*(__IO uint32_t *)(0x4000661C)) |= 0xFFFFFFF;
+000150			(*(__IO uint32_t *)(0x40006620)) |= 0x3FF;
+000151			(*(__IO uint32_t *)(0x40006600)) = 0x2A010101;
+000152	        (*(__IO uint32_t *)(0x40006600)) &= ~0x1;
+000153	        if(CAN1 == CANx)
+000154	        {
+000155	            (*(__IO uint32_t *)(0x40006580)) |= 0x3;
+000156	            while(!((*(__IO uint32_t *)(0x4000640C)) & 0x3));
+000157	            (*(__IO uint32_t *)(0x4000640C)) = 0x38;
+000158	        }else if (CAN2 == CANx)
+000159	        {
+000160	            (*(__IO uint32_t *)(0x40006980)) |= 0x3;
+000161	            while(!((*(__IO uint32_t *)(0x4000680C)) & 0x3));
+000162	            (*(__IO uint32_t *)(0x4000680C)) = 0x38;
+000163	        }else if (CAN3 == CANx)
+000164	        {
+000165	            (*(__IO uint32_t *)(0x40007980)) |= 0x3;
+000166	            while(!((*(__IO uint32_t *)(0x4000780C)) & 0x3));
+000167	            (*(__IO uint32_t *)(0x4000780C)) = 0x38;
+000168	        }
+000169
+000170	        if(CAN1 == CANx)
+000171	        {
+000172	            (*(__IO uint32_t *)(0x40021014)) |= 0x02000000;
+000173	            (*(__IO uint32_t *)(0x40021014)) &= ~(0x02000000);
+000174	        }else if(CAN2 == CANx)
+000175	        {
+000176	            (*(__IO uint32_t *)(0x40021014)) |= 0x04000000;
+000177	            (*(__IO uint32_t *)(0x40021014)) &= ~(0x04000000);
+000178	        }else if(CAN3 == CANx)
+000179			{
+000180				(*(__IO uint32_t *)(0x40021014)) |= 0x01000000;
+000181	            (*(__IO uint32_t *)(0x40021014)) &= ~(0x01000000);
+000182			}
+000183	        (*(__IO uint32_t *)(0x40006600)) |= 0x1;
+000184	        (*(__IO uint32_t *)(0x4000660C)) |= 0xFFFFFFF;
+000185	        (*(__IO uint32_t *)(0x4000661C)) |= 0xFFFFFFF;
+000186	        (*(__IO uint32_t *)(0x40006600)) &= ~0x1;
+000187			(*(__IO uint32_t *)(0x40006600)) |= 0x1;
+000188			(*(__IO uint32_t *)(0x40006600)) = 0x2A010101;
+000189			(*(__IO uint32_t *)(0x40006600)) &= ~0x1;
+000190	        wait_ack = 0;
+000191		}
+000192
+000193		CANx->CTLR &= (~(uint32_t)CAN_CTLR_SLEEP);
+000194		CANx->CTLR |= CAN_CTLR_INRQ ;
+000195
+000196		while (((CANx->STATR & CAN_STATR_INAK) != CAN_STATR_INAK) && (wait_ack != INAK_TIMEOUT))
+000197		{
+000198			wait_ack++;
+000199		}
+000200
+000201		if ((CANx->STATR & CAN_STATR_INAK) != CAN_STATR_INAK)
+000202		{
+000203			InitStatus = CAN_InitStatus_Failed;
+000204		}
+000205		else

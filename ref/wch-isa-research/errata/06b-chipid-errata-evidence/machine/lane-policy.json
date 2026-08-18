@@ -1,0 +1,47 @@
+{
+  "inheritance": "not used: every physical occurrence is materialized and is its own representative",
+  "method_vocabulary": [
+    "primary",
+    "independent"
+  ],
+  "native_occurrence_required_lanes": {
+    "primary_and_independent_primitives": [
+      "csr-opcode",
+      "xw-slot",
+      "address-form-opcode",
+      "literal-pointer",
+      "relocation-source"
+    ],
+    "primary_semantic": [
+      "symbol-string-debug",
+      "raw-csr",
+      "address-dataflow",
+      "indirect-flow"
+    ]
+  },
+  "non_native_occurrence_required_lanes": {
+    "primary": [
+      "scope-control"
+    ]
+  },
+  "rom_occurrence_required_lanes": {
+    "primary_and_independent_primitives": [
+      "rom-csr-opcode",
+      "rom-xw-slot",
+      "rom-address-or-literal"
+    ],
+    "primary_semantic": [
+      "rom-symbol-metadata",
+      "rom-raw-csr",
+      "rom-address-dataflow",
+      "rom-indirect-flow"
+    ]
+  },
+  "schema_version": "2",
+  "status_semantics": {
+    "not-required": "format/provenance excludes the occurrence from native RISC-V semantic scanning",
+    "partial": "candidate semantics, boundary, resolution, consumer, link, or runtime closure remains unresolved",
+    "pass-hit": "candidate discovery complete; semantic interpretation may remain elsewhere",
+    "pass-no-hit": "complete for the stated primitive/domain only; never a global no-ID claim"
+  }
+}

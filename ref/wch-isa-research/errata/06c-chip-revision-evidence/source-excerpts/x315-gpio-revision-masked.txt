@@ -1,0 +1,22 @@
+source	tmp/wch-evt/evt/QingkeV3F_CH32X315_EVT/EXAM/SRC/Peripheral/src/ch32x3x5_gpio.c
+sha256	7170a4e17031b52c951b0cfb2cd34feb9fd65174ddacde40819e68be7f78bac4
+range	582-600
+000582	void GPIO_IPD_Unused(void)
+000583	{
+000584	    GPIO_InitTypeDef GPIO_InitStructure = {0};
+000585	    uint32_t chip = 0;
+000586	    RCC_HB2PeriphClockCmd(RCC_HB2Periph_GPIOA | RCC_HB2Periph_GPIOB | RCC_HB2Periph_GPIOC|\
+000587	                           RCC_HB2Periph_GPIOD , ENABLE);
+000588
+000589	    chip = VCfg_Init() & (~0x000000F0);
+000590
+000591	    switch(chip)
+000592	    {
+000593	        case 0x31510001:     //CH32X315CCU
+000594	        {
+000595	            GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0|GPIO_Pin_1|GPIO_Pin_2\
+000596	                                          |GPIO_Pin_3|GPIO_Pin_12|GPIO_Pin_13\
+000597	                                          |GPIO_Pin_14|GPIO_Pin_15;
+000598	            GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
+000599	            GPIO_Init(GPIOB, &GPIO_InitStructure);
+000600	            GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0|GPIO_Pin_1|GPIO_Pin_2\

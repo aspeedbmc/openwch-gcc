@@ -1,0 +1,10 @@
+{
+  "local_scope": "126 physical PDFs / 98 content hashes from the frozen 06b document manifest, plus EVT C/H source and selected builds",
+  "negative_claim_limit": "bounded to the recorded local corpus, query forms, and checked official repositories; not a universal absence claim",
+  "official_sources_checked": [
+    "https://github.com/openwch/ch32v20x",
+    "https://github.com/openwch/ch32v307"
+  ],
+  "result": "official SDK distribution was found; no checked official source mapped printed package lot-code positions to DBGMCU_GetREVID values",
+  "schema_version": "1"
+}

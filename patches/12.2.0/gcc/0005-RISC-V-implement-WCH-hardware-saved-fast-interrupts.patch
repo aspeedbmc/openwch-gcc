@@ -1,0 +1,159 @@
+From bd629f503783b2db15f606c30d63afdfcb480464 Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 4 <phase4@openwch.local>
+Date: Thu, 13 Aug 2026 07:15:07 +0900
+Subject: [PATCH 5/9] RISC-V: implement WCH hardware-saved fast interrupts
+
+EVT handlers still warn on and reject the exact WCH-Interrupt-fast spelling, producing ordinary returns and software interrupt frames. Accept that spelling, retain the typo warning behavior, model the caller-saved GPRs and ra as hardware-saved, keep the remaining callee-saved registers under the ordinary rules, and use the existing machine-mode mret path.
+
+Behavior specification: tmp/phase4-evidence/s1-official/diagnostic-fast.c; tmp/phase4-evidence/s1-official/diagnostics/gcc-fast.stderr; tmp/phase4-evidence/s3-fast-interrupt-final/official.s; tmp/phase4-evidence/s3-fast-interrupt-final/ours.s.
+
+gcc/ChangeLog:
+
+	* config/riscv/riscv.cc (struct machine_function): Add
+	wch_fast_interrupt_p.
+	(riscv_handle_type_attribute): Accept the "WCH-Interrupt-fast"
+	argument.
+	(riscv_wch_fast_interrupt_type_p): New function.
+	(riscv_save_reg_p): Do not save the hardware-saved registers.
+	(riscv_epilogue_uses): Keep the hardware-saved registers live.
+	(riscv_set_current_function): Set wch_fast_interrupt_p.
+	(riscv_hard_regno_rename_ok): Allow the hardware-saved registers.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/riscv/wch-fast-interrupt.c: New test.
+---
+ gcc/config/riscv/riscv.cc                     | 42 ++++++++++++++++++-
+ .../gcc.target/riscv/wch-fast-interrupt.c     | 21 ++++++++++
+ 2 files changed, 61 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-fast-interrupt.c
+
+diff --git a/gcc/config/riscv/riscv.cc b/gcc/config/riscv/riscv.cc
+index 4939d9964..8b5c9f9b2 100644
+--- a/gcc/config/riscv/riscv.cc
++++ b/gcc/config/riscv/riscv.cc
+@@ -139,6 +139,8 @@ struct GTY(())  machine_function {
+ 
+   /* True if current function is an interrupt function.  */
+   bool interrupt_handler_p;
++  /* True if WCH hardware saves the caller GPR interrupt context.  */
++  bool wch_fast_interrupt_p;
+   /* For an interrupt handler, indicates the privilege level.  */
+   enum riscv_privilege_levels interrupt_mode;
+ 
+@@ -3320,7 +3322,8 @@ riscv_handle_type_attribute (tree *node ATTRIBUTE_UNUSED, tree name, tree args,
+ 
+ 	  string = TREE_STRING_POINTER (cst);
+ 	  if (strcmp (string, "user") && strcmp (string, "supervisor")
+-	      && strcmp (string, "machine"))
++	      && strcmp (string, "machine")
++	      && strcmp (string, "WCH-Interrupt-fast"))
+ 	    {
+ 	      warning (OPT_Wattributes,
+ 		       "argument to %qE attribute is not %<\"user\"%>, %<\"supervisor\"%>, "
+@@ -3340,6 +3343,21 @@ riscv_interrupt_type_p (tree type)
+   return lookup_attribute ("interrupt", TYPE_ATTRIBUTES (type)) != NULL;
+ }
+ 
++/* Return true if TYPE requests the WCH hardware-saved interrupt frame.  */
++static bool
++riscv_wch_fast_interrupt_type_p (tree type)
++{
++  tree attr = lookup_attribute ("interrupt", TYPE_ATTRIBUTES (type));
++  if (attr == NULL_TREE)
++    return false;
++
++  tree args = TREE_VALUE (attr);
++  return (args
++	  && TREE_CODE (TREE_VALUE (args)) == STRING_CST
++	  && !strcmp (TREE_STRING_POINTER (TREE_VALUE (args)),
++		      "WCH-Interrupt-fast"));
++}
++
+ /* Return true if FUNC is a naked function.  */
+ static bool
+ riscv_naked_function_p (tree func)
+@@ -3884,6 +3902,12 @@ riscv_frame_set (rtx mem, rtx reg)
+ static bool
+ riscv_save_reg_p (unsigned int regno)
+ {
++  if (cfun->machine->wch_fast_interrupt_p
++      && GP_REG_P (regno)
++      && (call_used_or_fixed_reg_p (regno)
++	  || regno == RETURN_ADDR_REGNUM))
++    return false;
++
+   bool call_saved = !global_regs[regno] && !call_used_or_fixed_reg_p (regno);
+   bool might_clobber = crtl->saves_all_registers
+ 		       || df_regs_ever_live_p (regno);
+@@ -3898,7 +3922,8 @@ riscv_save_reg_p (unsigned int regno)
+     return true;
+ 
+   /* If this is an interrupt handler, then must save extra registers.  */
+-  if (cfun->machine->interrupt_handler_p)
++  if (cfun->machine->interrupt_handler_p
++      && !cfun->machine->wch_fast_interrupt_p)
+     {
+       /* zero register is always zero.  */
+       if (regno == GP_REG_FIRST)
+@@ -4624,6 +4649,11 @@ riscv_epilogue_uses (unsigned int regno)
+ 
+   if (epilogue_completed && cfun->machine->interrupt_handler_p)
+     {
++      if (cfun->machine->wch_fast_interrupt_p
++	  && GP_REG_P (regno)
++	  && call_used_or_fixed_reg_p (regno))
++	return true;
++
+       /* An interrupt function restores temp regs, so we must indicate that
+ 	 they are live at function end.  */
+       if (df_regs_ever_live_p (regno)
+@@ -5371,6 +5401,8 @@ riscv_set_current_function (tree decl)
+   cfun->machine->naked_p = riscv_naked_function_p (decl);
+   cfun->machine->interrupt_handler_p
+     = riscv_interrupt_type_p (TREE_TYPE (decl));
++  cfun->machine->wch_fast_interrupt_p
++    = riscv_wch_fast_interrupt_type_p (TREE_TYPE (decl));
+ 
+   if (cfun->machine->naked_p && cfun->machine->interrupt_handler_p)
+     error ("function attributes %qs and %qs are mutually exclusive",
+@@ -5499,6 +5531,12 @@ bool
+ riscv_hard_regno_rename_ok (unsigned from_regno ATTRIBUTE_UNUSED,
+ 			    unsigned to_regno)
+ {
++  if (cfun->machine->wch_fast_interrupt_p
++      && GP_REG_P (to_regno)
++      && (call_used_or_fixed_reg_p (to_regno)
++	  || to_regno == RETURN_ADDR_REGNUM))
++    return true;
++
+   /* Interrupt functions can only use registers that have already been
+      saved by the prologue, even if they would normally be
+      call-clobbered.  */
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt.c b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt.c
+new file mode 100644
+index 000000000..e75d8cb3a
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt.c
+@@ -0,0 +1,21 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv32imac_xw -mabi=ilp32" } */
++
++volatile int sink;
++
++void __attribute__ ((interrupt ("WCH-Interrupt-fast")))
++good (void)
++{
++  sink++;
++}
++
++void __attribute__ ((interrupt ("WCH-Interrupt-Fast")))
++typo (void)
++{ /* { dg-warning {argument to 'interrupt' attribute is not '"user"', '"supervisor"', or '"machine"'} } */
++  sink++;
++}
++
++/* { dg-final { scan-assembler "good:" } } */
++/* { dg-final { scan-assembler "\\mmret\\M" } } */
++/* { dg-final { scan-assembler "typo:" } } */
++/* { dg-final { scan-assembler "\\mret\\M" } } */

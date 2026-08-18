@@ -1,0 +1,25 @@
+
+<RUN_ROOT>/controls/positive-r2/objects/0b196fff0b9f666fc30cd4dcebe90ef299f1fed37fff6b66f460951515e494ca.o:     file format elf32-littleriscv
+
+
+Disassembly of section .text.WCHNET_PeriodicHandle:
+
+Disassembly of section .text.WCHNET_NetInput:
+
+Disassembly of section .text.WCHNET_PhyStatus:
+
+Disassembly of section .text.WCHNET_Rx:
+
+Disassembly of section .text.setRxBuffAddr:
+
+Disassembly of section .text.WCHNET_Tx:
+
+Disassembly of section .text.GetChipID:
+
+00000000 <GetChipID>:
+   0:	1ffff7b7          	lui	a5,0x1ffff
+   4:	7067d503          	lhu	a0,1798(a5) # 1ffff706 <.L21+0x1ffff50c>
+   8:	0f057513          	andi	a0,a0,240
+   c:	8082                	ret
+
+Disassembly of section .text.getTxBuffAddr:

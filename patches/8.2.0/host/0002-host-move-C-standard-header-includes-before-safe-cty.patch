@@ -1,0 +1,100 @@
+From cf81f1a84f7cc2de7860b56c1d7ea7d32fba07f0 Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 6 <phase6@openwch.local>
+Date: Sun, 16 Aug 2026 15:05:43 +0900
+Subject: [PATCH 2/5] host: move C++ standard header includes before
+ safe-ctype.h poisoning
+
+Phenomenon: building with modern Apple clang/libc++ (macOS 26 SDK), C++
+translation units that include gcc/system.h fail inside libc++'s
+<__locale>: member declarations such as "char_type toupper(char_type)"
+explode because safe-ctype.h has already poisoned toupper/tolower/... as
+function-like macros, and the modern libc++ header graph now reaches
+__locale from <vector>/<map>/<functional>, which gcc 8.2's system.h
+includes only AFTER safe-ctype.h (build log:
+tmp/toolchain_8.2.0/work/darwin-x64/logs/openwch-phase6/gcc-all-gcc.log,
+run 3, "__abi_tag__ attribute only applies to ..." / "too many arguments
+provided to function-like macro invocation" at __locale:477/479).
+
+Fix: move the existing conditional C++ standard header block
+(<algorithm>/<list>/<map>/<set>/<vector>/<cstring>/<new>/<utility>) up
+next to the INCLUDE_STRING block, before the safe-ctype.h include -- the
+same ordering later upstream releases adopted for exactly this class of
+conflict (newer system.h keeps all C++ standard headers ahead of the
+poisoning).
+
+The comment introducing that block still described the narrower gcc 8.2
+arrangement, in which <string> alone was hoisted ahead of the poisoning.
+Since the whole block now moves, the comment is brought in line with it by
+reusing the wording upstream settled on when it made the same move: lines
+197-198 of gcc/system.h on the gcc-mirror/gcc releases/gcc-15 branch, whose
+file sha256 is
+  bc102ceda9e9862ebb75aa81bb685df69a43c82325734d4a85003f234ab9fda2
+and which carries the comment at the same two line numbers this file does.
+Comment text only -- no preprocessor logic changes, so this stays an
+include-order change with the comment that describes it kept truthful.
+
+Host adaptation only: affects how the compiler is built on the modern
+Darwin host, not target code generation; goes to patches/8.2.0/host/.
+---
+ gcc/system.h | 33 +++++++++++++++------------------
+ 1 file changed, 15 insertions(+), 18 deletions(-)
+
+diff --git a/gcc/system.h b/gcc/system.h
+index 4abc321c7..33f78489a 100644
+--- a/gcc/system.h
++++ b/gcc/system.h
+@@ -194,29 +194,13 @@ extern int fprintf_unlocked (FILE *, const char *, ...);
+ #undef fread_unlocked
+ #undef fwrite_unlocked
+ 
+-/* Include <string> before "safe-ctype.h" to avoid GCC poisoning
+-   the ctype macros through safe-ctype.h */
++/* Include C++ standard headers before "safe-ctype.h" to avoid GCC
++   poisoning the ctype macros through safe-ctype.h */
+ 
+ #ifdef __cplusplus
+ #ifdef INCLUDE_STRING
+ # include <string>
+ #endif
+-#endif
+-
+-/* There are an extraordinary number of issues with <ctype.h>.
+-   The last straw is that it varies with the locale.  Use libiberty's
+-   replacement instead.  */
+-#include "safe-ctype.h"
+-
+-#include <sys/types.h>
+-
+-#include <errno.h>
+-
+-#if !defined (errno) && defined (HAVE_DECL_ERRNO) && !HAVE_DECL_ERRNO
+-extern int errno;
+-#endif
+-
+-#ifdef __cplusplus
+ #if defined (INCLUDE_ALGORITHM) || !defined (HAVE_SWAP_IN_UTILITY)
+ # include <algorithm>
+ #endif
+@@ -237,6 +221,19 @@ extern int errno;
+ # include <utility>
+ #endif
+ 
++/* There are an extraordinary number of issues with <ctype.h>.
++   The last straw is that it varies with the locale.  Use libiberty's
++   replacement instead.  */
++#include "safe-ctype.h"
++
++#include <sys/types.h>
++
++#include <errno.h>
++
++#if !defined (errno) && defined (HAVE_DECL_ERRNO) && !HAVE_DECL_ERRNO
++extern int errno;
++#endif
++
+ /* Some of glibc's string inlines cause warnings.  Plus we'd rather
+    rely on (and therefore test) GCC's string builtins.  */
+ #define __NO_STRING_INLINES
+-- 
+2.55.0
+

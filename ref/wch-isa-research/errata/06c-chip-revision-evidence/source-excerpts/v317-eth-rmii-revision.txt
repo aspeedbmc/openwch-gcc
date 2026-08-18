@@ -1,0 +1,97 @@
+source	tmp/wch-evt/evt/QingkeV4F_CH32V317_EVT/EXAM/ETH/NetLib/eth_driver_RMII.c
+sha256	75f3997a4a1dd457be9f3a6cad95ddd078c2726a969bea8dd4c8df6bb3c74a93
+range	511-535
+000511	void ETH_PHYLink( void )
+000512	{
+000513	    u32 phy_stat, phy_anlpar, phy_bcr;
+000514	#if !LINK_STAT_ACQUISITION_METHOD
+000515	    uint8_t timeout = 0;
+000516	#endif
+000517	    phy_stat = ETH_ReadPHYRegister( PHY_ADDRESS, PHY_BSR );
+000518	    phy_anlpar = ETH_ReadPHYRegister( PHY_ADDRESS, PHY_ANLPAR);
+000519	    phy_bcr = ETH_ReadPHYRegister( gPHYAddress, PHY_BCR);
+000520
+000521	#if !LINK_STAT_ACQUISITION_METHOD
+000522	    if((ChipId & 0xf0) <= 0x20)
+000523	    {
+000524	        while(phy_stat == 0)
+000525	        {
+000526	            Delay_Us(100);
+000527	            phy_stat = ETH_ReadPHYRegister( gPHYAddress, PHY_BSR);
+000528	            if(timeout++ == 15)   break;
+000529	        }
+000530	        if(LastPhyStat == phy_stat) return;
+000531	    }
+000532	    LastPhyStat = phy_stat;
+000533	#endif
+000534
+000535	    WCHNET_PhyStatus( phy_stat );
+range	904-971
+000904	void WCHNET_RecProcess(void)
+000905	{
+000906	    if(((ChipId & 0xf0) <= 0x20) && \
+000907	            ((ETH->DMAMFBOCR & 0x1FFE0000) != 0))
+000908	    {
+000909	        ReInitMACReg();
+000910	        /* Resume DMA transport */
+000911	        ETH->DMARPDR = 0;
+000912	        ETH->DMATPDR = 0;
+000913	    }
+000914	}
+000915
+000916	/*********************************************************************
+000917	 * @fn      WCHNET_ETHIsr
+000918	 *
+000919	 * @brief   Ethernet Interrupt Service Routine
+000920	 *
+000921	 * @return  none
+000922	 */
+000923	void WCHNET_ETHIsr(void)
+000924	{
+000925	    uint32_t int_sta;
+000926
+000927	    int_sta = ETH->DMASR;
+000928	    if (int_sta & ETH_DMA_IT_AIS)
+000929	    {
+000930	        if (int_sta & ETH_DMA_IT_RBU)
+000931	        {
+000932	            WCHNET_RecProcess();
+000933	            ETH_DMAClearITPendingBit(ETH_DMA_IT_RBU);
+000934	        }
+000935	        ETH_DMAClearITPendingBit(ETH_DMA_IT_AIS);
+000936	    }
+000937
+000938	    if( int_sta & ETH_DMA_IT_NIS )
+000939	    {
+000940	        if( int_sta & ETH_DMA_IT_R )
+000941	        {
+000942	            /*If you don't use the Ethernet library,
+000943	             * you can do some data processing operations here*/
+000944	            ETH_DMAClearITPendingBit(ETH_DMA_IT_R);
+000945	        }
+000946	        if( int_sta & ETH_DMA_IT_T )
+000947	        {
+000948	            ETH_DMAClearITPendingBit(ETH_DMA_IT_T);
+000949	        }
+000950	        ETH_DMAClearITPendingBit(ETH_DMA_IT_NIS);
+000951	    }
+000952	}
+000953
+000954	/*********************************************************************
+000955	 * @fn      ETH_Init
+000956	 *
+000957	 * @brief   Ethernet initialization.
+000958	 *
+000959	 * @return  none
+000960	 */
+000961	void ETH_Init( uint8_t *macAddr )
+000962	{
+000963	    ChipId = DBGMCU_GetCHIPID();
+000964	    ETH_Configuration( macAddr );
+000965	    ETH_DMATxDescChainInit(DMATxDscrTab, MACTxBuf, ETH_TXBUFNB);
+000966	    ETH_DMARxDescChainInit(DMARxDscrTab, MACRxBuf, ETH_RXBUFNB);
+000967	    pDMARxSet = DMARxDscrTab;
+000968	    pDMATxSet = DMATxDscrTab;
+000969	    NVIC_EnableIRQ(ETH_IRQn);
+000970	    NVIC_SetPriority(ETH_IRQn, 0);
+000971	}

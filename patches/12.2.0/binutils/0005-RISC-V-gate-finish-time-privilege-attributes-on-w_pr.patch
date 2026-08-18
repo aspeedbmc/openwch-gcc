@@ -1,0 +1,272 @@
+From 4c7e23190c441d148cf87d34df32e453228265d2 Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 4 <phase4@openwch.local>
+Date: Thu, 13 Aug 2026 07:08:02 +0900
+Subject: [PATCH 5/7] RISC-V: gate finish-time privilege attributes on
+ --w_priv_spec
+
+The official WCH 12.2 assembler canonicalizes explicit architecture attributes but does not synthesize Tag_RISCV_priv_spec attributes at finish time after CSR or privileged instructions, unless its hidden --w_priv_spec flag is given. Add that flag, default it off, and gate the synthesis on it. Attributes an input wrote explicitly are unaffected because they are recorded when the directive is parsed, and the inherited tests that expected the upstream-generated tags are updated for the new default.
+
+The flag takes no argument, is accepted with one or two leading dashes through getopt_long_only, is absent from --help, and is idempotent. It is the only factor this patch adds: whether an attribute section is emitted at all still follows the upstream arch_attr/explicit_attr path, and the upstream start_assemble and explicit_priv_attr conditions still decide whether there is a privilege spec to write at all.
+
+WCH 12.2 behavior evidence: tmp/phase4-evidence/s3-attribute-official/ and tmp/phase4-evidence/s3-attribute-final/. Official option surface, including the no-argument diagnostic, the single-dash and abbreviated spellings, the empty --help match and the idempotent object: tmp/phase8-evidence/12.2.0/probes/u1-gas-options.log. Official gate-factor decomposition, including the -mno-arch-attr, empty-file, no-CSR and -mpriv-spec cases and the explicit-attribute quadrant: tmp/phase8-evidence/12.2.0/probes/u1-gas-gate.log and tmp/phase8-evidence/12.2.0/probes/u3-spec-detail.log section 2. Full RISC-V GAS regression evidence: tmp/phase4-evidence/s3-vendor-x-final/.
+---
+ gas/config/tc-riscv.c                          | 18 ++++++++++++++++++
+ gas/testsuite/gas/riscv/attribute-11.d         |  1 -
+ gas/testsuite/gas/riscv/attribute-12.d         |  3 ---
+ gas/testsuite/gas/riscv/attribute-14a.d        |  1 -
+ gas/testsuite/gas/riscv/attribute-14b.d        |  1 -
+ gas/testsuite/gas/riscv/attribute-14c.d        |  1 -
+ gas/testsuite/gas/riscv/attribute-14d.d        |  1 -
+ gas/testsuite/gas/riscv/attribute-14e.d        |  1 -
+ .../gas/riscv/wch-attribute-no-rewrite.d       |  5 +++++
+ .../gas/riscv/wch-attribute-no-rewrite.s       |  3 +++
+ gas/testsuite/gas/riscv/wch-priv-attr-csr-on.d |  8 ++++++++
+ gas/testsuite/gas/riscv/wch-priv-attr-csr.s    |  2 ++
+ .../gas/riscv/wch-priv-attr-explicit.d         |  8 ++++++++
+ .../gas/riscv/wch-priv-attr-explicit.s         |  5 +++++
+ .../gas/riscv/wch-priv-attr-no-arch-attr.d     |  3 +++
+ gas/testsuite/gas/riscv/wch-priv-attr-option.d |  8 ++++++++
+ .../gas/riscv/wch-priv-attr-single-dash.d      |  8 ++++++++
+ 17 files changed, 68 insertions(+), 9 deletions(-)
+ create mode 100644 gas/testsuite/gas/riscv/wch-attribute-no-rewrite.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-attribute-no-rewrite.s
+ create mode 100644 gas/testsuite/gas/riscv/wch-priv-attr-csr-on.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-priv-attr-csr.s
+ create mode 100644 gas/testsuite/gas/riscv/wch-priv-attr-explicit.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-priv-attr-explicit.s
+ create mode 100644 gas/testsuite/gas/riscv/wch-priv-attr-no-arch-attr.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-priv-attr-option.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-priv-attr-single-dash.d
+
+diff --git a/gas/config/tc-riscv.c b/gas/config/tc-riscv.c
+index 145d9e54..6817646d 100644
+--- a/gas/config/tc-riscv.c
++++ b/gas/config/tc-riscv.c
+@@ -134,6 +134,11 @@ static enum float_abi float_abi = FLOAT_ABI_DEFAULT;
+ 
+ static unsigned elf_flags = 0;
+ 
++/* Emit the finish-time privilege-version attributes.  WCH builds keep
++   this off by default and expose it through a hidden command-line flag,
++   so it is intentionally omitted from md_show_usage.  */
++static bool w_priv_spec = false;
++
+ /* Set the default_isa_spec.  Return 0 if the spec isn't supported.
+    Otherwise, return 1.  */
+ 
+@@ -3400,6 +3405,7 @@ enum options
+   OPTION_MPRIV_SPEC,
+   OPTION_BIG_ENDIAN,
+   OPTION_LITTLE_ENDIAN,
++  OPTION_W_PRIV_SPEC,
+   OPTION_END_OF_ENUM
+ };
+ 
+@@ -3420,6 +3426,7 @@ struct option md_longopts[] =
+   {"mpriv-spec", required_argument, NULL, OPTION_MPRIV_SPEC},
+   {"mbig-endian", no_argument, NULL, OPTION_BIG_ENDIAN},
+   {"mlittle-endian", no_argument, NULL, OPTION_LITTLE_ENDIAN},
++  {"w_priv_spec", no_argument, NULL, OPTION_W_PRIV_SPEC},
+ 
+   {NULL, no_argument, NULL, 0}
+ };
+@@ -3504,6 +3511,10 @@ md_parse_option (int c, const char *arg)
+       target_big_endian = 0;
+       break;
+ 
++    case OPTION_W_PRIV_SPEC:
++      w_priv_spec = true;
++      break;
++
+     default:
+       return 0;
+     }
+@@ -4405,6 +4416,13 @@ riscv_write_out_attrs (void)
+   bfd_elf_add_proc_attr_string (stdoutput, Tag_RISCV_arch, arch_str);
+   xfree ((void *) arch_str);
+ 
++  /* WCH 12.2 canonicalizes the architecture attribute but synthesizes the
++     finish-time privilege-version attributes only when asked to.  The
++     attributes an input wrote explicitly are unaffected: they were
++     recorded when the directive was parsed.  */
++  if (!w_priv_spec)
++    return;
++
+   /* For the file without any instruction, we don't set the default_priv_spec
+      according to the privileged elf attributes since the md_assemble isn't
+      called.  */
+diff --git a/gas/testsuite/gas/riscv/attribute-11.d b/gas/testsuite/gas/riscv/attribute-11.d
+index 4bd66f0b..e0410278 100644
+--- a/gas/testsuite/gas/riscv/attribute-11.d
++++ b/gas/testsuite/gas/riscv/attribute-11.d
+@@ -4,5 +4,4 @@
+ Attribute Section: riscv
+ File Attributes
+   Tag_RISCV_arch: [a-zA-Z0-9_\"].*
+-  Tag_RISCV_priv_spec: [0-9_\"].*
+ #...
+diff --git a/gas/testsuite/gas/riscv/attribute-12.d b/gas/testsuite/gas/riscv/attribute-12.d
+index 980b36ca..0e0883db 100644
+--- a/gas/testsuite/gas/riscv/attribute-12.d
++++ b/gas/testsuite/gas/riscv/attribute-12.d
+@@ -4,6 +4,3 @@
+ Attribute Section: riscv
+ File Attributes
+   Tag_RISCV_arch: [a-zA-Z0-9_\"].*
+-  Tag_RISCV_priv_spec: 1
+-  Tag_RISCV_priv_spec_minor: 9
+-  Tag_RISCV_priv_spec_revision: 1
+diff --git a/gas/testsuite/gas/riscv/attribute-14a.d b/gas/testsuite/gas/riscv/attribute-14a.d
+index 7b66f0fa..0a27558b 100644
+--- a/gas/testsuite/gas/riscv/attribute-14a.d
++++ b/gas/testsuite/gas/riscv/attribute-14a.d
+@@ -4,5 +4,4 @@
+ Attribute Section: riscv
+ File Attributes
+   Tag_RISCV_arch: [a-zA-Z0-9_\"].*
+-  Tag_RISCV_priv_spec: [0-9_\"].*
+ #...
+diff --git a/gas/testsuite/gas/riscv/attribute-14b.d b/gas/testsuite/gas/riscv/attribute-14b.d
+index e044f4ff..a76e7754 100644
+--- a/gas/testsuite/gas/riscv/attribute-14b.d
++++ b/gas/testsuite/gas/riscv/attribute-14b.d
+@@ -4,5 +4,4 @@
+ Attribute Section: riscv
+ File Attributes
+   Tag_RISCV_arch: [a-zA-Z0-9_\"].*
+-  Tag_RISCV_priv_spec: [0-9_\"].*
+ #...
+diff --git a/gas/testsuite/gas/riscv/attribute-14c.d b/gas/testsuite/gas/riscv/attribute-14c.d
+index 6311a9d7..71c02484 100644
+--- a/gas/testsuite/gas/riscv/attribute-14c.d
++++ b/gas/testsuite/gas/riscv/attribute-14c.d
+@@ -4,5 +4,4 @@
+ Attribute Section: riscv
+ File Attributes
+   Tag_RISCV_arch: [a-zA-Z0-9_\"].*
+-  Tag_RISCV_priv_spec: [0-9_\"].*
+ #...
+diff --git a/gas/testsuite/gas/riscv/attribute-14d.d b/gas/testsuite/gas/riscv/attribute-14d.d
+index f0f2d63b..1ac5ff02 100644
+--- a/gas/testsuite/gas/riscv/attribute-14d.d
++++ b/gas/testsuite/gas/riscv/attribute-14d.d
+@@ -4,5 +4,4 @@
+ Attribute Section: riscv
+ File Attributes
+   Tag_RISCV_arch: [a-zA-Z0-9_\"].*
+-  Tag_RISCV_priv_spec: [0-9_\"].*
+ #...
+diff --git a/gas/testsuite/gas/riscv/attribute-14e.d b/gas/testsuite/gas/riscv/attribute-14e.d
+index 47fdc2e2..dd4ca427 100644
+--- a/gas/testsuite/gas/riscv/attribute-14e.d
++++ b/gas/testsuite/gas/riscv/attribute-14e.d
+@@ -4,5 +4,4 @@
+ Attribute Section: riscv
+ File Attributes
+   Tag_RISCV_arch: [a-zA-Z0-9_\"].*
+-  Tag_RISCV_priv_spec: [0-9_\"].*
+ #...
+diff --git a/gas/testsuite/gas/riscv/wch-attribute-no-rewrite.d b/gas/testsuite/gas/riscv/wch-attribute-no-rewrite.d
+new file mode 100644
+index 00000000..7937b9e2
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-attribute-no-rewrite.d
+@@ -0,0 +1,5 @@
++#as: -march=rv32imac_xw -mabi=ilp32
++#readelf: -A
++Attribute Section: riscv
++File Attributes
++  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_c2p0_zmmul1p0_xw1p0"
+diff --git a/gas/testsuite/gas/riscv/wch-attribute-no-rewrite.s b/gas/testsuite/gas/riscv/wch-attribute-no-rewrite.s
+new file mode 100644
+index 00000000..d196bdd7
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-attribute-no-rewrite.s
+@@ -0,0 +1,3 @@
++	.attribute arch,"rv32imac_xw"
++	.text
++	csrr a0,mstatus
+diff --git a/gas/testsuite/gas/riscv/wch-priv-attr-csr-on.d b/gas/testsuite/gas/riscv/wch-priv-attr-csr-on.d
+new file mode 100644
+index 00000000..ef8533bd
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-priv-attr-csr-on.d
+@@ -0,0 +1,8 @@
++#as: -march=rv32imac -mabi=ilp32 --w_priv_spec
++#readelf: -A
++#source: wch-priv-attr-csr.s
++Attribute Section: riscv
++File Attributes
++  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_c2p0_zmmul1p0"
++  Tag_RISCV_priv_spec: 1
++  Tag_RISCV_priv_spec_minor: 11
+diff --git a/gas/testsuite/gas/riscv/wch-priv-attr-csr.s b/gas/testsuite/gas/riscv/wch-priv-attr-csr.s
+new file mode 100644
+index 00000000..e03b9c23
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-priv-attr-csr.s
+@@ -0,0 +1,2 @@
++	.text
++	csrr	a0,mstatus
+diff --git a/gas/testsuite/gas/riscv/wch-priv-attr-explicit.d b/gas/testsuite/gas/riscv/wch-priv-attr-explicit.d
+new file mode 100644
+index 00000000..b3f1fc08
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-priv-attr-explicit.d
+@@ -0,0 +1,8 @@
++#as: -march=rv32imac -mabi=ilp32
++#readelf: -A
++#source: wch-priv-attr-explicit.s
++Attribute Section: riscv
++File Attributes
++#...
++  Tag_RISCV_priv_spec: 1
++  Tag_RISCV_priv_spec_minor: 11
+diff --git a/gas/testsuite/gas/riscv/wch-priv-attr-explicit.s b/gas/testsuite/gas/riscv/wch-priv-attr-explicit.s
+new file mode 100644
+index 00000000..71cac2c6
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-priv-attr-explicit.s
+@@ -0,0 +1,5 @@
++	.attribute priv_spec, 1
++	.attribute priv_spec_minor, 11
++	.attribute priv_spec_revision, 0
++	.text
++	csrr	a0,mstatus
+diff --git a/gas/testsuite/gas/riscv/wch-priv-attr-no-arch-attr.d b/gas/testsuite/gas/riscv/wch-priv-attr-no-arch-attr.d
+new file mode 100644
+index 00000000..e08305d7
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-priv-attr-no-arch-attr.d
+@@ -0,0 +1,3 @@
++#as: -march=rv32imac -mabi=ilp32 --w_priv_spec -mno-arch-attr
++#readelf: -A
++#source: wch-priv-attr-csr.s
+diff --git a/gas/testsuite/gas/riscv/wch-priv-attr-option.d b/gas/testsuite/gas/riscv/wch-priv-attr-option.d
+new file mode 100644
+index 00000000..579db724
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-priv-attr-option.d
+@@ -0,0 +1,8 @@
++#as: -march=rv32imac -mabi=ilp32 --w_priv_spec
++#readelf: -A
++#source: wch-attribute-no-rewrite.s
++Attribute Section: riscv
++File Attributes
++  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_c2p0_zmmul1p0_xw1p0"
++  Tag_RISCV_priv_spec: 1
++  Tag_RISCV_priv_spec_minor: 11
+diff --git a/gas/testsuite/gas/riscv/wch-priv-attr-single-dash.d b/gas/testsuite/gas/riscv/wch-priv-attr-single-dash.d
+new file mode 100644
+index 00000000..4c3a8474
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-priv-attr-single-dash.d
+@@ -0,0 +1,8 @@
++#as: -march=rv32imac -mabi=ilp32 -w_priv_spec
++#readelf: -A
++#source: wch-attribute-no-rewrite.s
++Attribute Section: riscv
++File Attributes
++  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_c2p0_zmmul1p0_xw1p0"
++  Tag_RISCV_priv_spec: 1
++  Tag_RISCV_priv_spec_minor: 11

@@ -1,0 +1,307 @@
+From eea98c9699f1f7bf7e43af0d211f244f432d0f09 Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 3 <phase3@openwch.local>
+Date: Thu, 13 Aug 2026 02:05:26 +0900
+Subject: [PATCH 3/9] RISC-V: match WCH fast interrupt EVT frames
+
+Returning ISR objects in v3b-pioc, v3c-led, and v4bc-pmp differ because
+pristine GCC rejects WCH-Interrupt-fast and emits ordinary returns.
+Accept the exact WCH spelling while retaining its incomplete warning list,
+model hardware-saved caller GPRs, preserve software callee and FPR saves,
+suppress t0 and FCSR traffic, and emit the existing machine-mode mret.
+
+The hardware-saved set is exactly the call-clobbered GPRs, and ra needs no
+test of its own: this port marks ra both fixed and call-clobbered
+(riscv.h, "x0, ra, sp, gp, and tp are fixed" and "The call RTLs themselves
+clobber ra"), so call_used_or_fixed_reg_p already returns true for it.
+
+Register renaming stays on the upstream interrupt contract, under which a
+rename target must already be live and therefore covered by the prologue.
+Relaxing it for the hardware-saved set was measured to move the observed
+reset-value chain in five non-returning CoreMark handlers from a5 to a
+previously unused t0, so a later patch in this series adds the regression
+test that pins the contract instead.
+
+Behavior specification:
+  analysis/toolchain/wch-gcc-toolchain-survey.md section 5.5
+  ref/wch-isa-research/isa/custom/qingke-custom-isa.md section 4.2
+  ref/wch-isa-research/isa/custom/wch-custom-isa-reference.md section 6.3
+
+gcc/ChangeLog:
+
+	* config/riscv/riscv.cc (TH_INT_INTERRUPT): Exclude WCH fast
+	interrupts.
+	(struct machine_function): Add wch_fast_interrupt_p.
+	(riscv_handle_type_attribute): Accept the WCH-Interrupt-fast
+	spelling.
+	(riscv_wch_fast_interrupt_type_p): New function.
+	(riscv_wch_fast_interrupt_saved_reg_p): New function.
+	(riscv_save_reg_p): Do not software-save what the WCH fast
+	interrupt hardware prologue already saved.
+	(riscv_compute_frame_info): Skip the interrupt CSR and large-frame
+	reservation for WCH fast interrupts.
+	(riscv_for_each_saved_reg): Do not save the prologue temporary for
+	WCH fast interrupts.
+	(riscv_set_current_function): Set wch_fast_interrupt_p.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/riscv/wch-fast-interrupt-epilogue-live.c: New test.
+	* gcc.target/riscv/wch-fast-interrupt-float.c: New test.
+	* gcc.target/riscv/wch-fast-interrupt-leaf.c: New test.
+	* gcc.target/riscv/wch-fast-interrupt-nonleaf.c: New test.
+	* gcc.target/riscv/wch-fast-interrupt-warning.c: New test.
+---
+ gcc/config/riscv/riscv.cc                     | 48 ++++++++++++++++++-
+ .../riscv/wch-fast-interrupt-epilogue-live.c  | 25 ++++++++++
+ .../riscv/wch-fast-interrupt-float.c          | 20 ++++++++
+ .../riscv/wch-fast-interrupt-leaf.c           | 14 ++++++
+ .../riscv/wch-fast-interrupt-nonleaf.c        | 18 +++++++
+ .../riscv/wch-fast-interrupt-warning.c        | 18 +++++++
+ 6 files changed, 141 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-epilogue-live.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-float.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-leaf.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-nonleaf.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-warning.c
+
+diff --git a/gcc/config/riscv/riscv.cc b/gcc/config/riscv/riscv.cc
+index bd0046ad2..29735b021 100644
+--- a/gcc/config/riscv/riscv.cc
++++ b/gcc/config/riscv/riscv.cc
+@@ -114,6 +114,7 @@ along with GCC; see the file COPYING3.  If not see
+    /* The XTheadInt extension only supports rv32.  */			\
+    && !TARGET_64BIT							\
+    && (c)->machine->interrupt_handler_p					\
++   && !(c)->machine->wch_fast_interrupt_p				\
+    /* The XTheadInt instructions can only be executed in M-mode.  */	\
+    && (c)->machine->interrupt_mode == MACHINE_MODE)
+ 
+@@ -193,6 +194,8 @@ struct GTY(())  machine_function {
+ 
+   /* True if current function is an interrupt function.  */
+   bool interrupt_handler_p;
++  /* True if the interrupt uses WCH hardware prologue/epilogue saves.  */
++  bool wch_fast_interrupt_p;
+   /* For an interrupt handler, indicates the privilege level.  */
+   enum riscv_privilege_levels interrupt_mode;
+ 
+@@ -6566,7 +6569,8 @@ riscv_handle_type_attribute (tree *node ATTRIBUTE_UNUSED, tree name, tree args,
+ 
+ 	  string = TREE_STRING_POINTER (cst);
+ 	  if (strcmp (string, "user") && strcmp (string, "supervisor")
+-	      && strcmp (string, "machine"))
++	      && strcmp (string, "machine")
++	      && strcmp (string, "WCH-Interrupt-fast"))
+ 	    {
+ 	      warning (OPT_Wattributes,
+ 		       "argument to %qE attribute is not %<\"user\"%>, %<\"supervisor\"%>, "
+@@ -6647,6 +6651,22 @@ riscv_interrupt_type_p (tree type)
+   return lookup_attribute ("interrupt", TYPE_ATTRIBUTES (type)) != NULL;
+ }
+ 
++/* Return true if function TYPE uses WCH hardware interrupt saves.  */
++static bool
++riscv_wch_fast_interrupt_type_p (tree type)
++{
++  tree attr = lookup_attribute ("interrupt", TYPE_ATTRIBUTES (type));
++
++  if (attr == NULL_TREE)
++    return false;
++
++  tree attr_args = TREE_VALUE (attr);
++  return (attr_args
++	  && TREE_CODE (TREE_VALUE (attr_args)) == STRING_CST
++	  && !strcmp (TREE_STRING_POINTER (TREE_VALUE (attr_args)),
++		      "WCH-Interrupt-fast"));
++}
++
+ /* Return true if FUNC is a naked function.  */
+ static bool
+ riscv_naked_function_p (tree func)
+@@ -7481,11 +7501,31 @@ riscv_save_return_addr_reg_p (void)
+   return false;
+ }
+ 
++/* Return true if REGNO is saved by the WCH fast-interrupt hardware prologue,
++   so the software prologue must leave it alone: the GPRs a call may clobber,
++   plus the fixed ones that no prologue would save in any case.  ra is named
++   separately rather than left to call_used_or_fixed_reg_p, because
++   -fcall-saved-ra clears both of that predicate's inputs for it --
++   fix_register() declines only the stack and frame pointers -- while the
++   hardware saves it either way.  */
++
++static bool
++riscv_wch_fast_interrupt_saved_reg_p (unsigned int regno)
++{
++  return (GP_REG_P (regno)
++	  && (call_used_or_fixed_reg_p (regno)
++	      || regno == RETURN_ADDR_REGNUM));
++}
++
+ /* Return true if the current function must save register REGNO.  */
+ 
+ static bool
+ riscv_save_reg_p (unsigned int regno)
+ {
++  if (cfun->machine->wch_fast_interrupt_p
++      && riscv_wch_fast_interrupt_saved_reg_p (regno))
++    return false;
++
+   bool call_saved = !global_regs[regno] && !call_used_or_fixed_reg_p (regno);
+   bool might_clobber = crtl->saves_all_registers
+ 		       || df_regs_ever_live_p (regno);
+@@ -7712,7 +7752,8 @@ riscv_compute_frame_info (void)
+      1, If we have a large frame, then we need to save/restore t0.  We check for
+      this before clearing the frame struct.
+      2, Need to save and restore some CSRs in the frame.  */
+-  if (cfun->machine->interrupt_handler_p)
++  if (cfun->machine->interrupt_handler_p
++      && !cfun->machine->wch_fast_interrupt_p)
+     {
+       HOST_WIDE_INT step1 = riscv_first_stack_step (frame, frame->total_size);
+       if (! POLY_SMALL_OPERAND_P ((frame->total_size - step1))
+@@ -8105,6 +8146,7 @@ riscv_for_each_saved_reg (poly_int64 sp_offset, riscv_save_restore_fn fn,
+ 	 to avoid changes in CSRs.  */
+       if (regno == RISCV_PROLOGUE_TEMP_REGNUM
+ 	  && cfun->machine->interrupt_handler_p
++	  && !cfun->machine->wch_fast_interrupt_p
+ 	  && ((TARGET_HARD_FLOAT  && cfun->machine->frame.fmask)
+ 	      || (TARGET_ZFINX
+ 		  && (cfun->machine->frame.mask & ~(1 << RISCV_PROLOGUE_TEMP_REGNUM)))))
+@@ -11238,6 +11280,8 @@ riscv_set_current_function (tree decl)
+       cfun->machine->naked_p = riscv_naked_function_p (decl);
+       cfun->machine->interrupt_handler_p
+ 	= riscv_interrupt_type_p (TREE_TYPE (decl));
++      cfun->machine->wch_fast_interrupt_p
++	= riscv_wch_fast_interrupt_type_p (TREE_TYPE (decl));
+ 
+       if (cfun->machine->naked_p && cfun->machine->interrupt_handler_p)
+ 	error ("function attributes %qs and %qs are mutually exclusive",
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-epilogue-live.c b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-epilogue-live.c
+new file mode 100644
+index 000000000..3d92e3dda
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-epilogue-live.c
+@@ -0,0 +1,25 @@
++/* Verify that hardware-saved GPRs remain live at fast interrupt exit.  */
++/* { dg-do compile } */
++/* { dg-options "-Os -march=rv32imc_zba_zbb_zbc_zbs_xw -mabi=ilp32" } */
++
++extern void sink (void);
++
++void __attribute__ ((interrupt ("WCH-Interrupt-fast")))
++handler (void)
++{
++  volatile unsigned short *status =
++    (volatile unsigned short *) 0x4000f004;
++  volatile unsigned char *control =
++    (volatile unsigned char *) 0x4000f000;
++
++  if (*status & 0x100)
++    {
++      *status = 0x100;
++      sink ();
++      *control |= 8;
++    }
++}
++
++/* { dg-final { scan-assembler-times {mv\ta5,s0} 1 } } */
++/* { dg-final { scan-assembler-not {sw\tra,} } } */
++/* { dg-final { scan-assembler "\\mmret\\M" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-float.c b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-float.c
+new file mode 100644
+index 000000000..60f815443
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-float.c
+@@ -0,0 +1,20 @@
++/* Verify that fast interrupts save FPRs without touching FCSR.  */
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv32imafc -mabi=ilp32f" } */
++
++extern float callee (float);
++volatile float sink;
++
++void __attribute__ ((interrupt ("WCH-Interrupt-fast")))
++handler (void)
++{
++  float value = callee (sink);
++  sink = callee (value) + value;
++}
++
++/* { dg-final { scan-assembler "fsw\\tfs0," } } */
++/* The WCH frame retains the aligned CSR slot although it emits no CSR access.  */
++/* { dg-final { scan-assembler {addi\tsp,sp,-128} } } */
++/* { dg-final { scan-assembler-not "frcsr" } } */
++/* { dg-final { scan-assembler-not "fscsr" } } */
++/* { dg-final { scan-assembler "\\mmret\\M" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-leaf.c b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-leaf.c
+new file mode 100644
+index 000000000..47405e597
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-leaf.c
+@@ -0,0 +1,14 @@
++/* Verify that WCH hardware saves replace the software interrupt frame.  */
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv32imac -mabi=ilp32" } */
++
++volatile int sink;
++
++void __attribute__ ((interrupt ("WCH-Interrupt-fast")))
++handler (void)
++{
++  sink++;
++}
++
++/* { dg-final { scan-assembler-not {addi\tsp,sp,-} } } */
++/* { dg-final { scan-assembler "\\mmret\\M" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-nonleaf.c b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-nonleaf.c
+new file mode 100644
+index 000000000..056faec48
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-nonleaf.c
+@@ -0,0 +1,18 @@
++/* Verify that fast interrupts save callee-saved GPRs but not RA.  */
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv32imac -mabi=ilp32" } */
++
++extern int callee (int);
++volatile int sink;
++
++void __attribute__ ((interrupt ("WCH-Interrupt-fast")))
++handler (void)
++{
++  int value = callee (sink);
++  sink = callee (value) + value;
++}
++
++/* { dg-final { scan-assembler "sw\\ts0," } } */
++/* { dg-final { scan-assembler "sw\\ts1," } } */
++/* { dg-final { scan-assembler-not "sw\\tra," } } */
++/* { dg-final { scan-assembler "\\mmret\\M" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-warning.c b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-warning.c
+new file mode 100644
+index 000000000..c32a9315d
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-fast-interrupt-warning.c
+@@ -0,0 +1,18 @@
++/* Preserve WCH's diagnostic list while accepting its exact fast spelling.  */
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv32imac -mabi=ilp32" } */
++
++void __attribute__ ((interrupt ("WCH-Interrupt-fast")))
++accepted (void)
++{
++}
++
++void __attribute__ ((interrupt ("WCH-Interrupt-Fast")))
++rejected (void)
++{ /* { dg-warning {argument to 'interrupt' attribute is not '"user"', '"supervisor"', or '"machine"'} } */
++}
++
++/* { dg-final { scan-assembler "accepted:" } } */
++/* { dg-final { scan-assembler "\\mmret\\M" } } */
++/* { dg-final { scan-assembler "rejected:" } } */
++/* { dg-final { scan-assembler "\\mret\\M" } } */
+-- 
+2.55.0
+

@@ -1,0 +1,104 @@
+diff --git a/QingkeV3F_CH32X315/EXAM/ADC/ADC_ScanOut/ADC_ScanOut.wvproj b/QingkeV3F_CH32X315/EXAM/ADC/ADC_ScanOut/ADC_ScanOut.wvproj
+--- a/QingkeV3F_CH32X315/EXAM/ADC/ADC_ScanOut/ADC_ScanOut.wvproj
++++ b/QingkeV3F_CH32X315/EXAM/ADC/ADC_ScanOut/ADC_ScanOut.wvproj
+@@ -64,5 +64,4 @@
+ 				"excludeResources": [
+ 					"${project}/Startup/startup_ch32x3x5_D8.S",
+-					"${project}/Peripheral/src/ch32x3x5_dma.c",
+ 					"${project}/Peripheral/src/ch32x3x5_pwr.c"
+ 				],
+diff --git a/QingkeV3F_CH32X315/EXAM/ADC/ADC_ScanOut/.cproject b/QingkeV3F_CH32X315/EXAM/ADC/ADC_ScanOut/.cproject
+--- a/QingkeV3F_CH32X315/EXAM/ADC/ADC_ScanOut/.cproject
++++ b/QingkeV3F_CH32X315/EXAM/ADC/ADC_ScanOut/.cproject
+@@ -268,1 +268,1 @@
+-            <entry excluding="Startup/startup_ch32x3x5_D8.S|Peripheral/src/ch32x3x5_dma.c|Peripheral/src/ch32x3x5_pwr.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
++            <entry excluding="Startup/startup_ch32x3x5_D8.S|Peripheral/src/ch32x3x5_pwr.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+diff --git a/QingkeV3F_CH32X315_EVT/EXAM/ADC/ADC_ScanOut/ADC_ScanOut.wvproj b/QingkeV3F_CH32X315_EVT/EXAM/ADC/ADC_ScanOut/ADC_ScanOut.wvproj
+--- a/QingkeV3F_CH32X315_EVT/EXAM/ADC/ADC_ScanOut/ADC_ScanOut.wvproj
++++ b/QingkeV3F_CH32X315_EVT/EXAM/ADC/ADC_ScanOut/ADC_ScanOut.wvproj
+@@ -64,5 +64,4 @@
+ 				"excludeResources": [
+ 					"${project}/Startup/startup_ch32x3x5_D8.S",
+-					"${project}/Peripheral/src/ch32x3x5_dma.c",
+ 					"${project}/Peripheral/src/ch32x3x5_pwr.c"
+ 				],
+diff --git a/QingkeV3F_CH32X315_EVT/EXAM/ADC/ADC_ScanOut/.cproject b/QingkeV3F_CH32X315_EVT/EXAM/ADC/ADC_ScanOut/.cproject
+--- a/QingkeV3F_CH32X315_EVT/EXAM/ADC/ADC_ScanOut/.cproject
++++ b/QingkeV3F_CH32X315_EVT/EXAM/ADC/ADC_ScanOut/.cproject
+@@ -268,1 +268,1 @@
+-            <entry excluding="Startup/startup_ch32x3x5_D8.S|Peripheral/src/ch32x3x5_dma.c|Peripheral/src/ch32x3x5_pwr.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
++            <entry excluding="Startup/startup_ch32x3x5_D8.S|Peripheral/src/ch32x3x5_pwr.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+diff --git a/QingkeV5F_CH32H417EVT/EXAM/CPU/HSEM/HSEM_DataSharing/Common/Ld/V5F/Link_v5f.ld b/QingkeV5F_CH32H417EVT/EXAM/CPU/HSEM/HSEM_DataSharing/Common/Ld/V5F/Link_v5f.ld
+--- a/QingkeV5F_CH32H417EVT/EXAM/CPU/HSEM/HSEM_DataSharing/Common/Ld/V5F/Link_v5f.ld
++++ b/QingkeV5F_CH32H417EVT/EXAM/CPU/HSEM/HSEM_DataSharing/Common/Ld/V5F/Link_v5f.ld
+@@ -4,10 +4,6 @@
+ 
+ PROVIDE( _stack_size = __stack_size );
+ 
+-INPUT(
+-	../../V3F/obj/User/shared.o
+-)
+-
+ MEMORY
+ {
+ 	/*FLASH, RAM, and RAM-CODE can be freely configured according to project 
+@@ -79,6 +75,12 @@
+ 	.shared (NOLOAD) :
+ 	{
+ 		. = ALIGN(4);
++		/* The V3F image owns the same shared-RAM variables in dual-core builds. */
++		PROVIDE(Buffer_Sharing = .);
++		. += 4;
++		PROVIDE(Data_Sharing = .);
++		. += 4;
++		. = ALIGN(4);
+ 		KEEP(*(SORT_NONE(.shared_data)))
+ 		. = ALIGN(4);
+ 	} >RAM_SHARED
+diff --git a/QingkeV5F_CH32H417EVT/EXAM/CPU/OS/FreeRTOS/FreeRTOS_Core/V5F/Ld/Link_v5f.ld b/QingkeV5F_CH32H417EVT/EXAM/CPU/OS/FreeRTOS/FreeRTOS_Core/V5F/Ld/Link_v5f.ld
+--- a/QingkeV5F_CH32H417EVT/EXAM/CPU/OS/FreeRTOS/FreeRTOS_Core/V5F/Ld/Link_v5f.ld
++++ b/QingkeV5F_CH32H417EVT/EXAM/CPU/OS/FreeRTOS/FreeRTOS_Core/V5F/Ld/Link_v5f.ld
+@@ -4,10 +4,6 @@
+ 
+ PROVIDE( _stack_size = __stack_size );
+ 
+-INPUT(
+-	../../V3F/obj/User/shared.o
+-)
+-
+ 
+ MEMORY
+ {
+@@ -80,6 +76,12 @@
+ 	.shared (NOLOAD) :
+ 	{
+ 		. = ALIGN(4);
++		/* The V3F image owns the same shared-RAM variables in dual-core builds. */
++		PROVIDE(Buffer_Sharing = .);
++		. += 4;
++		PROVIDE(Data_Sharing = .);
++		. += 4;
++		. = ALIGN(4);
+ 		KEEP(*(SORT_NONE(.shared_data)))
+ 		. = ALIGN(4);
+ 	} >RAM_SHARED
+diff --git a/QingkeV5F_CH32H417EVT/EXAM/FMC/SDRAM_32bit/Common/hardware.c b/QingkeV5F_CH32H417EVT/EXAM/FMC/SDRAM_32bit/Common/hardware.c
+--- a/QingkeV5F_CH32H417EVT/EXAM/FMC/SDRAM_32bit/Common/hardware.c
++++ b/QingkeV5F_CH32H417EVT/EXAM/FMC/SDRAM_32bit/Common/hardware.c
+@@ -13,5 +13,6 @@
+ 
+ /* Global define */
++#define bank1                                    0
+ #define Bank5_SDRAM_ADDR                         ((u32)(0XC0000000)) //SDRAM address
+ #define FMC_SDRAM_CMD_TARGET_BANK2               FMC_SDCMR_CTB2
+ #define FMC_SDRAM_CMD_TARGET_BANK1               FMC_SDCMR_CTB1
+diff --git a/QingkeV5F_CH32H417EVT/EXAM/FMC/SDRAM_32bit _DMA/Common/hardware.c b/QingkeV5F_CH32H417EVT/EXAM/FMC/SDRAM_32bit _DMA/Common/hardware.c
+--- a/QingkeV5F_CH32H417EVT/EXAM/FMC/SDRAM_32bit _DMA/Common/hardware.c	
++++ b/QingkeV5F_CH32H417EVT/EXAM/FMC/SDRAM_32bit _DMA/Common/hardware.c	
+@@ -13,5 +13,6 @@
+ 
+ /* Global define */
++#define bank1                                    0
+ #define BUFFER_SIZE                              1024*5
+ #define WRITE_READ_ADDR                          ((uint32_t)0x0)
+ 

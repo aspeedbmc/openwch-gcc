@@ -1,0 +1,18 @@
+source	tmp/wch-evt/evt/QingkeV5F_CH32H417_EVT/EXAM/USBSS/DEVICE/UVC/UVC-DVP/V3F/User/main.c
+sha256	0f2d69cf849a1e9abd80ab4bc0c245088de3b3433c662f7151839fb1a080ea7a
+range	44-58
+000044	     the following function can be executed to reduce the chip's power consumption and
+000045	     alleviate overheating. Note that this operation should only be performed when the
+000046	     external 1.2V power supply has stabilized.*/
+000047	    // PWR_VDD12ExternPower();
+000048
+000049	    Delay_Init();
+000050	    USART_Printf_Init(921600);
+000051
+000052	    Chip = (( DBGMCU_GetCHIPID() >> 4 ) & 0x0F);
+000053
+000054		printf("SystemClk:%d\r\n", SystemClock);
+000055		printf("V3F SystemCoreClk:%d\r\n", SystemCoreClock);
+000056	    printf("UVC_DVP Device Running On USBSS Controller\n");
+000057
+000058	#if (Run_Core == Run_Core_V3FandV5F)

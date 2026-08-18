@@ -1,0 +1,143 @@
+From c93a2581d03552138a8f6d2dbf13abe3e03d41bc Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 3 <phase3@openwch.local>
+Date: Sun, 16 Aug 2026 02:13:08 +0900
+Subject: [PATCH 6/7] RISC-V: mark objects built against the WCH software
+ library
+
+The official 15.2.0 assembler carries a second long option that --help
+does not list, --wchsoftlib.  Probing it on real objects shows the whole
+of its effect: it sets bit 24 of e_flags and changes nothing else.
+Baseline and option runs of the same source differ in exactly one byte,
+the top byte of e_flags at offset 0x27; every section payload, the symbol
+table and the relocations are identical.  Giving the option twice produces
+a byte-identical object, and it composes with -mrelax and -mno-relax
+without disturbing what those do to .rela.text.  It rejects an argument,
+like --w_priv_spec.
+
+Nothing reads the bit back: readelf leaves it out of the decoded flag
+names, printing only "0x1000001, RVC, soft-float ABI", and the ordinary
+e_flags merge carries it into a linked image even when only one input
+object has it.  So an or into elf_flags is the complete implementation.
+
+Behavior source: direct WCH 15.2.0 assembler probes over the option's
+acceptance, idempotence, relaxation orthogonality and section-level
+effect; the same option on 12.2.0 sets the same bit.
+---
+ gas/config/tc-riscv.c                          | 12 +++++++++++-
+ gas/testsuite/gas/riscv/wch-softlib-norelax.d  |  6 ++++++
+ gas/testsuite/gas/riscv/wch-softlib-off.d      |  6 ++++++
+ gas/testsuite/gas/riscv/wch-softlib-repeated.d |  6 ++++++
+ gas/testsuite/gas/riscv/wch-softlib.d          |  6 ++++++
+ include/elf/riscv.h                            |  6 ++++++
+ 6 files changed, 41 insertions(+), 1 deletion(-)
+ create mode 100644 gas/testsuite/gas/riscv/wch-softlib-norelax.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-softlib-off.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-softlib-repeated.d
+ create mode 100644 gas/testsuite/gas/riscv/wch-softlib.d
+
+diff --git a/gas/config/tc-riscv.c b/gas/config/tc-riscv.c
+index fe55de82..b247183b 100644
+--- a/gas/config/tc-riscv.c
++++ b/gas/config/tc-riscv.c
+@@ -4577,6 +4577,7 @@ enum options
+   OPTION_ARCH_ATTR,
+   OPTION_NO_ARCH_ATTR,
+   OPTION_W_PRIV_SPEC,
++  OPTION_WCHSOFTLIB,
+   OPTION_CSR_CHECK,
+   OPTION_NO_CSR_CHECK,
+   OPTION_MISA_SPEC,
+@@ -4598,8 +4599,9 @@ const struct option md_longopts[] =
+   {"march-attr", no_argument, NULL, OPTION_ARCH_ATTR},
+   {"mno-arch-attr", no_argument, NULL, OPTION_NO_ARCH_ATTR},
+   /* Deliberately absent from md_show_usage: the official assembler accepts
+-     this option but neither --help nor --target-help lists it.  */
++     these two options but neither --help nor --target-help lists them.  */
+   {"w_priv_spec", no_argument, NULL, OPTION_W_PRIV_SPEC},
++  {"wchsoftlib", no_argument, NULL, OPTION_WCHSOFTLIB},
+   {"mcsr-check", no_argument, NULL, OPTION_CSR_CHECK},
+   {"mno-csr-check", no_argument, NULL, OPTION_NO_CSR_CHECK},
+   {"misa-spec", required_argument, NULL, OPTION_MISA_SPEC},
+@@ -4680,6 +4682,14 @@ md_parse_option (int c, const char *arg)
+       w_priv_spec = true;
+       break;
+ 
++    case OPTION_WCHSOFTLIB:
++      /* Marks the object as built against the WCH software library.  This
++	 is the option's whole effect: the bit is or-ed into the header and
++	 nothing in the assembler reads it, so repeating the option changes
++	 nothing and it composes with -mrelax and -mno-relax alike.  */
++      elf_flags |= EF_RISCV_WCH_SOFTLIB;
++      break;
++
+     case OPTION_CSR_CHECK:
+       riscv_opts.csr_check = true;
+       break;
+diff --git a/gas/testsuite/gas/riscv/wch-softlib-norelax.d b/gas/testsuite/gas/riscv/wch-softlib-norelax.d
+new file mode 100644
+index 00000000..916d7f79
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-softlib-norelax.d
+@@ -0,0 +1,6 @@
++#as: --wchsoftlib -mno-relax -march=rv32imac -misa-spec=2.2
++#readelf: -h
++#source: empty.s
++#...
++ +Flags: +0x1000001, RVC, soft-float ABI
++#pass
+diff --git a/gas/testsuite/gas/riscv/wch-softlib-off.d b/gas/testsuite/gas/riscv/wch-softlib-off.d
+new file mode 100644
+index 00000000..3d237c77
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-softlib-off.d
+@@ -0,0 +1,6 @@
++#as: -march=rv32imac -misa-spec=2.2
++#readelf: -h
++#source: empty.s
++#...
++ +Flags: +0x1, RVC, soft-float ABI
++#pass
+diff --git a/gas/testsuite/gas/riscv/wch-softlib-repeated.d b/gas/testsuite/gas/riscv/wch-softlib-repeated.d
+new file mode 100644
+index 00000000..8230556c
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-softlib-repeated.d
+@@ -0,0 +1,6 @@
++#as: --wchsoftlib --wchsoftlib -march=rv32imac -misa-spec=2.2
++#readelf: -h
++#source: empty.s
++#...
++ +Flags: +0x1000001, RVC, soft-float ABI
++#pass
+diff --git a/gas/testsuite/gas/riscv/wch-softlib.d b/gas/testsuite/gas/riscv/wch-softlib.d
+new file mode 100644
+index 00000000..b0d110a3
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/wch-softlib.d
+@@ -0,0 +1,6 @@
++#as: --wchsoftlib -march=rv32imac -misa-spec=2.2
++#readelf: -h
++#source: empty.s
++#...
++ +Flags: +0x1000001, RVC, soft-float ABI
++#pass
+diff --git a/include/elf/riscv.h b/include/elf/riscv.h
+index 2ea1ae82..731cc648 100644
+--- a/include/elf/riscv.h
++++ b/include/elf/riscv.h
+@@ -140,6 +140,12 @@ END_RELOC_NUMBERS (R_RISCV_max)
+ /* File uses the TSO model. */
+ #define EF_RISCV_TSO 0x0010
+ 
++/* File is built against the WCH software library.  WCH sets this from the
++   assembler's --wchsoftlib option; no tool in the chain reads it back, and
++   readelf leaves it out of the decoded flag names, so it survives to the
++   linked image only through the ordinary e_flags merge.  */
++#define EF_RISCV_WCH_SOFTLIB 0x01000000
++
+ /* Additional section types.  */
+ #define SHT_RISCV_ATTRIBUTES (SHT_LOPROC + 3) /* Section holds attributes.  */
+ 
+-- 
+2.55.0
+

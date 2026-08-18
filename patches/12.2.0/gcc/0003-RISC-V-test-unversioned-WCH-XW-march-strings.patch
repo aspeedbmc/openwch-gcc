@@ -1,0 +1,45 @@
+From 67fe9e81f4376eab5fe4ae6eed31775602eb59ee Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 4 <phase4@openwch.local>
+Date: Thu, 13 Aug 2026 06:44:59 +0900
+Subject: [PATCH 3/9] RISC-V: test unversioned WCH XW march strings
+
+The WCH 12.2 driver accepts concatenated and underscore bare-XW spellings and preserves the unversioned vendor extension in generated assembly; GAS supplies the xw1p0 object-attribute default. Add regression tests for bare XW and retain explicit XW versions without adding a GCC-side default-version entry.
+
+Behavior specification: tmp/phase4-evidence/s1-official/bare-xw.tsv; tmp/phase4-evidence/s3-round1-xw-accept-final/results.tsv; tmp/phase4-evidence/s3-round1-xw-accept-final/official-rv32imac_xw.s; analysis/toolchain/phase4-diff-inventory.md.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/riscv/wch-xw-arch.c: New test.
+	* gcc.target/riscv/wch-xw-version.c: New test.
+---
+ gcc/testsuite/gcc.target/riscv/wch-xw-arch.c    | 7 +++++++
+ gcc/testsuite/gcc.target/riscv/wch-xw-version.c | 6 ++++++
+ 2 files changed, 13 insertions(+)
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-xw-arch.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/wch-xw-version.c
+
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-xw-arch.c b/gcc/testsuite/gcc.target/riscv/wch-xw-arch.c
+new file mode 100644
+index 000000000..431e7fd1e
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-xw-arch.c
+@@ -0,0 +1,7 @@
++/* { dg-do compile } */
++/* { dg-options "-march=rv32imac_xw -mabi=ilp32 -mriscv-attribute" } */
++
++int foo;
++
++/* GAS supplies the observed xw1p0 default when assembling this attribute.  */
++/* { dg-final { scan-assembler "_xw\"" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/wch-xw-version.c b/gcc/testsuite/gcc.target/riscv/wch-xw-version.c
+new file mode 100644
+index 000000000..8a0bf6e0c
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/wch-xw-version.c
+@@ -0,0 +1,6 @@
++/* { dg-do compile } */
++/* { dg-options "-march=rv32imacxw9p9 -mabi=ilp32 -mriscv-attribute" } */
++
++int foo;
++
++/* { dg-final { scan-assembler "xw9p9" } } */

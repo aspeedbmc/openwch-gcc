@@ -1,0 +1,22 @@
+
+/Users/apple/Projects/gccriscv-wch/tmp/chipid-revision-06c/runs/20260804T100258Z-27480e4af493-00/build-v317-eth-mac-raw/MAC_RAW.elf:     file format elf32-littleriscv
+
+
+Disassembly of section .init:
+
+Disassembly of section .vector:
+
+Disassembly of section .text:
+
+00000bf4 <WCHNET_RecProcess>:
+     bf4:	83c1a783          	lw	a5,-1988(gp) # 2000022c <ChipId>
+     bf8:	02000713          	li	a4,32
+     bfc:	0f07f793          	andi	a5,a5,240
+     c00:	00e79a63          	bne	a5,a4,c14 <WCHNET_RecProcess+0x20>
+     c04:	400297b7          	lui	a5,0x40029
+     c08:	539c                	lw	a5,32(a5)
+     c0a:	00379713          	slli	a4,a5,0x3
+     c0e:	8351                	srli	a4,a4,0x14
+     c10:	c311                	beqz	a4,c14 <WCHNET_RecProcess+0x20>
+     c12:	bd21                	j	a2a <ReInitMACReg>
+     c14:	8082                	ret

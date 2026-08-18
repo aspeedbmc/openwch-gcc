@@ -1,0 +1,48 @@
+
+/Users/apple/Projects/gccriscv-wch/tmp/chipid-revision-06c/runs/20260804T100258Z-27480e4af493-00/build-v317-eth-mac-raw/MAC_RAW.elf:     file format elf32-littleriscv
+
+
+Disassembly of section .init:
+
+Disassembly of section .vector:
+
+Disassembly of section .text:
+
+00000dfe <WCHNET_ETHIsr>:
+     dfe:	bf6ff2ef          	jal	t0,1f4 <__riscv_save_0>
+     e02:	400297b7          	lui	a5,0x40029
+     e06:	4bc0                	lw	s0,20(a5)
+     e08:	01041713          	slli	a4,s0,0x10
+     e0c:	02075a63          	bgez	a4,e40 <WCHNET_ETHIsr+0x42>
+     e10:	08047713          	andi	a4,s0,128
+     e14:	c31d                	beqz	a4,e3a <WCHNET_ETHIsr+0x3c>
+     e16:	83c1a703          	lw	a4,-1988(gp) # 2000022c <ChipId>
+     e1a:	46c1                	li	a3,16
+     e1c:	0f077713          	andi	a4,a4,240
+     e20:	00d71963          	bne	a4,a3,e32 <WCHNET_ETHIsr+0x34>
+     e24:	47f8                	lw	a4,76(a5)
+     e26:	800006b7          	lui	a3,0x80000
+     e2a:	4758                	lw	a4,12(a4)
+     e2c:	c314                	sw	a3,0(a4)
+     e2e:	0007a423          	sw	zero,8(a5) # 40029008 <_eusrstack+0x20019008>
+     e32:	08000513          	li	a0,128
+     e36:	746000ef          	jal	157c <ETH_DMAClearITPendingBit>
+     e3a:	6521                	lui	a0,0x8
+     e3c:	740000ef          	jal	157c <ETH_DMAClearITPendingBit>
+     e40:	00f41793          	slli	a5,s0,0xf
+     e44:	0207da63          	bgez	a5,e78 <WCHNET_ETHIsr+0x7a>
+     e48:	04047793          	andi	a5,s0,64
+     e4c:	c789                	beqz	a5,e56 <WCHNET_ETHIsr+0x58>
+     e4e:	04000513          	li	a0,64
+     e52:	72a000ef          	jal	157c <ETH_DMAClearITPendingBit>
+     e56:	00147793          	andi	a5,s0,1
+     e5a:	c781                	beqz	a5,e62 <WCHNET_ETHIsr+0x64>
+     e5c:	4505                	li	a0,1
+     e5e:	71e000ef          	jal	157c <ETH_DMAClearITPendingBit>
+     e62:	00045863          	bgez	s0,e72 <WCHNET_ETHIsr+0x74>
+     e66:	a07ff0ef          	jal	86c <ETH_PHYLink>
+     e6a:	80000537          	lui	a0,0x80000
+     e6e:	70e000ef          	jal	157c <ETH_DMAClearITPendingBit>
+     e72:	6541                	lui	a0,0x10
+     e74:	708000ef          	jal	157c <ETH_DMAClearITPendingBit>
+     e78:	ba4ff06f          	j	21c <__riscv_restore_0>

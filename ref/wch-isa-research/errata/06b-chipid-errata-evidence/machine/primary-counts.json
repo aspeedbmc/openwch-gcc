@@ -1,0 +1,35 @@
+{
+  "archives": 3221,
+  "binary_artifacts": 4439,
+  "input_manifest_files": 31908,
+  "inventory_artifacts_including_rom_headers_package": 4566,
+  "logical_member_or_standalone_occurrences": 682142,
+  "metadata_or_docs": 27344,
+  "package_sha256": "ba423f9deed098a29b79bce243da1471b89d7889a183dfc9b814465b9d3adb96",
+  "rom_candidates": 123,
+  "rom_payloads": 5,
+  "schema_version": "2",
+  "scope_counts": {
+    "derived": 118,
+    "foreign-target": 660,
+    "host": 1,
+    "rom-payload": 5,
+    "rom-wrapper": 5,
+    "source-package": 1,
+    "unknown-provenance": 3393,
+    "wch-closed": 383
+  },
+  "source_set_counts": {
+    "evt": 175,
+    "mrs-2.4-arm": 660,
+    "mrs-2.4-riscv-gcc12": 1032,
+    "mrs-2.4-riscv-gcc15": 537,
+    "mrs-2.4-riscv-gcc8": 292,
+    "mrs-2.5-linux-x64-gcc15": 545,
+    "mrs-2.5-macos-arm64-gcc12": 1032,
+    "mrs-2.5-macos-arm64-gcc8": 292,
+    "mrs-2.5-macos-arm64-package": 1
+  },
+  "standalone_objects": 1218,
+  "unique_scan_units": 235234
+}

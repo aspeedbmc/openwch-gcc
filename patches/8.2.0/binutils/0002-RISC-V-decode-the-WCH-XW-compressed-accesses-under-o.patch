@@ -1,0 +1,280 @@
+From 8a0da1b4237cbcfd46a64c9b8127b8745193bbb0 Mon Sep 17 00:00:00 2001
+From: OpenWCH Phase 6 <phase6@openwch.local>
+Date: Sun, 16 Aug 2026 19:13:12 +0900
+Subject: [PATCH 2/2] RISC-V: decode the WCH XW compressed accesses under
+ objdump -M xw
+
+The XW encodings the assembler now emits had no way back.  objdump has no
+switch for them, so an object full of XW halfwords still disassembles
+through the double-precision slots those halfwords occupy:
+
+  $ objdump -d xwall.o             0: 2188  fld     fa0,0(a1)
+  $ objdump -d -M xw xwall.o       0: 2188  lbu     a0,0(a1)
+  $ objdump -d -M xw,no-aliases    0: 2188  c.lbu   a0,0(a1)
+
+The vendor objdump adds exactly one -M value and nothing else.  Its -M face
+is not table driven; it is a three-way strcmp chain whose third arm is
+"xw", and every other name still falls through to the stock "unrecognized
+disassembler option" error.  So "XW" and "Xw" are rejected, and a bad name
+in a comma list does not stop the remaining names from taking effect
+(tmp/toolchain_8.2.0/evidence/s1/optsweep/optsweep.md section 2.4, measured
+in tmp/toolchain_8.2.0/evidence/s1/optsweep/raw/probe/B-M-*).  This adds the
+same third arm.  The vendor build compares the three bytes inline and
+therefore carries no "xw" string literal, which is a code generation
+artefact, not behaviour, and is not reproduced.
+
+The option sets the wch_rvc_extension flag that the XW opcode entries
+already read through match_with_wch_rvc_extension, which is where this
+meets the assembler side of the same gate: gas raises that flag from
+-march, the XW entries and the c.f{ld,sd}{,sp} entries hang off the two
+complementary matchers, and the default disassembler options clear it.
+Nothing but -M xw changes what objdump prints, so the default output stays
+what it was -- an XW architecture attribute alone still decodes these
+halfwords as c.fld, exactly as the vendor objdump does.  Because the two
+matchers are complementary, at most one family can match a given halfword
+for either value of the flag, so table order does not enter into it and the
+XW rows stay where the assembler patch put them.
+
+The four XW address operands also needed printers.  They existed only on
+the assembler side because nothing had ever printed one, and without them
+-M xw would drop the offset.
+
+--help gains the vendor's own two lines, byte for byte, including the seven
+tabs and the trailing " ." on the continuation line
+(tmp/toolchain_8.2.0/evidence/s1/probes/raw/06-hidden-options/
+help-objdump.stdout lines 78-79).
+
+gas/testsuite: 5 new tests, every expected line taken from a vendor objdump
+run over the same object (tmp/toolchain_8.2.0/evidence/s3/d3/spec-probe):
+xw-dis, xw-dis-no-aliases, xw-dis-numeric and xw-dis-off over the existing
+xw-compressed.s, plus xw-dis-imm over xw-imm.s.  The last one is what
+separates the four operand printers: at offset zero all four print 0.
+---
+ gas/testsuite/gas/riscv/xw-dis-imm.d        | 22 +++++++++++++++++
+ gas/testsuite/gas/riscv/xw-dis-no-aliases.d | 26 +++++++++++++++++++++
+ gas/testsuite/gas/riscv/xw-dis-numeric.d    | 26 +++++++++++++++++++++
+ gas/testsuite/gas/riscv/xw-dis-off.d        | 26 +++++++++++++++++++++
+ gas/testsuite/gas/riscv/xw-dis.d            | 26 +++++++++++++++++++++
+ opcodes/riscv-dis.c                         | 25 ++++++++++++++++++++
+ 6 files changed, 151 insertions(+)
+ create mode 100644 gas/testsuite/gas/riscv/xw-dis-imm.d
+ create mode 100644 gas/testsuite/gas/riscv/xw-dis-no-aliases.d
+ create mode 100644 gas/testsuite/gas/riscv/xw-dis-numeric.d
+ create mode 100644 gas/testsuite/gas/riscv/xw-dis-off.d
+ create mode 100644 gas/testsuite/gas/riscv/xw-dis.d
+
+diff --git a/gas/testsuite/gas/riscv/xw-dis-imm.d b/gas/testsuite/gas/riscv/xw-dis-imm.d
+new file mode 100644
+index 00000000..5503b29d
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-dis-imm.d
+@@ -0,0 +1,22 @@
++#as: -march=rv32imac_xw -mabi=ilp32
++#source: xw-imm.s
++#objdump: -d -Mxw,no-aliases
++
++.*:[ 	]+file format .*
++
++
++Disassembly of section .text:
++
++0+000 <\.text>:
++[ 	]+0:[ 	]+3de8[ 	]+c\.lbu[ 	]+a0,31\(a1\)
++[ 	]+2:[ 	]+3dea[ 	]+c\.lhu[ 	]+a0,62\(a1\)
++[ 	]+4:[ 	]+bde8[ 	]+c\.sb[ 	]+a0,31\(a1\)
++[ 	]+6:[ 	]+bdea[ 	]+c\.sh[ 	]+a0,62\(a1\)
++[ 	]+8:[ 	]+8788[ 	]+c\.lbusp[ 	]+a0,15\(sp\)
++[ 	]+a:[ 	]+87a8[ 	]+c\.lhusp[ 	]+a0,30\(sp\)
++[ 	]+c:[ 	]+87c8[ 	]+c\.sbsp[ 	]+a0,15\(sp\)
++[ 	]+e:[ 	]+87e8[ 	]+c\.shsp[ 	]+a0,30\(sp\)
++[ 	]+10:[ 	]+3988[ 	]+c\.lbu[ 	]+a0,17\(a1\)
++[ 	]+12:[ 	]+358a[ 	]+c\.lhu[ 	]+a0,40\(a1\)
++[ 	]+14:[ 	]+8488[ 	]+c\.lbusp[ 	]+a0,9\(sp\)
++[ 	]+16:[ 	]+83a8[ 	]+c\.lhusp[ 	]+a0,22\(sp\)
+diff --git a/gas/testsuite/gas/riscv/xw-dis-no-aliases.d b/gas/testsuite/gas/riscv/xw-dis-no-aliases.d
+new file mode 100644
+index 00000000..089b1e30
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-dis-no-aliases.d
+@@ -0,0 +1,26 @@
++#as: -march=rv32imac_xw -mabi=ilp32
++#source: xw-compressed.s
++#objdump: -d -Mxw,no-aliases
++
++.*:[ 	]+file format .*
++
++
++Disassembly of section .text:
++
++0+000 <\.text>:
++[ 	]+0:[ 	]+2188[ 	]+c\.lbu[ 	]+a0,0\(a1\)
++[ 	]+2:[ 	]+218a[ 	]+c\.lhu[ 	]+a0,0\(a1\)
++[ 	]+4:[ 	]+a188[ 	]+c\.sb[ 	]+a0,0\(a1\)
++[ 	]+6:[ 	]+a18a[ 	]+c\.sh[ 	]+a0,0\(a1\)
++[ 	]+8:[ 	]+8008[ 	]+c\.lbusp[ 	]+a0,0\(sp\)
++[ 	]+a:[ 	]+8028[ 	]+c\.lhusp[ 	]+a0,0\(sp\)
++[ 	]+c:[ 	]+8048[ 	]+c\.sbsp[ 	]+a0,0\(sp\)
++[ 	]+e:[ 	]+8068[ 	]+c\.shsp[ 	]+a0,0\(sp\)
++[ 	]+10:[ 	]+2188[ 	]+c\.lbu[ 	]+a0,0\(a1\)
++[ 	]+12:[ 	]+218a[ 	]+c\.lhu[ 	]+a0,0\(a1\)
++[ 	]+14:[ 	]+a188[ 	]+c\.sb[ 	]+a0,0\(a1\)
++[ 	]+16:[ 	]+a18a[ 	]+c\.sh[ 	]+a0,0\(a1\)
++[ 	]+18:[ 	]+8008[ 	]+c\.lbusp[ 	]+a0,0\(sp\)
++[ 	]+1a:[ 	]+8028[ 	]+c\.lhusp[ 	]+a0,0\(sp\)
++[ 	]+1c:[ 	]+8048[ 	]+c\.sbsp[ 	]+a0,0\(sp\)
++[ 	]+1e:[ 	]+8068[ 	]+c\.shsp[ 	]+a0,0\(sp\)
+diff --git a/gas/testsuite/gas/riscv/xw-dis-numeric.d b/gas/testsuite/gas/riscv/xw-dis-numeric.d
+new file mode 100644
+index 00000000..a17c0616
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-dis-numeric.d
+@@ -0,0 +1,26 @@
++#as: -march=rv32imac_xw -mabi=ilp32
++#source: xw-compressed.s
++#objdump: -d -Mxw,numeric
++
++.*:[ 	]+file format .*
++
++
++Disassembly of section .text:
++
++0+000 <\.text>:
++[ 	]+0:[ 	]+2188[ 	]+lbu[ 	]+x10,0\(x11\)
++[ 	]+2:[ 	]+218a[ 	]+lhu[ 	]+x10,0\(x11\)
++[ 	]+4:[ 	]+a188[ 	]+sb[ 	]+x10,0\(x11\)
++[ 	]+6:[ 	]+a18a[ 	]+sh[ 	]+x10,0\(x11\)
++[ 	]+8:[ 	]+8008[ 	]+lbu[ 	]+x10,0\(x2\)
++[ 	]+a:[ 	]+8028[ 	]+lhu[ 	]+x10,0\(x2\)
++[ 	]+c:[ 	]+8048[ 	]+sb[ 	]+x10,0\(x2\)
++[ 	]+e:[ 	]+8068[ 	]+sh[ 	]+x10,0\(x2\)
++[ 	]+10:[ 	]+2188[ 	]+lbu[ 	]+x10,0\(x11\)
++[ 	]+12:[ 	]+218a[ 	]+lhu[ 	]+x10,0\(x11\)
++[ 	]+14:[ 	]+a188[ 	]+sb[ 	]+x10,0\(x11\)
++[ 	]+16:[ 	]+a18a[ 	]+sh[ 	]+x10,0\(x11\)
++[ 	]+18:[ 	]+8008[ 	]+lbu[ 	]+x10,0\(x2\)
++[ 	]+1a:[ 	]+8028[ 	]+lhu[ 	]+x10,0\(x2\)
++[ 	]+1c:[ 	]+8048[ 	]+sb[ 	]+x10,0\(x2\)
++[ 	]+1e:[ 	]+8068[ 	]+sh[ 	]+x10,0\(x2\)
+diff --git a/gas/testsuite/gas/riscv/xw-dis-off.d b/gas/testsuite/gas/riscv/xw-dis-off.d
+new file mode 100644
+index 00000000..c30300ed
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-dis-off.d
+@@ -0,0 +1,26 @@
++#as: -march=rv32imac_xw -mabi=ilp32
++#source: xw-compressed.s
++#objdump: -d
++
++.*:[ 	]+file format .*
++
++
++Disassembly of section .text:
++
++0+000 <\.text>:
++[ 	]+0:[ 	]+2188[ 	]+fld[ 	]+fa0,0\(a1\)
++[ 	]+2:[ 	]+218a[ 	]+fld[ 	]+ft3,128\(sp\)
++[ 	]+4:[ 	]+a188[ 	]+fsd[ 	]+fa0,0\(a1\)
++[ 	]+6:[ 	]+a18a[ 	]+fsd[ 	]+ft2,192\(sp\)
++[ 	]+8:[ 	]+8008[ 	]+0x8008
++[ 	]+a:[ 	]+8028[ 	]+0x8028
++[ 	]+c:[ 	]+8048[ 	]+0x8048
++[ 	]+e:[ 	]+8068[ 	]+0x8068
++[ 	]+10:[ 	]+2188[ 	]+fld[ 	]+fa0,0\(a1\)
++[ 	]+12:[ 	]+218a[ 	]+fld[ 	]+ft3,128\(sp\)
++[ 	]+14:[ 	]+a188[ 	]+fsd[ 	]+fa0,0\(a1\)
++[ 	]+16:[ 	]+a18a[ 	]+fsd[ 	]+ft2,192\(sp\)
++[ 	]+18:[ 	]+8008[ 	]+0x8008
++[ 	]+1a:[ 	]+8028[ 	]+0x8028
++[ 	]+1c:[ 	]+8048[ 	]+0x8048
++[ 	]+1e:[ 	]+8068[ 	]+0x8068
+diff --git a/gas/testsuite/gas/riscv/xw-dis.d b/gas/testsuite/gas/riscv/xw-dis.d
+new file mode 100644
+index 00000000..f7902656
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/xw-dis.d
+@@ -0,0 +1,26 @@
++#as: -march=rv32imac_xw -mabi=ilp32
++#source: xw-compressed.s
++#objdump: -d -Mxw
++
++.*:[ 	]+file format .*
++
++
++Disassembly of section .text:
++
++0+000 <\.text>:
++[ 	]+0:[ 	]+2188[ 	]+lbu[ 	]+a0,0\(a1\)
++[ 	]+2:[ 	]+218a[ 	]+lhu[ 	]+a0,0\(a1\)
++[ 	]+4:[ 	]+a188[ 	]+sb[ 	]+a0,0\(a1\)
++[ 	]+6:[ 	]+a18a[ 	]+sh[ 	]+a0,0\(a1\)
++[ 	]+8:[ 	]+8008[ 	]+lbu[ 	]+a0,0\(sp\)
++[ 	]+a:[ 	]+8028[ 	]+lhu[ 	]+a0,0\(sp\)
++[ 	]+c:[ 	]+8048[ 	]+sb[ 	]+a0,0\(sp\)
++[ 	]+e:[ 	]+8068[ 	]+sh[ 	]+a0,0\(sp\)
++[ 	]+10:[ 	]+2188[ 	]+lbu[ 	]+a0,0\(a1\)
++[ 	]+12:[ 	]+218a[ 	]+lhu[ 	]+a0,0\(a1\)
++[ 	]+14:[ 	]+a188[ 	]+sb[ 	]+a0,0\(a1\)
++[ 	]+16:[ 	]+a18a[ 	]+sh[ 	]+a0,0\(a1\)
++[ 	]+18:[ 	]+8008[ 	]+lbu[ 	]+a0,0\(sp\)
++[ 	]+1a:[ 	]+8028[ 	]+lhu[ 	]+a0,0\(sp\)
++[ 	]+1c:[ 	]+8048[ 	]+sb[ 	]+a0,0\(sp\)
++[ 	]+1e:[ 	]+8068[ 	]+sh[ 	]+a0,0\(sp\)
+diff --git a/opcodes/riscv-dis.c b/opcodes/riscv-dis.c
+index 764c4d4d..d6842830 100644
+--- a/opcodes/riscv-dis.c
++++ b/opcodes/riscv-dis.c
+@@ -50,6 +50,10 @@ set_default_riscv_dis_options (void)
+   riscv_gpr_names = riscv_gpr_names_abi;
+   riscv_fpr_names = riscv_fpr_names_abi;
+   no_aliases = 0;
++  /* The WCH XW compressed accesses occupy the Q0/Q2 double-precision slots,
++     so they cannot be decoded alongside them; leave them off until asked
++     for by name.  */
++  wch_rvc_extension = 0;
+ }
+ 
+ static void
+@@ -62,6 +66,8 @@ parse_riscv_dis_option (const char *option)
+       riscv_gpr_names = riscv_gpr_names_numeric;
+       riscv_fpr_names = riscv_fpr_names_numeric;
+     }
++  else if (strcmp (option, "xw") == 0)
++    wch_rvc_extension = 1;
+   else
+     {
+       /* xgettext:c-format */
+@@ -181,6 +187,21 @@ print_insn_args (const char *d, insn_t l, bfd_vma pc, disassemble_info *info)
+ 	    case 'N':
+ 	      print (info->stream, "%d", (int)EXTRACT_RVC_SDSP_IMM (l));
+ 	      break;
++	    /* WCH XW compressed byte/halfword offsets.  Lower case is the
++	       byte form and upper case the halfword form; b/B address off a
++	       register and h/H off sp, matching the assembler.  */
++	    case 'b':
++	      print (info->stream, "%d", (int)EXTRACT_RVC_XW_B_UIMM (l));
++	      break;
++	    case 'B':
++	      print (info->stream, "%d", (int)EXTRACT_RVC_XW_H_UIMM (l));
++	      break;
++	    case 'h':
++	      print (info->stream, "%d", (int)EXTRACT_RVC_XW_BSP_UIMM (l));
++	      break;
++	    case 'H':
++	      print (info->stream, "%d", (int)EXTRACT_RVC_XW_HSP_UIMM (l));
++	      break;
+ 	    case 'p':
+ 	      info->target = EXTRACT_RVC_B_IMM (l) + pc;
+ 	      (*info->print_address_func) (info->target, info);
+@@ -549,5 +570,9 @@ with the -M switch (multiple options should be separated by commas):\n"));
+   no-aliases    Disassemble only into canonical instructions, rather\n\
+                 than into pseudoinstructions.\n"));
+ 
++  fprintf (stream, _("\n\
++  xw            Enable WCH compressed instruction extension, such as\n\
++  \t\t\t\t\t\t\tlbu lhu sb sh lbusp lhusp sbsp shsp .\n"));
++
+   fprintf (stream, _("\n"));
+ }
+-- 
+2.55.0
+

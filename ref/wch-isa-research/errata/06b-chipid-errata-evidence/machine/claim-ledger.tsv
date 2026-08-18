@@ -1,0 +1,12 @@
+schema_version	claim_id	prior_or_prompt_claim	disposition	basis	replacement
+2	round1-independent-parser	independent scanner was parser-independent	rejected	round one reused primary parser state	new raw archive/ELF/ROM parser; zero mismatches over 3,221 archives, 682,142 occurrences, 235,234 units and five ROMs
+2	round1-linear-all-starts	linear decoder established every instruction start	rejected	2-byte stepping confused candidate supersets with proven boundaries	separate seeded recursive CFG, mixed-run framing, and all-IALIGN prefix controls
+2	round1-csr-semantics	eight EVT CSR words were identity/capability reads	rejected	field decode showed zero identity/capability CSR reads	eight exact word occurrences retained as scanner controls only
+2	round1-v317-float	two V317 float eth_api members perform ID-SELECT	rejected	both lack GetChipID and 0x1ffff706 load; getTxBuffAddr is descriptor-only	reclassified STATIC-VARIANT-SPECIALIZATION
+2	round1-rom-reachable	CH587 jump-table CFG reaches 0x40968 mcpy	rejected	recursive walk does not reach the local block	local bytes prove a parcel-aligned mcpy control, not runtime reachability
+2	round1-rom-long-lengths	CH587 has proven 6/10/12/14-byte instructions	rejected	whole-range claims included data and stopped on reserved >=192-bit prefixes	recursive code has only 2/4-byte parcels; mixed framing has 10/12-byte parcels and explicit stop errors
+2	prompt-gcc8-xw-rejection	GCC8 rejects versioned _xw spellings	rejected-prompt-expectation	host fixture accepts _xw, _xw1p0, _xw2p0, _xw2p2, _xw3p0 and legacy concatenated spelling	GCC8 still rejects mcpy
+2	round1-iochub-workaround	IoCHub hardware read selects a workaround	rejected	16 factory bytes feed registration/auth identity derivation	ID-READ/ID-FLOW; remote interpretation and runtime behavior unresolved
+2	round1-linux-scope	MRS scope was complete	rejected	entire MRS_Toolchain_Linux_X64_V250 tree was absent	added 435 archives and 110 standalone objects
+2	wchnet-soft	soft WCHNET source-select chain exists	reproduced-narrowed	independently re-extracted eight eth_api occurrences and disassembled four byte groups	ID-READ + ID-SELECT + defensive recovery; silicon defect cause remains unproved
+2	iqmath-mcpy-negative	IQMath has no mcpy encoding	reproduced-limited	50 physical archives/9 content groups; exact/reverse/masked scans all zero	limited to enumerated bytes and mcpy encoding family; not a global no-ID proof
