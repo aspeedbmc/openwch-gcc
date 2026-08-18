@@ -367,6 +367,16 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
+      - name: Ensure makeinfo is present
+        # binutils built from a git tree regenerates doc/*.info, and the
+        # macos-15 image ships no makeinfo, so all-bfd dies with Error 127.
+        # Homebrew texinfo is keg-only and stays off the PATH unless added.
+        run: |
+          set -eu
+          brew list texinfo >/dev/null 2>&1 || brew install texinfo
+          echo "/opt/homebrew/opt/texinfo/bin" >> "$GITHUB_PATH"
+          /opt/homebrew/opt/texinfo/bin/makeinfo --version | head -n 1
+
       - name: Record environment facts and resolve GNU tar
         run: |
           set -eu
@@ -627,6 +637,16 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
+      - name: Ensure makeinfo is present
+        # binutils built from a git tree regenerates doc/*.info, and the
+        # macos-15 image ships no makeinfo, so all-bfd dies with Error 127.
+        # Homebrew texinfo is keg-only and stays off the PATH unless added.
+        run: |
+          set -eu
+          brew list texinfo >/dev/null 2>&1 || brew install texinfo
+          echo "/opt/homebrew/opt/texinfo/bin" >> "$GITHUB_PATH"
+          /opt/homebrew/opt/texinfo/bin/makeinfo --version | head -n 1
+
       - name: Record environment facts and resolve GNU tar
         run: |
           set -eu
@@ -883,6 +903,16 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Ensure makeinfo is present
+        # binutils built from a git tree regenerates doc/*.info, and the
+        # macos-15 image ships no makeinfo, so all-bfd dies with Error 127.
+        # Homebrew texinfo is keg-only and stays off the PATH unless added.
+        run: |
+          set -eu
+          brew list texinfo >/dev/null 2>&1 || brew install texinfo
+          echo "/opt/homebrew/opt/texinfo/bin" >> "$GITHUB_PATH"
+          /opt/homebrew/opt/texinfo/bin/makeinfo --version | head -n 1
 
       - name: Record environment facts and resolve GNU tar
         run: |
