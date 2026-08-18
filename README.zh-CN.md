@@ -83,8 +83,9 @@ ISA 的研究可以公开进行。
 `download-evt.sh`。真正作为测试语料的九个 `Qingke*/` 示例工程目录不入库，需要自行就位：
 
 ```sh
-scripts/fetch-evt.sh --url "$EVT_PACK_URL" --apply   # 分发 URL，随发布公布
-scripts/fetch-evt.sh --file <本地包> --apply          # 同一个包的本地副本
+scripts/fetch-evt.sh --apply                  # 内置缺省=已发布的 Release 资产
+scripts/fetch-evt.sh --url <URL> --apply      # 显式来源（或设 EVT_PACK_URL）
+scripts/fetch-evt.sh --file <本地包> --apply   # 同一个包的本地副本
 ```
 
 语料包的 SHA-256 在解包前校验，且没有放宽开关——语料是逐字节 gate 的输入。也可以自 WCH 官网逐包

@@ -88,8 +88,11 @@ done
 
 [ -n "$pack_url" ] && [ -n "$pack_file" ] && die '--url 与 --file 互斥，只能给一个'
 
+# 发布后的正式分发地址（GitHub Release 资产；语料树变更时随 EVT_PACK_NAME/SHA256 同步更新）。
+EVT_PACK_DEFAULT_URL='https://github.com/aspeedbmc/openwch-gcc/releases/download/evt-pack-d5added7/openwch-evt-d5added7.tar.gz'
+
 if [ -z "$pack_file" ] && [ -z "$pack_url" ]; then
-    pack_url=${EVT_PACK_URL:-}
+    pack_url=${EVT_PACK_URL:-$EVT_PACK_DEFAULT_URL}
 fi
 
 if [ -z "$pack_file" ] && [ -z "$pack_url" ]; then

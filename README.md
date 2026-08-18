@@ -94,8 +94,9 @@ The comparison baseline. Both land in `ref/gcc/<platform>/<version>/`, which is 
 the actual test corpus, are not tracked and have to be put in place:
 
 ```sh
-scripts/fetch-evt.sh --url "$EVT_PACK_URL" --apply   # distribution URL, published with the release
-scripts/fetch-evt.sh --file <local-pack> --apply     # a local copy of the same pack
+scripts/fetch-evt.sh --apply                       # built-in default: the published release asset
+scripts/fetch-evt.sh --url <URL> --apply           # an explicit source (or set EVT_PACK_URL)
+scripts/fetch-evt.sh --file <local-pack> --apply   # a local copy of the same pack
 ```
 
 The pack's SHA-256 is verified before unpacking, with no override — the corpus is an input
