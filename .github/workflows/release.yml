@@ -59,6 +59,11 @@ env:
   BUILD_JOBS: "16"
   EVT_GOLDEN_WORKERS: "16"
   EVT_COMPARE_WORKERS: "16"
+  # Where the EVT corpus pack lives, for the checkouts that do not carry the
+  # corpus itself.  Empty on a repository that has not set the variable; the
+  # provisioning step then fails with instructions instead of silently
+  # building the gate on a partial corpus.
+  EVT_PACK_URL: ${{ vars.EVT_PACK_URL }}
   SOURCE_DATE_EPOCH: "1767225600"
 
 jobs:
@@ -116,8 +121,61 @@ jobs:
           printf 'P7_DISK\tafter-provision\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
           printf 'P7_STAGE\tend\tprovision\t%s\n' "$(date +%s)"
 
-      - name: Apply EVT project patches
-        run: sh ref/wch-evt/patches/apply.sh
+      # The EVT corpus (ref/wch-evt/Qingke*/, 25065 files) is not carried by
+      # every checkout.  The public repository excludes it and distributes it
+      # as a SHA-256 pinned pack that scripts/fetch-evt.sh fetches, verifies
+      # and unpacks; a checkout that does carry it carries it unpatched, since
+      # the nine modified files in a developer tree are apply.sh's applied
+      # state.  The patch step is therefore mandatory in both cases and is
+      # idempotent: one step, two ways in, a single apply at the end.
+      #
+      # The pack URL comes from the EVT_PACK_URL repository variable (Settings
+      # > Secrets and variables > Actions > Variables).  The cache key is the
+      # pack's own SHA-256, so a hit can only be the exact bytes fetch-evt.sh
+      # demands and a new pack takes a new key instead of being served from a
+      # stale entry.  Only a pack fetch-evt.sh has already accepted is moved
+      # into the cache directory: an unverified download must never become the
+      # entry every later run restores.
+      - name: Cache the EVT corpus pack
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          # Expression form, not $RUNNER_TEMP: `with:` inputs are not run
+          # through a shell, so a shell variable would be taken literally.
+          path: ${{ runner.temp }}/evt-cache
+          key: evt-pack-18b7ddd6cb6bf148881648800a33097d3ff035019fe3ded55689aa0a3c646b58
+
+      - name: Provision the EVT corpus and apply its patches
+        run: |
+          set -eu
+          cache_dir="$RUNNER_TEMP/evt-cache"
+          pack="$cache_dir/openwch-evt-d5added7.tar.gz"
+          # Created unconditionally: the cache's post step reports a path that
+          # does not exist, and the in-tree branch never creates one.
+          mkdir -p "$cache_dir"
+          if [ -d ref/wch-evt/QingkeV2AC_CH32V00x ]; then
+            printf 'P7_EVT\tcorpus=in-tree\tpack=not-needed\n'
+          elif [ -f "$pack" ]; then
+            printf 'P7_EVT\tcorpus=absent\tpack=cache-hit\n'
+            scripts/fetch-evt.sh --file "$pack"
+          else
+            printf 'P7_EVT\tcorpus=absent\tpack=cache-miss\n'
+            if [ -z "${EVT_PACK_URL:-}" ]; then
+              echo "The EVT corpus is not in this checkout, no pack is cached, and EVT_PACK_URL is empty." >&2
+              echo "Set the repository variable EVT_PACK_URL to the URL of openwch-evt-d5added7.tar.gz" >&2
+              echo "(Settings > Secrets and variables > Actions > Variables), or run act locally with" >&2
+              echo "--env EVT_PACK_URL=<url>.  The pack's SHA-256 is pinned in scripts/fetch-evt.sh." >&2
+              exit 1
+            fi
+            download="$RUNNER_TEMP/openwch-evt-pack.tar.gz"
+            curl -fSL --retry 3 --retry-delay 2 -o "$download" "$EVT_PACK_URL"
+            # fetch-evt.sh checks the SHA-256 fail-closed before it unpacks, so
+            # reaching the mv is itself the proof that these are the pinned
+            # bytes.  --apply is not used here: the apply below covers both
+            # ways in, so neither can drift from the other.
+            scripts/fetch-evt.sh --file "$download"
+            mv "$download" "$pack"
+          fi
+          sh ref/wch-evt/patches/apply.sh
 
       - name: Prepare pristine sources and apply the patch series
         run: |
@@ -311,8 +369,61 @@ jobs:
           printf 'P7_DISK\tafter-provision\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
           printf 'P7_STAGE\tend\tprovision\t%s\n' "$(date +%s)"
 
-      - name: Apply EVT project patches
-        run: sh ref/wch-evt/patches/apply.sh
+      # The EVT corpus (ref/wch-evt/Qingke*/, 25065 files) is not carried by
+      # every checkout.  The public repository excludes it and distributes it
+      # as a SHA-256 pinned pack that scripts/fetch-evt.sh fetches, verifies
+      # and unpacks; a checkout that does carry it carries it unpatched, since
+      # the nine modified files in a developer tree are apply.sh's applied
+      # state.  The patch step is therefore mandatory in both cases and is
+      # idempotent: one step, two ways in, a single apply at the end.
+      #
+      # The pack URL comes from the EVT_PACK_URL repository variable (Settings
+      # > Secrets and variables > Actions > Variables).  The cache key is the
+      # pack's own SHA-256, so a hit can only be the exact bytes fetch-evt.sh
+      # demands and a new pack takes a new key instead of being served from a
+      # stale entry.  Only a pack fetch-evt.sh has already accepted is moved
+      # into the cache directory: an unverified download must never become the
+      # entry every later run restores.
+      - name: Cache the EVT corpus pack
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          # Expression form, not $RUNNER_TEMP: `with:` inputs are not run
+          # through a shell, so a shell variable would be taken literally.
+          path: ${{ runner.temp }}/evt-cache
+          key: evt-pack-18b7ddd6cb6bf148881648800a33097d3ff035019fe3ded55689aa0a3c646b58
+
+      - name: Provision the EVT corpus and apply its patches
+        run: |
+          set -eu
+          cache_dir="$RUNNER_TEMP/evt-cache"
+          pack="$cache_dir/openwch-evt-d5added7.tar.gz"
+          # Created unconditionally: the cache's post step reports a path that
+          # does not exist, and the in-tree branch never creates one.
+          mkdir -p "$cache_dir"
+          if [ -d ref/wch-evt/QingkeV2AC_CH32V00x ]; then
+            printf 'P7_EVT\tcorpus=in-tree\tpack=not-needed\n'
+          elif [ -f "$pack" ]; then
+            printf 'P7_EVT\tcorpus=absent\tpack=cache-hit\n'
+            scripts/fetch-evt.sh --file "$pack"
+          else
+            printf 'P7_EVT\tcorpus=absent\tpack=cache-miss\n'
+            if [ -z "${EVT_PACK_URL:-}" ]; then
+              echo "The EVT corpus is not in this checkout, no pack is cached, and EVT_PACK_URL is empty." >&2
+              echo "Set the repository variable EVT_PACK_URL to the URL of openwch-evt-d5added7.tar.gz" >&2
+              echo "(Settings > Secrets and variables > Actions > Variables), or run act locally with" >&2
+              echo "--env EVT_PACK_URL=<url>.  The pack's SHA-256 is pinned in scripts/fetch-evt.sh." >&2
+              exit 1
+            fi
+            download="$RUNNER_TEMP/openwch-evt-pack.tar.gz"
+            curl -fSL --retry 3 --retry-delay 2 -o "$download" "$EVT_PACK_URL"
+            # fetch-evt.sh checks the SHA-256 fail-closed before it unpacks, so
+            # reaching the mv is itself the proof that these are the pinned
+            # bytes.  --apply is not used here: the apply below covers both
+            # ways in, so neither can drift from the other.
+            scripts/fetch-evt.sh --file "$download"
+            mv "$download" "$pack"
+          fi
+          sh ref/wch-evt/patches/apply.sh
 
       - name: Prepare pristine sources and apply the patch series
         run: |
@@ -499,8 +610,61 @@ jobs:
           printf 'P7_DISK\tafter-provision\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
           printf 'P7_STAGE\tend\tprovision\t%s\n' "$(date +%s)"
 
-      - name: Apply EVT project patches
-        run: sh ref/wch-evt/patches/apply.sh
+      # The EVT corpus (ref/wch-evt/Qingke*/, 25065 files) is not carried by
+      # every checkout.  The public repository excludes it and distributes it
+      # as a SHA-256 pinned pack that scripts/fetch-evt.sh fetches, verifies
+      # and unpacks; a checkout that does carry it carries it unpatched, since
+      # the nine modified files in a developer tree are apply.sh's applied
+      # state.  The patch step is therefore mandatory in both cases and is
+      # idempotent: one step, two ways in, a single apply at the end.
+      #
+      # The pack URL comes from the EVT_PACK_URL repository variable (Settings
+      # > Secrets and variables > Actions > Variables).  The cache key is the
+      # pack's own SHA-256, so a hit can only be the exact bytes fetch-evt.sh
+      # demands and a new pack takes a new key instead of being served from a
+      # stale entry.  Only a pack fetch-evt.sh has already accepted is moved
+      # into the cache directory: an unverified download must never become the
+      # entry every later run restores.
+      - name: Cache the EVT corpus pack
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          # Expression form, not $RUNNER_TEMP: `with:` inputs are not run
+          # through a shell, so a shell variable would be taken literally.
+          path: ${{ runner.temp }}/evt-cache
+          key: evt-pack-18b7ddd6cb6bf148881648800a33097d3ff035019fe3ded55689aa0a3c646b58
+
+      - name: Provision the EVT corpus and apply its patches
+        run: |
+          set -eu
+          cache_dir="$RUNNER_TEMP/evt-cache"
+          pack="$cache_dir/openwch-evt-d5added7.tar.gz"
+          # Created unconditionally: the cache's post step reports a path that
+          # does not exist, and the in-tree branch never creates one.
+          mkdir -p "$cache_dir"
+          if [ -d ref/wch-evt/QingkeV2AC_CH32V00x ]; then
+            printf 'P7_EVT\tcorpus=in-tree\tpack=not-needed\n'
+          elif [ -f "$pack" ]; then
+            printf 'P7_EVT\tcorpus=absent\tpack=cache-hit\n'
+            scripts/fetch-evt.sh --file "$pack"
+          else
+            printf 'P7_EVT\tcorpus=absent\tpack=cache-miss\n'
+            if [ -z "${EVT_PACK_URL:-}" ]; then
+              echo "The EVT corpus is not in this checkout, no pack is cached, and EVT_PACK_URL is empty." >&2
+              echo "Set the repository variable EVT_PACK_URL to the URL of openwch-evt-d5added7.tar.gz" >&2
+              echo "(Settings > Secrets and variables > Actions > Variables), or run act locally with" >&2
+              echo "--env EVT_PACK_URL=<url>.  The pack's SHA-256 is pinned in scripts/fetch-evt.sh." >&2
+              exit 1
+            fi
+            download="$RUNNER_TEMP/openwch-evt-pack.tar.gz"
+            curl -fSL --retry 3 --retry-delay 2 -o "$download" "$EVT_PACK_URL"
+            # fetch-evt.sh checks the SHA-256 fail-closed before it unpacks, so
+            # reaching the mv is itself the proof that these are the pinned
+            # bytes.  --apply is not used here: the apply below covers both
+            # ways in, so neither can drift from the other.
+            scripts/fetch-evt.sh --file "$download"
+            mv "$download" "$pack"
+          fi
+          sh ref/wch-evt/patches/apply.sh
 
       - name: Prepare pristine sources and apply the patch series
         run: |
@@ -711,8 +875,61 @@ jobs:
           printf 'P7_DISK\tafter-provision\t%s\tdf available KiB\n' "$(df -k . | tail -n 1 | awk '{print $4}')"
           printf 'P7_STAGE\tend\tprovision\t%s\n' "$(date +%s)"
 
-      - name: Apply EVT project patches
-        run: sh ref/wch-evt/patches/apply.sh
+      # The EVT corpus (ref/wch-evt/Qingke*/, 25065 files) is not carried by
+      # every checkout.  The public repository excludes it and distributes it
+      # as a SHA-256 pinned pack that scripts/fetch-evt.sh fetches, verifies
+      # and unpacks; a checkout that does carry it carries it unpatched, since
+      # the nine modified files in a developer tree are apply.sh's applied
+      # state.  The patch step is therefore mandatory in both cases and is
+      # idempotent: one step, two ways in, a single apply at the end.
+      #
+      # The pack URL comes from the EVT_PACK_URL repository variable (Settings
+      # > Secrets and variables > Actions > Variables).  The cache key is the
+      # pack's own SHA-256, so a hit can only be the exact bytes fetch-evt.sh
+      # demands and a new pack takes a new key instead of being served from a
+      # stale entry.  Only a pack fetch-evt.sh has already accepted is moved
+      # into the cache directory: an unverified download must never become the
+      # entry every later run restores.
+      - name: Cache the EVT corpus pack
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          # Expression form, not $RUNNER_TEMP: `with:` inputs are not run
+          # through a shell, so a shell variable would be taken literally.
+          path: ${{ runner.temp }}/evt-cache
+          key: evt-pack-18b7ddd6cb6bf148881648800a33097d3ff035019fe3ded55689aa0a3c646b58
+
+      - name: Provision the EVT corpus and apply its patches
+        run: |
+          set -eu
+          cache_dir="$RUNNER_TEMP/evt-cache"
+          pack="$cache_dir/openwch-evt-d5added7.tar.gz"
+          # Created unconditionally: the cache's post step reports a path that
+          # does not exist, and the in-tree branch never creates one.
+          mkdir -p "$cache_dir"
+          if [ -d ref/wch-evt/QingkeV2AC_CH32V00x ]; then
+            printf 'P7_EVT\tcorpus=in-tree\tpack=not-needed\n'
+          elif [ -f "$pack" ]; then
+            printf 'P7_EVT\tcorpus=absent\tpack=cache-hit\n'
+            scripts/fetch-evt.sh --file "$pack"
+          else
+            printf 'P7_EVT\tcorpus=absent\tpack=cache-miss\n'
+            if [ -z "${EVT_PACK_URL:-}" ]; then
+              echo "The EVT corpus is not in this checkout, no pack is cached, and EVT_PACK_URL is empty." >&2
+              echo "Set the repository variable EVT_PACK_URL to the URL of openwch-evt-d5added7.tar.gz" >&2
+              echo "(Settings > Secrets and variables > Actions > Variables), or run act locally with" >&2
+              echo "--env EVT_PACK_URL=<url>.  The pack's SHA-256 is pinned in scripts/fetch-evt.sh." >&2
+              exit 1
+            fi
+            download="$RUNNER_TEMP/openwch-evt-pack.tar.gz"
+            curl -fSL --retry 3 --retry-delay 2 -o "$download" "$EVT_PACK_URL"
+            # fetch-evt.sh checks the SHA-256 fail-closed before it unpacks, so
+            # reaching the mv is itself the proof that these are the pinned
+            # bytes.  --apply is not used here: the apply below covers both
+            # ways in, so neither can drift from the other.
+            scripts/fetch-evt.sh --file "$download"
+            mv "$download" "$pack"
+          fi
+          sh ref/wch-evt/patches/apply.sh
 
       - name: Prepare pristine sources and apply the patch series
         run: |

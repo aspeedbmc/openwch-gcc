@@ -107,6 +107,8 @@ digest 钉死的是基础镜像，其上叠的 apt 层是可变的，「环境�
 
 `ref/wch-evt/` 按设计以**未应用态**入库，开发机上那 9 个改动文件是 `ref/wch-evt/patches/apply.sh` 的已应用态。CI 是干净 checkout，所以四条腿都显式跑一次该脚本（幂等）。本地 act 验证走同一步，与 CI 同构。
 
+**2026-08-18 合并更新**：语料树改为分发制——公开仓库不收录 `ref/wch-evt/Qingke*/`（25065 文件），由 `scripts/fetch-evt.sh` 按钉死的 SHA-256 取包还原。两个 workflow 的这一步因此换成双分支一步「Provision the EVT corpus and apply its patches」：语料在位（私有 checkout）只跑 `apply.sh`，不在位则先按仓库变量 `EVT_PACK_URL` 取包、校验、解包再 apply，包按其 SHA-256 做缓存键；八条腿逐字节同构。必要性有实测：U5 在公开树上跑 act，缺语料时该步直接失败（`cannot apply: 0001-pmp-select-ch32v20x-d8w.patch`，`Job failed`），证据 `tmp/publish/evidence/u5/12-act-result.txt`。apply 是第一道拦截；即使它侥幸通过，§3.2 的绝对分母断言（274 / 9）仍会在比对前拦下缩水的语料树——两道都不从 manifest 自身取分母。
+
 ### 3.9 runner 分配
 
 | job | runner | 规格 | 说明 |
